@@ -3,6 +3,8 @@
 ## What it is
 MatchLayer is an AI-native ATS (Applicant Tracking System) simulator and career intelligence platform. Users upload a resume and a job description, and the system returns a match score, semantic skill-gap analysis, and AI-driven improvement suggestions. Long-term it grows into a full SaaS recruiting/career product.
 
+**Domain:** `matchlayer.net`
+
 ## Target users
 - **Primary (MVP):** job seekers who want to know how their resume scores against a specific job and how to improve it.
 - **Secondary (later phases):** recruiters and small teams running candidate pipelines.
@@ -36,3 +38,8 @@ Real ATS systems are opaque. Candidates optimize blindly. MatchLayer makes the m
 
 ## Success signals per phase
 Each phase ships when: (a) it is deployed somewhere reachable, (b) it could stand alone on a resume, (c) the next phase's infrastructure is unblocked.
+
+## Cost ceiling
+- **Phases 1–5:** total monthly spend must stay under **$20**. Use free tiers (Vercel hobby, Fly.io free, Supabase/Neon free Postgres, OpenAI usage-priced low). Track in a running cost log in `docs/costs.md`.
+- **Phase 6:** budget revisited explicitly when AWS lands. AWS infra has different cost dynamics; $20 is unrealistic with managed services running 24/7.
+- **Domain + miscellaneous (~$1.25/mo amortized for `matchlayer.net`)** counts toward the ceiling.

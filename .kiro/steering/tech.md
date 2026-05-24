@@ -5,7 +5,7 @@
 - **Tailwind CSS** for styling.
 - **shadcn/ui** for component primitives.
 - **TanStack Query** for server state.
-- **Zod** for runtime validation (shared schema patterns with backend where possible).
+- **Zod** for runtime validation (Zod schemas auto-generated from the FastAPI OpenAPI spec via `openapi-zod-client`).
 
 ## Backend
 - **FastAPI** (Python 3.11+) — async, type-driven, OpenAPI out of the box.
@@ -26,12 +26,15 @@
 - **Phase 4:** LangGraph for agent orchestration.
 - **Phase 5:** DeepEval for LLM evaluation, MLflow or a lightweight equivalent for prompt versioning.
 
-## Infrastructure (Phase 6+)
-- **AWS ECS Fargate** — backend containers.
-- **CloudFront + S3** — frontend (Next.js static export) or Vercel for the frontend if simpler.
-- **RDS Postgres** with pgvector.
-- **SQS** for async AI jobs (resume parsing, agent runs, embeddings).
-- **CloudWatch** for logs and metrics; structured JSON logging from day one.
+## Hosting per phase
+- **Phases 1–5:**
+  - **Frontend:** Vercel (hobby tier, free).
+  - **Backend:** Fly.io (free shared-cpu-1x machine, free 3GB Postgres). Picked for the closest free-tier parity to ECS Fargate so the Phase 6 migration is mostly an environment swap.
+  - **Postgres:** Fly Postgres until pgvector is needed; consider Supabase or Neon if Fly Postgres + pgvector becomes painful.
+  - **S3:** real AWS S3 (free tier covers the expected volume) — keeps the file-storage abstraction identical from day one.
+- **Phase 6+:** full AWS migration. ECS Fargate, RDS, CloudFront, SQS, CloudWatch.
+
+## Infrastructure-as-code (Phase 6+)
 - **AWS CDK (TypeScript)** for IaC — type-safe, AWS-first, no separate state file to manage.
 - **GitHub Actions** for CI/CD.
 - **Docker** + **docker-compose** for local development from Phase 1.

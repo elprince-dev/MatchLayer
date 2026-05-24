@@ -109,19 +109,21 @@ docker-compose.yml                 # postgres + minio
 
 ## Work breakdown (rough — refine in spec)
 1. Repo scaffold: `pnpm-workspace.yaml`, root `package.json`, `apps/web` via `create-next-app`, `apps/api` via `uv init`.
-2. Local dev: `docker-compose.yml` with Postgres + MinIO, `.env.example`.
+2. Local dev: `docker-compose.yml` with Postgres + MinIO + Redis, `.env.example`.
 3. Backend: FastAPI skeleton, settings, structlog, request-id middleware, health endpoint.
-4. Backend: SQLAlchemy + Alembic, initial migration with users / resumes / match_results.
-5. Backend: auth module (register, login, refresh, password hashing, JWT issuance).
-6. Backend: resume upload — multipart parsing, S3 client, text extraction service.
+4. Backend: SQLAlchemy + Alembic, initial migration with users / resumes / match_results / audit_log / password_reset_tokens.
+5. Backend: auth module (register, login, refresh, logout, password reset, password hashing, JWT issuance via PyJWT, rate limiting, lockout).
+6. Backend: resume upload — multipart parsing, S3 client, magic-byte validation, text extraction service.
 7. Backend: match service — TF-IDF scoring, keyword overlap, persist results.
-8. Frontend: Next.js skeleton, Tailwind, shadcn/ui setup, layout.
-9. Frontend: auth pages + cookie/session handling.
+8. Frontend: Next.js skeleton, Tailwind, shadcn/ui setup, layout, security-headers middleware.
+9. Frontend: auth pages + cookie/session handling. Zod schemas + TS types auto-generated from OpenAPI via `openapi-typescript` and `openapi-zod-client` into `packages/shared-types/`.
 10. Frontend: resume upload page, JD input, results page.
 11. CI: GitHub Actions running ruff, mypy, pytest, eslint, vitest, **`pip-audit`, `pnpm audit --prod`, CodeQL**.
 12. Pre-commit: `gitleaks` hook configured locally and in CI.
 13. Frontend: security headers middleware, CSRF token wiring, privacy + ToS pages.
-14. Deploy: pick platforms, write deploy docs, wire up env vars (use platform-native secret stores even on free tier — never plaintext env in dashboards).
+14. **Build the eyeball set:** populate `ml/evals/datasets/eyeball/` with 3–5 hand-curated resume + JD pairs (strong match, clear mismatch, partial match, adversarial keyword-stuffed). Use public datasets (Kaggle resume + JD datasets) — your own data goes in the gitignored `private/` folder if used.
+15. **Eyeball-test the deployed Phase 1:** verify scores look reasonable on the eyeball set before declaring Phase 1 done.
+16. Deploy: pick platforms, write deploy docs, wire up env vars (use platform-native secret stores even on free tier — never plaintext env in dashboards).
 
 ## Definition of done
 A new visitor can register, upload a resume, paste a JD, and see a score and a matched-skills breakdown — all running on a public URL with HTTPS, with code in `main` and CI green.
