@@ -4,6 +4,11 @@
 - **Next.js** (App Router, TypeScript) — chosen for SSR, file-based routing, Vercel-friendly.
 - **Tailwind CSS** for styling.
 - **shadcn/ui** for component primitives.
+- **Aceternity UI / Magic UI** as optional sources for "fancy" landing-page components (copied into the repo, not added as deps).
+- **Geist Sans + Geist Mono** via `next/font` — primary typefaces.
+- **Framer Motion** for animations.
+- **next-themes** for dark/light theme management.
+- **Lucide** for icons.
 - **TanStack Query** for server state.
 - **Zod** for runtime validation (Zod schemas auto-generated from the FastAPI OpenAPI spec via `openapi-zod-client`).
 
