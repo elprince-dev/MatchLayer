@@ -16,7 +16,13 @@ Up to Phase 6, MatchLayer is a free tool with production-grade infra. Phase 7 is
   - Plans: Free (1 resume, 5 matches/month, basic coach), Pro ($X/mo, unlimited matches + full coach + interview prep), Team ($Y/mo, deferred).
   - Stripe Checkout for sign-up, Customer Portal for plan management.
   - Stripe webhooks → update subscription state in our DB.
+  - **Webhook signature verification** via `Stripe-Signature` header — reject any payload that fails. Use Stripe's official SDK helper, not custom HMAC code.
+  - **Webhook idempotency** via `stripe_events.stripe_event_id` unique index. Replays are safe.
   - Feature flags driven by subscription tier (`user.tier` checked at the service layer, not in routes).
+- **Multi-factor authentication (MFA)**
+  - TOTP-based MFA via authenticator apps. Optional for Free, encouraged for Pro, required for Team admins.
+  - Recovery codes generated at enrollment, displayed once, hashed in DB.
+  - MFA challenge required for sensitive actions (plan changes, account deletion, team admin changes).
 - **Resume versioning**
   - Each resume has versions (v1, v2, …) with a `parent_resume_id`.
   - Diff view: side-by-side comparison of two versions.
@@ -65,8 +71,11 @@ SaaS architecture · Stripe · webhook handling · multi-tenancy · feature flag
 
 ## Risks & gotchas
 - **Stripe complexity.** Subscriptions are deceptively complex (proration, trial-to-paid, mid-cycle upgrades, failed payments, dunning). Use the Stripe Customer Portal as much as possible to offload UX. Don't reimplement what Stripe gives you for free.
-- **Webhook idempotency.** Stripe will redeliver. Persist `stripe_event_id` and reject duplicates.
+- **Webhook signature.** Always verify the `Stripe-Signature` header before parsing the body. Unverified webhooks are an unauthenticated mutation endpoint — a real attack vector.
+- **Webhook idempotency.** Stripe will redeliver. Persist `stripe_event_id` (unique index) and reject duplicates *after* signature verification.
 - **Tier check leakage.** Easy to scatter `if user.tier == 'pro'` everywhere. Centralize in a `Permissions` service. One bug there = all tiers break — but that's the point: one place to test.
+- **MFA recovery code handling.** Display once, hash in DB. Never log them. Be explicit in support flows: lost recovery codes = identity verification before reset.
+- **Cross-tenant data leakage in team mode.** Every query touching team-owned data must scope by `team_id`. Add a SQLAlchemy event hook or middleware enforcing this where possible.
 - **Team mode scope creep.** It's tempting to make team mode a full recruiter platform. Resist. The success criterion is "two people can collaborate on resume scoring", nothing more.
 - **Data export burden.** GDPR export needs to include resumes, matches, agent runs, billing history. Plan the schema; don't bolt on later.
 - **Resume version explosion.** Garbage-collect orphan versions. Cap free-tier users at 5 versions; paid at 50.
@@ -98,7 +107,8 @@ DB additions:
 - `resume_versions` modeled by adding `parent_resume_id` and `version_number` to `resumes`, or a new `resume_versions` join table — pick one in design phase.
 - `teams` (id, name, owner_user_id, plan, created_at)
 - `team_members` (id, team_id, user_id, role, created_at)
-- `audit_log` (id, actor_user_id, action, target_type, target_id, payload_json, created_at)
+- `mfa_secrets` (user_id, totp_secret_encrypted, enrolled_at, recovery_codes_hashed_json)
+- Existing `audit_log` (from Phase 1) extended with billing + team + MFA events.
 
 ## Work breakdown
 1. Wire Stripe Checkout → backend webhook handler → `subscriptions` table.

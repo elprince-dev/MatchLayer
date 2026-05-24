@@ -12,7 +12,7 @@
 - **Pydantic v2** for request/response models.
 - **SQLAlchemy 2.x** (async) + **Alembic** for migrations.
 - **uv** for Python dependency management (faster than pip/poetry).
-- **JWT** auth via `python-jose`; passwords hashed with `argon2-cffi`.
+- **JWT** auth via **PyJWT** (active maintenance, safer defaults than `python-jose`); passwords hashed with `argon2-cffi`.
 
 ## Database & storage
 - **PostgreSQL 16** with the **pgvector** extension (added in Phase 2).
@@ -45,6 +45,13 @@
 - **Backend:** pytest, pytest-asyncio, httpx for API tests.
 - **Frontend:** Vitest + Testing Library; Playwright for E2E from Phase 1 deploy.
 - **AI:** DeepEval suites versioned in repo (Phase 5).
+
+## Security tooling
+- **Dependency scanning:** `pip-audit` (Python, works with `uv` lockfiles), `pnpm audit --prod` (JS/TS), Trivy on container images.
+- **SAST:** CodeQL (or Semgrep) on every PR.
+- **Secret scanning:** `gitleaks` as a pre-commit hook + GitHub Secret Scanning enabled on the repo.
+- **Dependabot** enabled for security updates only.
+- **Pinned major versions** for all dependencies; lockfiles committed and CI installs with frozen lockfile.
 
 ## Decision log
 - **Monorepo over polyrepo** — solo dev, AI-assisted, easier cross-cutting changes.

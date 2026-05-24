@@ -48,9 +48,23 @@
 - **Never push directly to `main`.** `main` is always deployable.
 
 ## Secrets & config
-- `.env` is for local dev only and is gitignored. `.env.example` is committed and lists every required var.
+- `.env` is for local dev only and is gitignored. `.env.example` is committed and lists every required var with placeholder values.
+- **Pre-commit hook (`gitleaks`)** scans staged content for secrets. Required, not optional.
+- **GitHub Secret Scanning** enabled on the repo.
 - Production secrets live in AWS Secrets Manager (Phase 6). Never in env vars stored in plaintext infra files.
 - API keys (OpenAI, etc.) are accessed through a single config object — never read from env directly in business logic.
+- Secrets must never appear in error messages, stack traces, log lines, or LLM telemetry.
+
+## Security defaults (cross-cutting)
+- See `security.md` for the full security baseline. Highlights enforced as conventions:
+- **CORS:** explicit allowlist per environment. Never `*` on authenticated endpoints.
+- **CSRF:** any cookie-authenticated mutating endpoint requires CSRF protection (double-submit token or `SameSite=Strict`).
+- **Security headers** on every HTML response: CSP, HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, `X-Frame-Options: DENY`.
+- **Rate limiting** on every authenticated endpoint; tighter limits on auth endpoints.
+- **Idempotency:** mutating endpoints accept `Idempotency-Key` header where re-execution risk matters (uploads, payments, webhooks). Persist keys for 24h.
+- **Containers run as non-root** with read-only root filesystem where possible. Minimal base image (distroless or chiseled). No shell in prod images.
+- **Error responses** never leak stack traces or secrets in production. RFC 7807 envelope `detail` must be safe to display.
+- **File uploads** validated by magic bytes server-side, never by `Content-Type` header. Filenames sanitized; stored under UUID, original filename kept only as a display field.
 
 ## AI/LLM-specific (Phase 3+)
 - **Every prompt is a versioned file** in `apps/api/src/matchlayer_api/ml/prompts/` with a semantic version in the filename (`resume_coach.v1.txt`).
