@@ -13,7 +13,7 @@
 - **Zod** for runtime validation (Zod schemas auto-generated from the FastAPI OpenAPI spec via `openapi-zod-client`).
 
 ## Backend
-- **FastAPI** (Python 3.11+) — async, type-driven, OpenAPI out of the box.
+- **FastAPI** (Python 3.13+) — async, type-driven, OpenAPI out of the box.
 - **Pydantic v2** for request/response models.
 - **SQLAlchemy 2.x** (async) + **Alembic** for migrations.
 - **uv** for Python dependency management (faster than pip/poetry).

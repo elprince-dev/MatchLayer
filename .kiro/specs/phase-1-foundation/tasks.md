@@ -6,22 +6,22 @@ This spec lands as **one PR** on branch `phase-1/foundation` (per `conventions.m
 
 The implementation is the test: a green CI run on the foundation PR itself, plus the explicit `/healthz` and security-headers automated tests, plus a final manual smoke against the README, are the acceptance signal.
 
-Languages: **Python 3.11** for the API, **TypeScript** for the web app, **Node.js (ESM)** for the codegen orchestrator. All are fixed by `tech.md` and the design — no language choice is required.
+Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.js 24 (ESM)** for the codegen orchestrator. All are fixed by `tech.md` and the design — no language choice is required.
 
 ## Tasks
 
-- [ ] 1. Repo + workspace bootstrap
-  - [ ] 1.1 Author root tooling configs
+- [x] 1. Repo + workspace bootstrap
+  - [x] 1.1 Author root tooling configs
     - Create `.editorconfig` (LF, UTF-8, 2-space indent default, 4-space for Python).
-    - Create `.nvmrc` containing `20`.
-    - Create `.python-version` containing `3.11`.
+    - Create `.nvmrc` containing `24`.
+    - Create `.python-version` containing `3.13`.
     - Extend `.gitignore` with `.env`, `.env.local`, `.venv/`, `node_modules/`, `.next/`, `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `dist/`, `*.egg-info/`, `coverage/`, `openapi.json` (transient codegen artifact).
     - _Requirements: 3.4_
     - _Design: §3, §12_
 
-  - [ ] 1.2 Author pnpm workspace, root `package.json`, and `tsconfig.base.json`
+  - [x] 1.2 Author pnpm workspace, root `package.json`, and `tsconfig.base.json`
     - Create `pnpm-workspace.yaml` declaring `apps/*` and `packages/*`.
-    - Create root `package.json` (private, `"name": "matchlayer"`) with `engines.node = ">=20"`, `packageManager = "pnpm@9.x"`, dev-only deps for `prettier`, `typescript`, and the two openapi-* codegen tools, and the top-level scripts `lint`, `typecheck`, `test`, `build`, `codegen`, `format` (the codegen script invokes `node packages/shared-types/scripts/codegen.mjs`; the others fan out via `pnpm -r --parallel run`).
+    - Create root `package.json` (private, `"name": "matchlayer"`) with `engines.node = ">=24"`, `packageManager = "pnpm@9.x"`, dev-only deps for `prettier`, `typescript`, and the two openapi-* codegen tools, and the top-level scripts `lint`, `typecheck`, `test`, `build`, `codegen`, `format` (the codegen script invokes `node packages/shared-types/scripts/codegen.mjs`; the others fan out via `pnpm -r --parallel run`).
     - Create `tsconfig.base.json` with `strict`, `noUncheckedIndexedAccess`, `target ES2022`, `module ESNext`, `moduleResolution Bundler`, `skipLibCheck`, and a path alias `@matchlayer/shared-types` → `packages/shared-types/src`.
     - _Requirements: 1.1, 1.2, 1.6, 1.7_
     - _Design: §3, §4_
@@ -41,7 +41,7 @@ Languages: **Python 3.11** for the API, **TypeScript** for the web app, **Node.j
 
 - [ ] 3. Backend baseline (`apps/api`)
   - [ ] 3.1 Initialize the uv project with `pyproject.toml` and pinned dependencies
-    - Create `apps/api/pyproject.toml` declaring `name = "matchlayer-api"`, `requires-python = ">=3.11"`, runtime deps with pinned majors (`fastapi`, `uvicorn[standard]`, `pydantic`, `pydantic-settings`, `sqlalchemy[asyncio]`, `asyncpg`, `alembic`, `psycopg[binary]` for Alembic sync, `structlog`, `uuid_utils`), and dev deps (`ruff`, `mypy`, `pytest`, `pytest-asyncio`, `httpx`, `pip-audit`).
+    - Create `apps/api/pyproject.toml` declaring `name = "matchlayer-api"`, `requires-python = ">=3.13"`, runtime deps with pinned majors (`fastapi`, `uvicorn[standard]`, `pydantic`, `pydantic-settings`, `sqlalchemy[asyncio]`, `asyncpg`, `alembic`, `psycopg[binary]` for Alembic sync, `structlog`, `uuid_utils`), and dev deps (`ruff`, `mypy`, `pytest`, `pytest-asyncio`, `httpx`, `pip-audit`).
     - Configure `[tool.ruff]`, `[tool.mypy]` (strict on `services`, `api`, `core`, `ml`), and `[tool.pytest.ini_options]` (asyncio mode `auto`).
     - Run `uv sync` and commit `apps/api/uv.lock`.
     - _Requirements: 1.4, 1.5_
@@ -226,13 +226,13 @@ Languages: **Python 3.11** for the API, **TypeScript** for the web app, **Node.j
 
 - [ ] 9. Production container images
   - [ ] 9.1 Author `infra/docker/api.Dockerfile`
-    - Multi-stage: builder `python:3.11-slim` pinned by digest, copy in `uv` from `ghcr.io/astral-sh/uv`, `uv sync --frozen --no-dev`, copy `apps/api/src` and `apps/api/alembic*`. Final stage `gcr.io/distroless/python3-debian12:nonroot` pinned by digest, copy the resolved `.venv` and the source/alembic dirs, set `PATH` and `PYTHONPATH`, `USER nonroot`, `EXPOSE 8000`, `HEALTHCHECK` that GETs `http://127.0.0.1:8000/healthz` via `python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status == 200 else 1)"`, `ENTRYPOINT` running uvicorn against `matchlayer_api.main:app` on `0.0.0.0:8000`.
+    - Multi-stage: builder `python:3.13-slim` pinned by digest, copy in `uv` from `ghcr.io/astral-sh/uv`, `uv sync --frozen --no-dev`, copy `apps/api/src` and `apps/api/alembic*`. Final stage `gcr.io/distroless/python3-debian13:nonroot` pinned by digest (this image ships Python 3.13, matching the builder), copy the resolved `.venv` and the source/alembic dirs, set `PATH` and `PYTHONPATH`, `USER nonroot`, `EXPOSE 8000`, `HEALTHCHECK` that GETs `http://127.0.0.1:8000/healthz` via `python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status == 200 else 1)"`, `ENTRYPOINT` running uvicorn against `matchlayer_api.main:app` on `0.0.0.0:8000`.
     - Verify locally: `docker build -f infra/docker/api.Dockerfile .` exits 0 from a fresh clone.
     - _Requirements: 10.1, 10.3, 10.4, 10.5, 10.6, 10.7, 10.9_
     - _Design: §11.1_
 
   - [ ] 9.2 Author `infra/docker/web.Dockerfile`
-    - Multi-stage: builder `node:20-bookworm-slim` pinned by digest, `corepack enable`, copy lockfile + workspace files, `pnpm install --frozen-lockfile`, copy the rest, `pnpm --filter @matchlayer/web build` (relies on `output: "standalone"` from §4.1). Final stage `gcr.io/distroless/nodejs20-debian12:nonroot` pinned by digest, copy `.next/standalone`, `.next/static`, `public` from the builder, `USER nonroot`, `EXPOSE 3000`, `HEALTHCHECK` GETting `http://127.0.0.1:3000/`, `ENTRYPOINT ["/nodejs/bin/node", "apps/web/server.js"]`.
+    - Multi-stage: builder `node:24-bookworm-slim` pinned by digest, `corepack enable`, copy lockfile + workspace files, `pnpm install --frozen-lockfile`, copy the rest, `pnpm --filter @matchlayer/web build` (relies on `output: "standalone"` from §4.1). Final stage `gcr.io/distroless/nodejs24-debian12:nonroot` pinned by digest, copy `.next/standalone`, `.next/static`, `public` from the builder, `USER nonroot`, `EXPOSE 3000`, `HEALTHCHECK` GETting `http://127.0.0.1:3000/`, `ENTRYPOINT ["/nodejs/bin/node", "apps/web/server.js"]`.
     - Verify locally: `docker build -f infra/docker/web.Dockerfile .` exits 0 from a fresh clone.
     - _Requirements: 10.2, 10.3, 10.4, 10.5, 10.6, 10.8, 10.9_
     - _Design: §11.2_
@@ -244,7 +244,7 @@ Languages: **Python 3.11** for the API, **TypeScript** for the web app, **Node.j
     - _Design: §13_
 
   - [ ] 10.2 Update the root `README.md`
-    - Add a "Prerequisites" section: pnpm, Node 20+, Python 3.11+, uv, Docker Engine 24+, `pre-commit` (note WSL on Windows).
+    - Add a "Prerequisites" section: pnpm, Node 24+, Python 3.13+, uv, Docker Engine 24+, `pre-commit` (note WSL on Windows).
     - Replace the existing "Running locally" section with a numbered setup flow: clone → `cp .env.example .env` → `pnpm install` → `uv sync` (in `apps/api`) → `docker compose up -d --wait` → `uv run --project apps/api alembic upgrade head` (no-op against the empty baseline, but exercises wiring) → `pre-commit install` → `uv run --project apps/api uvicorn matchlayer_api.main:app --reload` (port 8000) and `pnpm --filter @matchlayer/web dev` (port 3000).
     - Add a "Branch & PR conventions" pointer that the foundation PR uses branch `phase-1/foundation` and link to `conventions.md`.
     - Add a "GitHub-side configuration" section linking to `docs/runbooks/repo-setup.md`.

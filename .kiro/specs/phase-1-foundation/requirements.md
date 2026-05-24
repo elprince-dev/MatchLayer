@@ -42,7 +42,7 @@ Scope boundaries:
 2. THE Foundation_Repo SHALL contain a root `package.json` declaring the workspace and exposing top-level scripts named `lint`, `typecheck`, `test`, `build`, and `codegen`.
 3. THE Foundation_Repo SHALL contain the directories `apps/web/`, `apps/api/`, `packages/shared-types/`, `infra/docker/`, and `docs/runbooks/`.
 4. THE Foundation_Repo SHALL commit `pnpm-lock.yaml` at the repo root and `uv.lock` inside `apps/api/` so dependency versions are reproducible across machines.
-5. WHEN a developer runs `pnpm install` at the repo root and `uv sync` inside `apps/api/` from a fresh clone on a machine with pnpm, Node 20 or later, Python 3.11 or later, uv, and Docker Engine 24 or later already installed, THE Foundation_Repo SHALL complete dependency installation within 5 minutes on a 50 Mbps connection AND the exit status of each install command SHALL reflect the actual installation outcome.
+5. WHEN a developer runs `pnpm install` at the repo root and `uv sync` inside `apps/api/` from a fresh clone on a machine with pnpm, Node 24 or later, Python 3.13 or later, uv, and Docker Engine 24 or later already installed, THE Foundation_Repo SHALL complete dependency installation within 5 minutes on a 50 Mbps connection AND the exit status of each install command SHALL reflect the actual installation outcome.
 6. IF a directory under `apps/` or `packages/` contains a `package.json` file but is not matched by a glob in `pnpm-workspace.yaml`, THEN THE Foundation_Repo SHALL fail `pnpm install` with an error identifying the unrecognized package.
 7. THE Foundation_Repo SHALL NOT treat directories under `apps/` or `packages/` that lack a `package.json` (for example IDE metadata folders or scratch directories) as workspace packages.
 
@@ -210,7 +210,7 @@ Scope boundaries:
 
 #### Acceptance Criteria
 
-1. THE Root_README SHALL document the prerequisite tooling: pnpm, Node 20 or later, Python 3.11 or later, uv, Docker Engine 24 or later, and `pre-commit`.
+1. THE Root_README SHALL document the prerequisite tooling: pnpm, Node 24 or later, Python 3.13 or later, uv, Docker Engine 24 or later, and `pre-commit`.
 2. THE Root_README SHALL document a numbered setup flow covering cloning the repo, copying `.env.example` to `.env`, running `pnpm install` at the repo root, running `uv sync` inside `apps/api/`, running `docker compose up -d`, applying the Alembic baseline, running `pre-commit install`, and starting the API_App and Web_App in development mode.
 3. THE Root_README SHALL link to `docs/runbooks/repo-setup.md` for GitHub-side configuration.
 4. THE Root_README SHALL include a section that names `phase-1-auth` and `phase-1-matching` as the next specs in Phase 1 and identifies which capabilities each will deliver.

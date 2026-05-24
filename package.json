@@ -1,0 +1,25 @@
+{
+  "name": "matchlayer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MatchLayer monorepo root — orchestrates the JS/TS workspace (apps/web, packages/shared-types) and the OpenAPI codegen pipeline.",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "lint": "pnpm -r --parallel run lint",
+    "typecheck": "pnpm -r --parallel run typecheck",
+    "test": "pnpm -r --parallel run test",
+    "build": "pnpm -r --parallel run build",
+    "codegen": "node packages/shared-types/scripts/codegen.mjs",
+    "format": "prettier --check .",
+    "format:write": "prettier --write ."
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.4.4",
+    "openapi-zod-client": "^1.18.3",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  }
+}

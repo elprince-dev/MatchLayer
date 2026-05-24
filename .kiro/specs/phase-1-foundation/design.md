@@ -15,7 +15,7 @@ flowchart LR
   subgraph monorepo["matchlayer/ (single git repo)"]
     direction TB
     web["apps/web<br/>(Next.js, TS)"]
-    api["apps/api<br/>(FastAPI, Py 3.11)"]
+    api["apps/api<br/>(FastAPI, Py 3.13)"]
     shared["packages/shared-types<br/>(TS types + Zod)"]
     docker["infra/docker/<br/>api.Dockerfile, web.Dockerfile"]
     ci[".github/workflows/ci.yml"]
@@ -62,8 +62,8 @@ matchlayer/
 ├── .pre-commit-config.yaml                          (c)
 ├── .gitignore                                       (already exists, may extend)
 ├── .editorconfig                                    (c)
-├── .nvmrc                                           (c) → "20"
-├── .python-version                                  (c) → "3.11"
+├── .nvmrc                                           (c) → "24"
+├── .python-version                                  (c) → "3.13"
 ├── docker-compose.yml                               (c)
 ├── package.json                                     (c) — root, only scripts + devDeps
 ├── pnpm-workspace.yaml                              (c)
@@ -151,7 +151,7 @@ Two coexisting workspaces, one per language:
   - `packages/shared-types` → `@matchlayer/shared-types`
   - root → `matchlayer` (private)
 
-- **Python workspace (uv project).** `apps/api/pyproject.toml` defines a single uv project named `matchlayer-api`. `uv.lock` lives next to it. uv uses `requires-python = ">=3.11"`. Future Python packages (e.g., `ml/`) will define their own uv projects rather than joining a workspace — keeps boundaries crisp.
+- **Python workspace (uv project).** `apps/api/pyproject.toml` defines a single uv project named `matchlayer-api`. `uv.lock` lives next to it. uv uses `requires-python = ">=3.13"`. Future Python packages (e.g., `ml/`) will define their own uv projects rather than joining a workspace — keeps boundaries crisp.
 
 The two workspaces don't share a manifest. They communicate exclusively through the codegen pipeline and the OpenAPI contract.
 
@@ -659,7 +659,7 @@ Multi-stage:
 
 ```dockerfile
 # Stage 1: builder
-FROM python:3.11-slim@sha256:<digest> AS builder
+FROM python:3.13-slim@sha256:<digest> AS builder
 COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /uvx /usr/local/bin/
 WORKDIR /app
 COPY apps/api/pyproject.toml apps/api/uv.lock ./
@@ -670,7 +670,7 @@ COPY apps/api/alembic ./alembic
 RUN uv sync --frozen --no-dev
 
 # Stage 2: final (distroless)
-FROM gcr.io/distroless/python3-debian12:nonroot@sha256:<digest>
+FROM gcr.io/distroless/python3-debian13:nonroot@sha256:<digest>
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src
@@ -685,7 +685,7 @@ ENTRYPOINT ["uvicorn", "matchlayer_api.main:app", "--host", "0.0.0.0", "--port",
 ```
 
 Notes:
-- Distroless `python3-debian12:nonroot` runs as UID 65532 (≥ 10000, satisfies AC 10.4).
+- Distroless `python3-debian13:nonroot` runs as UID 65532 (≥ 10000, satisfies AC 10.4) and ships Python 3.13, matching the builder stage exactly — no version skew between builder and runtime interpreters.
 - No shell in the final image — HEALTHCHECK uses the python interpreter directly.
 - `--read-only` compatible; uvicorn doesn't write to disk. `/tmp` would be a tmpfs mount in production compose.
 - Pinned digests with the human-readable tag in a comment for review.
@@ -694,7 +694,7 @@ Notes:
 
 ```dockerfile
 # Stage 1: builder
-FROM node:20-bookworm-slim@sha256:<digest> AS builder
+FROM node:24-bookworm-slim@sha256:<digest> AS builder
 RUN corepack enable
 WORKDIR /repo
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -705,7 +705,7 @@ COPY . .
 RUN pnpm --filter @matchlayer/web build
 
 # Stage 2: final (distroless node)
-FROM gcr.io/distroless/nodejs20-debian12:nonroot@sha256:<digest>
+FROM gcr.io/distroless/nodejs24-debian12:nonroot@sha256:<digest>
 WORKDIR /app
 COPY --from=builder /repo/apps/web/.next/standalone ./
 COPY --from=builder /repo/apps/web/.next/static ./apps/web/.next/static
