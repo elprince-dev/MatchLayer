@@ -75,4 +75,4 @@ MIT. See [`LICENSE`](./LICENSE).
 
 ## Author
 
-Built by [Mohammad El Prince](https://github.com/hhumoham) as a portfolio + learning project.
+Built by [Mohammad El Prince](https://github.com/elprince-dev/) as a portfolio + learning project.
