@@ -26,14 +26,14 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
     - _Requirements: 1.1, 1.2, 1.6, 1.7_
     - _Design: §3, §4_
 
-- [ ] 2. Local development stack
-  - [ ] 2.1 Author `docker-compose.yml`
+- [x] 2. Local development stack
+  - [x] 2.1 Author `docker-compose.yml`
     - Define three services: `postgres` (image `postgres:16-alpine` pinned by digest, env `POSTGRES_USER/PASSWORD/DB`, port 5432, named volume `matchlayer-postgres-data`, healthcheck `pg_isready` interval 2s × 30 retries), `redis` (image `redis:7-alpine` pinned by digest, port 6379, healthcheck `redis-cli ping`), and `minio` (image `minio/minio` pinned by digest, ports 9000/9001, env `MINIO_ROOT_USER/PASSWORD`, named volume `matchlayer-minio-data`, healthcheck against `/minio/health/live`).
     - Declare both named volumes at the top level so `docker compose down` (without `-v`) preserves them.
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8_
     - _Design: §5_
 
-  - [ ] 2.2 Author `.env.example` at the repo root
+  - [x] 2.2 Author `.env.example` at the repo root
     - Include every variable from the design's environment-variable contract: `MATCHLAYER_ENVIRONMENT`, `MATCHLAYER_LOG_LEVEL`, `MATCHLAYER_DATABASE_URL`, `MATCHLAYER_REDIS_URL`, `MATCHLAYER_S3_ENDPOINT_URL`, `MATCHLAYER_S3_REGION`, `MATCHLAYER_S3_ACCESS_KEY_ID`, `MATCHLAYER_S3_SECRET_ACCESS_KEY`, `MATCHLAYER_S3_BUCKET`, `MATCHLAYER_CORS_ALLOWED_ORIGINS`, `NEXT_PUBLIC_API_BASE_URL`.
     - Use placeholder values that match the docker-compose defaults so `cp .env.example .env` is enough to run both apps locally with no further edits.
     - _Requirements: 3.1, 3.2, 3.3_
@@ -173,7 +173,8 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
     - _Design: §3, §8_
 
   - [ ] 5.2 Author the codegen orchestrator
-    - Create `packages/shared-types/scripts/codegen.mjs` (Node ESM) that, in order: (1) shells out to `uv run --project ../../apps/api python -m matchlayer_api.tools.dump_openapi` and writes stdout to `openapi.json`; (2) runs `npx openapi-typescript openapi.json --output src/api-types.ts`; (3) runs `npx openapi-zod-client openapi.json --output src/api-schemas.ts --with-alias`; (4) deletes `openapi.json` on success.
+    - Create `packages/shared-types/scripts/codegen.mjs` (Node ESM). At the top of the script, resolve its own directory with `fileURLToPath(import.meta.url)` and set the working directory used by all subsequent shell-outs to `packages/shared-types/` (the parent of `scripts/`) so the relative paths below resolve regardless of where `pnpm codegen` is invoked from.
+    - In order: (1) shell out via `execa("uv", ["run", "--project", "../../apps/api", "python", "-m", "matchlayer_api.tools.dump_openapi"], { cwd: <packages/shared-types> })` and pipe stdout into `openapi.json`; (2) run `openapi-typescript openapi.json --output src/api-types.ts`; (3) run `openapi-zod-client openapi.json --output src/api-schemas.ts --with-alias`; (4) delete `openapi.json` on success.
     - Any non-zero exit from steps 1–3 must propagate. Never read or fall back to a pre-existing `openapi.json` — always re-derive from the live FastAPI app.
     - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.6, 7.7_
     - _Design: §8.1, §8.2_
@@ -254,8 +255,10 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
 
 - [ ] 11. Final QA / smoke
   - [ ] 11.1 Walk the README setup flow on a simulated fresh clone
-    - From the foundation branch, simulate a fresh clone (`git clean -xdf -e .git -e .env`, then `rm -rf node_modules apps/api/.venv apps/web/.next packages/shared-types/node_modules`).
+    - From the foundation branch, simulate a fresh clone in a way that does NOT touch the live working tree: clone the repo into a sibling temp directory (`git clone . ../matchlayer-smoke && cd ../matchlayer-smoke`), then run only `cp .env.example .env` and proceed with the README steps in order.
+    - Do NOT run `git clean -xdf` on the primary working tree — it destroys uncommitted work.
     - Execute every numbered step in the README in order. Record any deviation, fix the README in this same task, and re-run until the steps pass verbatim.
+    - Delete `../matchlayer-smoke` when finished.
     - _Requirements: 12.2_
     - _Design: §13_
 
@@ -287,13 +290,15 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
 ```json
 {
   "waves": [
-    { "id": 0, "tasks": ["1.1", "1.2", "2.1", "2.2"] },
-    { "id": 1, "tasks": ["3.1", "4.1", "5.1"] },
-    { "id": 2, "tasks": ["3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.9", "3.10", "4.2", "4.3", "4.5", "4.6", "4.7", "5.2"] },
-    { "id": 3, "tasks": ["3.8", "4.4", "4.8", "7.1", "7.3", "8.1", "9.1", "9.2", "10.1"] },
-    { "id": 4, "tasks": ["3.11", "4.9", "5.3", "7.2", "10.2"] },
-    { "id": 5, "tasks": ["5.4"] },
-    { "id": 6, "tasks": ["11.1", "11.2", "11.3"] }
+    { "id": 0, "tasks": ["2.1", "2.2", "3.1", "4.1", "5.1"] },
+    { "id": 1, "tasks": ["3.2", "4.2", "4.3", "4.6", "4.7", "5.2"] },
+    { "id": 2, "tasks": ["3.3", "3.4", "3.5", "3.6", "3.9", "4.5", "4.9"] },
+    { "id": 3, "tasks": ["3.7", "4.4", "4.8"] },
+    { "id": 4, "tasks": ["3.8", "7.1", "7.3", "8.1", "9.2", "10.1"] },
+    { "id": 5, "tasks": ["3.10", "3.11", "7.2", "9.1"] },
+    { "id": 6, "tasks": ["5.3"] },
+    { "id": 7, "tasks": ["5.4", "10.2"] },
+    { "id": 8, "tasks": ["11.1", "11.2", "11.3"] }
   ]
 }
 ```
