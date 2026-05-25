@@ -1,0 +1,163 @@
+[project]
+name = "matchlayer-api"
+version = "0.0.0"
+description = "MatchLayer FastAPI backend (apps/api). Phase 1 foundation: app factory, /healthz, structlog, request-id middleware, async SQLAlchemy, Alembic baseline."
+requires-python = ">=3.13"
+readme = "README.md"
+license = { text = "MIT" }
+
+# Runtime dependencies — pinned by major to match `tech.md` and security.md
+# "Pinned major versions for all dependencies; lockfiles committed and CI installs with frozen lockfile."
+# Lower bound = a known-good current minor; upper bound = next major.
+dependencies = [
+    "fastapi>=0.115,<0.120",
+    "uvicorn[standard]>=0.30,<0.40",
+    "pydantic>=2.9,<3.0",
+    "pydantic-settings>=2.6,<3.0",
+    "sqlalchemy[asyncio]>=2.0,<3.0",
+    "asyncpg>=0.29,<0.31",
+    "alembic>=1.13,<2.0",
+    # Sync driver used only by Alembic (env.py swaps +asyncpg → +psycopg per design §6.7).
+    "psycopg[binary]>=3.2,<4.0",
+    "structlog>=24.4,<26.0",
+    # Stdlib doesn't ship UUIDv7 yet; uuid_utils provides it (design §6.4).
+    "uuid_utils>=0.9,<1.0",
+]
+
+[project.optional-dependencies]
+# Keep this list narrow; CI also reads it via `uv sync --frozen`.
+dev = [
+    "ruff>=0.7,<1.0",
+    "mypy>=1.13,<2.0",
+    "pytest>=8.3,<9.0",
+    "pytest-asyncio>=0.24,<1.0",
+    "httpx>=0.27,<1.0",
+    "pip-audit>=2.7,<3.0",
+]
+
+[dependency-groups]
+# uv's preferred place for dev-only deps; mirrors [project.optional-dependencies].dev.
+# Both are kept so `uv sync` (default groups) and `pip install .[dev]` both work.
+dev = [
+    "ruff>=0.7,<1.0",
+    "mypy>=1.13,<2.0",
+    "pytest>=8.3,<9.0",
+    "pytest-asyncio>=0.24,<1.0",
+    "httpx>=0.27,<1.0",
+    "pip-audit>=2.7,<3.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/matchlayer_api"]
+
+# ---------------------------------------------------------------------------
+# Ruff — formatter + linter (replaces black, isort, flake8). conventions.md.
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src", "tests"]
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+# Sensible default ruleset for a typed FastAPI backend.
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+    "ASYNC",# flake8-async
+    "S",    # flake8-bandit (basic security)
+    "TID",  # tidy imports
+]
+ignore = [
+    # Allow asserts in tests; bandit S101 is too noisy for a typed codebase.
+    "S101",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Migrations are auto-generated and follow Alembic's own conventions.
+"alembic/env.py" = ["E402"]
+"alembic/versions/*" = ["E402", "F401", "N999"]
+# Tests freely use fixtures and asserts.
+"tests/*" = ["S", "N802", "N803"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["matchlayer_api"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# ---------------------------------------------------------------------------
+# Mypy — strict on services / api / core / ml per task 3.1 + conventions.md.
+# Other modules (config, main, tools, db, workers) get the looser project-wide
+# settings below. Strict flags are spelled out because mypy doesn't honor a
+# single `strict = true` inside per-module overrides.
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.13"
+mypy_path = ["src"]
+namespace_packages = true
+explicit_package_bases = true
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+no_implicit_optional = true
+check_untyped_defs = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = [
+    "matchlayer_api.services.*",
+    "matchlayer_api.api.*",
+    "matchlayer_api.core.*",
+    "matchlayer_api.ml.*",
+    "matchlayer_api.tools.*",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_subclassing_any = true
+disallow_any_generics = true
+warn_return_any = true
+strict_equality = true
+extra_checks = true
+no_implicit_reexport = true
+
+# ---------------------------------------------------------------------------
+# Pytest — asyncio mode auto so we don't decorate every async test.
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+filterwarnings = [
+    "error",
+    # Pytest's own "no files found in testpaths" startup warning fires when the
+    # tests/ dir is empty (e.g., between scaffolding and task 3.11); ignore it
+    # so an empty test tree doesn't fail-fast the suite.
+    "ignore::pytest.PytestConfigWarning",
+    # SQLAlchemy / asyncpg occasionally emit benign DeprecationWarnings from
+    # third-party libs; promote-to-error catches our own. Add per-warning
+    # ignores here as needed when they appear in CI.
+]

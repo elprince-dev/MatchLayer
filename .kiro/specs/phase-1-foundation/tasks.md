@@ -6,7 +6,7 @@ This spec lands as **one PR** on branch `phase-1/foundation` (per `conventions.m
 
 The implementation is the test: a green CI run on the foundation PR itself, plus the explicit `/healthz` and security-headers automated tests, plus a final manual smoke against the README, are the acceptance signal.
 
-Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.js 24 (ESM)** for the codegen orchestrator. All are fixed by `tech.md` and the design — no language choice is required.
+Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **TypeScript** for the web app, **Node.js 24 (ESM)** for the codegen orchestrator. No language selection needed — the design specifies concrete stacks, not pseudocode.
 
 ## Tasks
 
@@ -21,7 +21,7 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
 
   - [x] 1.2 Author pnpm workspace, root `package.json`, and `tsconfig.base.json`
     - Create `pnpm-workspace.yaml` declaring `apps/*` and `packages/*`.
-    - Create root `package.json` (private, `"name": "matchlayer"`) with `engines.node = ">=24"`, `packageManager = "pnpm@9.x"`, dev-only deps for `prettier`, `typescript`, and the two openapi-* codegen tools, and the top-level scripts `lint`, `typecheck`, `test`, `build`, `codegen`, `format` (the codegen script invokes `node packages/shared-types/scripts/codegen.mjs`; the others fan out via `pnpm -r --parallel run`).
+    - Create root `package.json` (private, `"name": "matchlayer"`) with `engines.node = ">=24"`, an exact `packageManager` pin (e.g., `"packageManager": "pnpm@9.15.0"` — corepack rejects ranges like `9.x`), dev-only deps for `prettier`, `typescript`, and the two openapi-* codegen tools, and the top-level scripts `lint`, `typecheck`, `test`, `build`, `codegen`, `format` (the codegen script invokes `node packages/shared-types/scripts/codegen.mjs`; the others fan out via `pnpm -r --parallel run`).
     - Create `tsconfig.base.json` with `strict`, `noUncheckedIndexedAccess`, `target ES2022`, `module ESNext`, `moduleResolution Bundler`, `skipLibCheck`, and a path alias `@matchlayer/shared-types` → `packages/shared-types/src`.
     - _Requirements: 1.1, 1.2, 1.6, 1.7_
     - _Design: §3, §4_
@@ -39,56 +39,56 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
     - _Requirements: 3.1, 3.2, 3.3_
     - _Design: §12_
 
-- [ ] 3. Backend baseline (`apps/api`)
-  - [ ] 3.1 Initialize the uv project with `pyproject.toml` and pinned dependencies
+- [x] 3. Backend baseline (`apps/api`)
+  - [x] 3.1 Initialize the uv project with `pyproject.toml` and pinned dependencies
     - Create `apps/api/pyproject.toml` declaring `name = "matchlayer-api"`, `requires-python = ">=3.13"`, runtime deps with pinned majors (`fastapi`, `uvicorn[standard]`, `pydantic`, `pydantic-settings`, `sqlalchemy[asyncio]`, `asyncpg`, `alembic`, `psycopg[binary]` for Alembic sync, `structlog`, `uuid_utils`), and dev deps (`ruff`, `mypy`, `pytest`, `pytest-asyncio`, `httpx`, `pip-audit`).
     - Configure `[tool.ruff]`, `[tool.mypy]` (strict on `services`, `api`, `core`, `ml`), and `[tool.pytest.ini_options]` (asyncio mode `auto`).
     - Run `uv sync` and commit `apps/api/uv.lock`.
     - _Requirements: 1.4, 1.5_
     - _Design: §4, §6.1_
 
-  - [ ] 3.2 Implement `config.py` (Pydantic Settings)
+  - [x] 3.2 Implement `config.py` (Pydantic Settings)
     - Create `apps/api/src/matchlayer_api/__init__.py` and `config.py` with a single `Settings(BaseSettings)` class using `env_prefix="MATCHLAYER_"`, fields matching `.env.example`, and types `Literal[...]`, `PostgresDsn`, `RedisDsn`, `SecretStr`, `list[AnyHttpUrl]`.
     - Expose a cached accessor `get_settings()` for use as a FastAPI dependency.
     - _Requirements: 4.2, 4.3_
     - _Design: §6.2_
 
-  - [ ] 3.3 Implement structlog logging with PII redaction
+  - [x] 3.3 Implement structlog logging with PII redaction
     - Create `apps/api/src/matchlayer_api/core/__init__.py` and `core/logging.py` with `configure_logging(settings)` that wires a JSON renderer in non-development and a console renderer in development.
     - Include processors for `merge_contextvars`, `add_log_level`, ISO/UTC `TimeStamper`, `StackInfoRenderer`, `format_exc_info`, and a small redaction processor that scrubs keys matching `password|token|secret|email|resume_text|parsed_text`.
     - _Requirements: 4.4, 4.14_
     - _Design: §6.3_
 
-  - [ ] 3.4 Implement the request-id ASGI middleware
+  - [x] 3.4 Implement the request-id ASGI middleware
     - Create `core/middleware.py` exporting `RequestIdMiddleware` (pure ASGI, not `BaseHTTPMiddleware`) that reuses inbound `X-Request-Id` matching `^[A-Za-z0-9_-]{8,128}$`, otherwise generates a UUIDv7 via `uuid_utils`, binds `request_id`/`route`/`method` to a structlog contextvar, sets `X-Request-Id` on the response, and emits one structured access log line per request with `status` and `latency_ms`.
     - _Requirements: 4.4, 4.5, 4.6_
     - _Design: §6.4_
 
-  - [ ] 3.5 Implement RFC 7807 error handlers
+  - [x] 3.5 Implement RFC 7807 error handlers
     - Create `core/errors.py` defining a base `MatchLayerError`, a registration helper `register_exception_handlers(app)`, and handlers for `MatchLayerError`, `RequestValidationError`, and the catch-all `Exception` that emit `{type, title, detail, status, request_id}`.
     - In production, the catch-all handler returns generic `internal_server_error` text; the original exception is logged but never returned.
     - _Requirements: 4.13_
     - _Design: §6.8_
 
-  - [ ] 3.6 Implement async DB engine, session factory, and dependency
+  - [x] 3.6 Implement async DB engine, session factory, and dependency
     - Create `core/db.py` exposing `engine`, `SessionLocal`, and `get_session()` (async iterator) using `pool_pre_ping=True`, `pool_size=5`, `max_overflow=5`.
     - Add a lifespan helper `verify_database_connection()` that runs `SELECT 1` once at startup; raise on failure so uvicorn exits non-zero.
     - _Requirements: 4.10, 4.12, 4.13_
     - _Design: §6.6_
 
-  - [ ] 3.7 Implement the `/healthz` router
+  - [x] 3.7 Implement the `/healthz` router
     - Create `apps/api/src/matchlayer_api/api/__init__.py` and `api/health.py` with an async `GET /healthz` that runs `await session.execute(text("SELECT 1"))` via the `get_session` dependency.
     - On success return `200 {"status": "ok"}`; on `SQLAlchemyError` log a structured warning (no DSN/credentials) and return `503 {"status": "unhealthy", "reason": "database_unreachable"}`.
     - _Requirements: 4.7, 4.8, 4.9_
     - _Design: §6.5_
 
-  - [ ] 3.8 Implement the application factory `main.py`
+  - [x] 3.8 Implement the application factory `main.py`
     - Create `apps/api/src/matchlayer_api/main.py` exporting `create_app() -> FastAPI` and a module-level `app = create_app()`.
     - Wire: `configure_logging`, lifespan that calls `verify_database_connection`, `RequestIdMiddleware`, CORS middleware reading `cors_allowed_origins` from settings, the error handlers from §3.5, and the `/healthz` router from §3.7.
     - _Requirements: 4.1, 4.12_
     - _Design: §6.1, §6.6, §6.8_
 
-  - [ ] 3.9 Configure Alembic with an empty baseline revision
+  - [x] 3.9 Configure Alembic with an empty baseline revision
     - Create `apps/api/alembic.ini` pointing at `alembic/`.
     - Create `apps/api/alembic/env.py` that imports `Settings`, derives the sync URL by swapping `+asyncpg` for `+psycopg`, and configures the offline + online run modes.
     - Add `apps/api/alembic/script.py.mako` (Alembic default).
@@ -96,13 +96,14 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
     - _Requirements: 4.11_
     - _Design: §6.7_
 
-  - [ ] 3.10 Implement the OpenAPI dump CLI
+  - [x] 3.10 Implement the OpenAPI dump CLI
     - Create `apps/api/src/matchlayer_api/tools/__init__.py` and `tools/dump_openapi.py` that imports `create_app()`, calls `app.openapi()`, and writes `json.dumps(spec, indent=2)` to stdout.
     - The script must be invocable as `uv run --project apps/api python -m matchlayer_api.tools.dump_openapi`.
+    - Note: `app.openapi()` does not invoke the lifespan, so this command does NOT require a running Postgres. It does require `.env` to exist (so `Settings` can validate at import time) — `cp .env.example .env` from §2.2 is sufficient.
     - _Requirements: 7.2, 7.7_
     - _Design: §6.9_
 
-  - [ ] 3.11 Write pytest tests for `/healthz`
+  - [x] 3.11 Write pytest tests for `/healthz`
     - Create `apps/api/tests/conftest.py` exposing an `httpx.AsyncClient` fixture against `create_app()` and a fixture that overrides `get_session` with a stub that either succeeds or raises `SQLAlchemyError`.
     - Create `apps/api/tests/test_health.py` with two cases: (a) DB probe succeeds → `200 {"status": "ok"}`; (b) DB probe raises → `503 {"status": "unhealthy", "reason": "database_unreachable"}` and the response body contains no DSN, credentials, or PII.
     - _Requirements: 4.7, 4.8, 4.9, 4.14_
@@ -111,6 +112,7 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
 - [ ] 4. Frontend baseline (`apps/web`)
   - [ ] 4.1 Scaffold the Next.js App Router project
     - Initialize `apps/web` (Next.js latest, TypeScript, App Router, ESLint, Tailwind v4, src/ layout, no experimental flags). Replace any default `tailwind.config.ts` with the design's CSS-first approach.
+    - Set the package manifest fields explicitly: `"name": "@matchlayer/web"`, `"private": true`, `"type": "module"`. The `@matchlayer/web` name is referenced by every `pnpm --filter` invocation in CI and Dockerfiles.
     - Set `next.config.mjs` with `output: "standalone"` (required by §11.2 Dockerfile).
     - Configure `tsconfig.json` extending `../../tsconfig.base.json` with `strict`, `noImplicitAny`, `strictNullChecks`, `noUncheckedIndexedAccess`.
     - Add `vitest.config.ts` and `eslint.config.mjs`. Set `package.json` scripts: `dev`, `build`, `start`, `lint`, `typecheck` (`tsc --noEmit`), `test` (`vitest run`), `format` (`prettier --check`).
@@ -161,16 +163,20 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
     - _Design: §7.8_
 
   - [ ] 4.9 Write the security-headers vitest test
-    - Add `apps/web/tests/middleware.test.ts` (or equivalent under `src/`) that asserts every header from §4.7 is present with its exact value on a fetch to `/`. The CI `frontend` job will start `pnpm --filter @matchlayer/web start` in the background after `pnpm --filter @matchlayer/web build`; the test runs against that server. Document this convention inline in the test file.
+    - Add `apps/web/tests/middleware.test.ts` (or equivalent under `src/`) that asserts every header from §4.7 is present with its exact value on a fetch to `/`.
+    - The test runs against a real built+started Next server; the CI `frontend` job (§7.2) handles `pnpm --filter @matchlayer/web build` → `pnpm --filter @matchlayer/web start &` → wait-for-server → `pnpm --filter @matchlayer/web test`. Document this convention in a top-of-file comment in the test so a developer running tests locally knows to start the server first.
     - _Requirements: 6.7_
     - _Design: §7.9_
 
 - [ ] 5. Shared types + codegen pipeline (`packages/shared-types`)
   - [ ] 5.1 Initialize the `@matchlayer/shared-types` package
-    - Create `packages/shared-types/package.json` (`"name": "@matchlayer/shared-types"`, `"private": true`, `"type": "module"`, scripts `lint` (eslint), `typecheck` (`tsc --noEmit`), `codegen` (`node ./scripts/codegen.mjs`)). Declare devDeps `openapi-typescript`, `openapi-zod-client`, `execa`, `typescript`, `zod`, `eslint`, `prettier`.
+    - Create `packages/shared-types/package.json` (`"name": "@matchlayer/shared-types"`, `"private": true`, `"type": "module"`) with scripts `lint` (`eslint .`), `typecheck` (`tsc --noEmit`), `test` (`vitest run --passWithNoTests`), `format` (`prettier --check 'src/**/*.{ts,json,md}' 'scripts/**/*.mjs'`), `codegen` (`node ./scripts/codegen.mjs`). Every script must exist so the root `pnpm -r --parallel run` fan-outs from §1.2 don't silently skip this package and so the CI `shared-types` job (§7.2) can invoke each one.
+    - Declare devDeps: `openapi-typescript`, `openapi-zod-client`, `execa`, `typescript`, `zod`, `eslint`, `prettier`, `vitest`.
     - Create `packages/shared-types/tsconfig.json` extending `../../tsconfig.base.json`, with `include: ["src"]` and `noEmit: true`.
-    - _Requirements: 7.1_
-    - _Design: §3, §8_
+    - Create `packages/shared-types/eslint.config.mjs` (flat config, TypeScript preset, ignores `src/api-types.ts` and `src/api-schemas.ts` since those are generated).
+    - Create `packages/shared-types/vitest.config.ts` configured with `environment: "node"` (no DOM needed for type-level tests). The package may have no tests in this spec — `--passWithNoTests` keeps the CI job green until a sibling spec adds one.
+    - _Requirements: 7.1, 8.5_
+    - _Design: §3, §8, §9.1_
 
   - [ ] 5.2 Author the codegen orchestrator
     - Create `packages/shared-types/scripts/codegen.mjs` (Node ESM). At the top of the script, resolve its own directory with `fileURLToPath(import.meta.url)` and set the working directory used by all subsequent shell-outs to `packages/shared-types/` (the parent of `scripts/`) so the relative paths below resolve regardless of where `pnpm codegen` is invoked from.
@@ -180,7 +186,8 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
     - _Design: §8.1, §8.2_
 
   - [ ] 5.3 Run `pnpm codegen` once and commit the generated artifacts
-    - With Postgres up and `apps/api` deps installed, run `pnpm codegen` from the repo root.
+    - Prerequisites: `apps/api` deps installed (§3.1) and `.env` present at the repo root (`cp .env.example .env`). Postgres does NOT need to be running — `app.openapi()` does not invoke the lifespan or open a DB connection.
+    - From the repo root, run `pnpm codegen`.
     - Commit the resulting `packages/shared-types/src/api-types.ts` and `packages/shared-types/src/api-schemas.ts`. These will be regenerated by the CI drift check on every PR.
     - Confirm both files reference the `/healthz` endpoint and no extras.
     - _Requirements: 7.3, 7.4_
@@ -196,6 +203,7 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
 - [ ] 6. Checkpoint — backend, frontend, and codegen all green locally
   - Run `docker compose up -d --wait`, `uv run --project apps/api uvicorn matchlayer_api.main:app` (must start without error and `curl /healthz` returns 200), `uv run --project apps/api pytest`, `pnpm --filter @matchlayer/web build && pnpm --filter @matchlayer/web test`, and `pnpm codegen` (zero diff). Ensure all tests pass, ask the user if questions arise.
 
+
 - [ ] 7. CI pipeline
   - [ ] 7.1 Implement the `.env` drift-detection script
     - Create `tools/check_env_drift.py` (small standalone script, no extra deps beyond stdlib) that walks `apps/api/src` for `MATCHLAYER_*` env-var references (regex over `os.environ` and Pydantic Settings field names) and walks `apps/web/src` for `process.env.MATCHLAYER_*` and `process.env.NEXT_PUBLIC_*` references, then compares the union against the keys present in `.env.example`. Exit non-zero on either missing or stale entries with a message naming each variable.
@@ -205,18 +213,23 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
   - [ ] 7.2 Author `.github/workflows/ci.yml`
     - Trigger on `pull_request` (target `main`) and `push` (`main`). Set top-level `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: ${{ github.event_name == 'pull_request' }} }`.
     - Define five parallel jobs:
-      - `backend`: setup uv (`astral-sh/setup-uv@v2`) with cache key on `apps/api/uv.lock`, `uv sync --frozen` in `apps/api`, `ruff format --check`, `ruff check`, `mypy`, `pytest`. Run `python tools/check_env_drift.py` as a final step.
-      - `frontend`: `pnpm/action-setup@v3` + `actions/setup-node@v4` (`cache: "pnpm"`), `pnpm install --frozen-lockfile`, `pnpm --filter @matchlayer/web lint`, `pnpm --filter @matchlayer/web typecheck`, `pnpm --filter @matchlayer/web build` (`actions/cache@v4` keyed on `apps/web/package.json` + `pnpm-lock.yaml`), then `pnpm --filter @matchlayer/web start &` followed by `pnpm --filter @matchlayer/web test`.
-      - `shared-types`: `pnpm install --frozen-lockfile`, `pnpm --filter @matchlayer/shared-types lint`, `pnpm --filter @matchlayer/shared-types typecheck`.
-      - `security`: `pip-audit` against the uv lockfile (fail on `high`/`critical`), `pnpm audit --prod` (fail on `high`/`critical`), `gitleaks` PR-diff scan via `gitleaks/gitleaks-action`, and the GitHub-managed `github/codeql-action/init` + `analyze` for `python` and `javascript-typescript`.
-      - `openapi-drift`: `uv sync --frozen`, `pnpm install --frozen-lockfile`, `pnpm codegen`, `git diff --exit-code packages/shared-types/src/` (failure message: "Run `pnpm codegen` and commit the result").
+      - `backend`: `astral-sh/setup-uv@v2` with cache key on `apps/api/uv.lock`, `uv sync --frozen` in `apps/api`, `ruff format --check`, `ruff check`, `mypy`, `pytest`. Run `python tools/check_env_drift.py` as a final step.
+      - `frontend`: `pnpm/action-setup@v3` + `actions/setup-node@v4` (`cache: "pnpm"`), `pnpm install --frozen-lockfile`, `pnpm --filter @matchlayer/web lint`, `pnpm --filter @matchlayer/web format` (prettier --check), `pnpm --filter @matchlayer/web typecheck`, `pnpm --filter @matchlayer/web build` (`actions/cache@v4` keyed on `apps/web/package.json` + `pnpm-lock.yaml`), then `pnpm --filter @matchlayer/web start &` followed by `npx wait-on http://127.0.0.1:3000` (or an equivalent `curl --retry` poll) so the test does not race the server, then `pnpm --filter @matchlayer/web test`.
+      - `shared-types`: `pnpm install --frozen-lockfile`, `pnpm --filter @matchlayer/shared-types lint`, `pnpm --filter @matchlayer/shared-types format` (prettier --check), `pnpm --filter @matchlayer/shared-types typecheck`, `pnpm --filter @matchlayer/shared-types test`. AC 8.5 requires every one of these gates to run against the Shared_Types_Package.
+      - `security`:
+        - `pip-audit`: run as `uv export --project apps/api --no-dev --format requirements-txt > requirements.txt && pip-audit --strict -r requirements.txt`. Fail the build on any unfixed vulnerability of `high` or `critical` severity (use `pip-audit`'s default fail behavior plus `--ignore-vuln` for any explicitly accepted CVE; track accepted CVEs in `.pip-audit-ignore` if needed).
+        - `pnpm audit --prod --audit-level=high` (the `--audit-level` flag gates failures to high/critical only).
+        - `gitleaks` PR-diff scan via `gitleaks/gitleaks-action`.
+        - The GitHub-managed `github/codeql-action/init` + `github/codeql-action/analyze` for `python` and `javascript-typescript`.
+        - Run `pre-commit run --all-files` here too, so developers who skipped `pre-commit install` locally are still caught.
+      - `openapi-drift`: `astral-sh/setup-uv@v2`, `uv sync --frozen --project apps/api`, `pnpm install --frozen-lockfile`, `pnpm codegen`, `git diff --exit-code packages/shared-types/src/` (failure message: "Run `pnpm codegen` and commit the result").
     - Add a final `required-checks` job with `needs: [backend, frontend, shared-types, security, openapi-drift]` and `if: always()` so branch protection can target a single check name.
     - _Requirements: 3.5, 3.6, 7.8, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.10, 8.11, 8.12_
     - _Design: §9.1, §9.2, §9.3, §9.4_
 
   - [ ] 7.3 Author `.github/dependabot.yml`
-    - Enable security-only updates (`open-pull-requests-limit: 0` for non-security, `package-ecosystem: "npm"` rooted at `/`, `package-ecosystem: "pip"` rooted at `/apps/api`, `package-ecosystem: "github-actions"` rooted at `/`).
-    - _Design: §9, security.md (Dependency & supply-chain security)_
+    - Enable security-only updates (`open-pull-requests-limit: 0` for non-security ecosystems, `package-ecosystem: "npm"` rooted at `/`, `package-ecosystem: "pip"` rooted at `/apps/api`, `package-ecosystem: "github-actions"` rooted at `/`).
+    - _Design: §9; security.md "Dependency & supply-chain security"_
 
 - [ ] 8. Pre-commit hooks
   - [ ] 8.1 Author `.pre-commit-config.yaml`
@@ -228,13 +241,19 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
 - [ ] 9. Production container images
   - [ ] 9.1 Author `infra/docker/api.Dockerfile`
     - Multi-stage: builder `python:3.13-slim` pinned by digest, copy in `uv` from `ghcr.io/astral-sh/uv`, `uv sync --frozen --no-dev`, copy `apps/api/src` and `apps/api/alembic*`. Final stage `gcr.io/distroless/python3-debian13:nonroot` pinned by digest (this image ships Python 3.13, matching the builder), copy the resolved `.venv` and the source/alembic dirs, set `PATH` and `PYTHONPATH`, `USER nonroot`, `EXPOSE 8000`, `HEALTHCHECK` that GETs `http://127.0.0.1:8000/healthz` via `python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status == 200 else 1)"`, `ENTRYPOINT` running uvicorn against `matchlayer_api.main:app` on `0.0.0.0:8000`.
-    - Verify locally: `docker build -f infra/docker/api.Dockerfile .` exits 0 from a fresh clone.
+    - Document the `--read-only` runtime contract in a top-of-file comment: the image must be runnable as `docker run --read-only --tmpfs /tmp ...`. uvicorn does not write to disk; `/tmp` is mounted as tmpfs for any transient interpreter scratch.
+    - Verify locally:
+      - `docker build -f infra/docker/api.Dockerfile .` exits 0 from a fresh clone.
+      - `docker run --rm --read-only --tmpfs /tmp -e MATCHLAYER_DATABASE_URL=... -p 8000:8000 <image>` starts cleanly and `curl http://127.0.0.1:8000/healthz` returns a response (200 against a real DB or 503 if no DB attached — either proves the read-only runtime didn't crash on a write).
     - _Requirements: 10.1, 10.3, 10.4, 10.5, 10.6, 10.7, 10.9_
     - _Design: §11.1_
 
   - [ ] 9.2 Author `infra/docker/web.Dockerfile`
     - Multi-stage: builder `node:24-bookworm-slim` pinned by digest, `corepack enable`, copy lockfile + workspace files, `pnpm install --frozen-lockfile`, copy the rest, `pnpm --filter @matchlayer/web build` (relies on `output: "standalone"` from §4.1). Final stage `gcr.io/distroless/nodejs24-debian12:nonroot` pinned by digest, copy `.next/standalone`, `.next/static`, `public` from the builder, `USER nonroot`, `EXPOSE 3000`, `HEALTHCHECK` GETting `http://127.0.0.1:3000/`, `ENTRYPOINT ["/nodejs/bin/node", "apps/web/server.js"]`.
-    - Verify locally: `docker build -f infra/docker/web.Dockerfile .` exits 0 from a fresh clone.
+    - Document the `--read-only` runtime contract in a top-of-file comment: the image must be runnable as `docker run --read-only --tmpfs /tmp ...`. The Next.js standalone server does not write to disk at runtime; `/tmp` is mounted as tmpfs for any transient scratch.
+    - Verify locally:
+      - `docker build -f infra/docker/web.Dockerfile .` exits 0 from a fresh clone.
+      - `docker run --rm --read-only --tmpfs /tmp -p 3000:3000 <image>` starts cleanly and `curl http://127.0.0.1:3000/` returns 200.
     - _Requirements: 10.2, 10.3, 10.4, 10.5, 10.6, 10.8, 10.9_
     - _Design: §11.2_
 
@@ -284,16 +303,17 @@ Languages: **Python 3.13** for the API, **TypeScript** for the web app, **Node.j
 - Each task references the granular requirement IDs it satisfies and the design section it implements, so traceability is preserved without duplicating design content.
 - Sequential ordering: every task can be executed without forward references. The codegen task (5.3) sits after both `apps/api` exposes the OpenAPI dump (3.10) and `packages/shared-types` exists with an orchestrator (5.1, 5.2). The CI workflow (7.2) sits after the source it tests exists.
 - Sibling specs `phase-1-auth` and `phase-1-matching` consume this scaffold; do not pull their work (auth flows, resume upload, scoring, MinIO bucket bootstrap, Alembic domain migrations) into this spec.
+- Tasks completed before this refresh: 1.1, 1.2, 2.1, 2.2, 3.1. The dependency graph below contains only the remaining incomplete leaf sub-tasks.
 
 ## Task Dependency Graph
 
 ```json
 {
   "waves": [
-    { "id": 0, "tasks": ["2.1", "2.2", "3.1", "4.1", "5.1"] },
-    { "id": 1, "tasks": ["3.2", "4.2", "4.3", "4.6", "4.7", "5.2"] },
-    { "id": 2, "tasks": ["3.3", "3.4", "3.5", "3.6", "3.9", "4.5", "4.9"] },
-    { "id": 3, "tasks": ["3.7", "4.4", "4.8"] },
+    { "id": 0, "tasks": ["3.2", "4.1", "5.1"] },
+    { "id": 1, "tasks": ["3.3", "3.6", "3.9", "4.2", "4.3", "4.6", "4.7", "5.2"] },
+    { "id": 2, "tasks": ["3.4", "3.5", "4.4", "4.5", "4.9"] },
+    { "id": 3, "tasks": ["3.7", "4.8"] },
     { "id": 4, "tasks": ["3.8", "7.1", "7.3", "8.1", "9.2", "10.1"] },
     { "id": 5, "tasks": ["3.10", "3.11", "7.2", "9.1"] },
     { "id": 6, "tasks": ["5.3"] },
