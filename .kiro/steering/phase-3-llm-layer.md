@@ -9,9 +9,11 @@ inclusion: manual
 **Goal:** add LLM-driven coaching — bullet rewriting, keyword optimization, interview question generation. The system should now feel "AI-powered", not just "ML-powered".
 
 ## Why this phase exists
-Phase 2 tells users *what* matches and what doesn't. Phase 3 tells them *what to do about it* — rewrite this bullet, add this keyword, prepare for these interview questions. This is the leap from "analytics tool" to "career assistant".
+
+Phase 2 tells users _what_ matches and what doesn't. Phase 3 tells them _what to do about it_ — rewrite this bullet, add this keyword, prepare for these interview questions. This is the leap from "analytics tool" to "career assistant".
 
 ## In scope
+
 - **LLM provider abstraction**
   - Single interface (`LLMClient.complete(prompt, model, schema)`) so we can swap providers later.
   - Default: OpenAI `gpt-4o-mini` for cost. Anthropic and local-via-Ollama supported as alternates.
@@ -45,6 +47,7 @@ Phase 2 tells users *what* matches and what doesn't. Phase 3 tells them *what to
   - Show cost transparency: "This used X tokens / your daily limit".
 
 ## Explicitly out of scope
+
 - Multi-step agents (Phase 4).
 - Eval framework (Phase 5).
 - Streaming responses (nice-to-have, defer unless trivial).
@@ -52,21 +55,25 @@ Phase 2 tells users *what* matches and what doesn't. Phase 3 tells them *what to
 - RAG over a corpus of resumes / interviews — not needed yet.
 
 ## Deliverables
+
 1. Coach endpoint and Interview endpoint live, with versioned prompts in repo.
 2. Redis added to docker-compose for caching.
 3. LLM call log table (`llm_calls`) populated on every call.
 4. Cost dashboard or at least a daily-cost script developers can run.
 
 ## Success criteria
+
 - Coach suggestions are useful on 8/10 hand-curated test cases (subjective judgment, document the cases).
 - p95 coach latency < 6 seconds (one LLM call, gpt-4o-mini, ~1500 input tokens).
 - Zero unstructured-output failures in production after launch (every output passes Pydantic validation).
 - Daily LLM spend per active user < $0.10 with quotas in place.
 
 ## Skills demonstrated
+
 LLM engineering · prompt versioning · structured outputs · cost control · provider abstraction · degraded-mode design
 
 ## Risks & gotchas
+
 - **Hallucinations.** The model will invent skills the user "has". Mitigate by grounding the prompt in the actual resume text and instructing it to cite which bullet it's rewriting. Phase 5's eval suite will catch regressions.
 - **Prompt injection.** Adversarial resumes/JDs can try to override the system prompt. Defenses: structured input sections (XML tags), instruction-following the LLM is told to ignore in user content, adversarial eval cases. Treat every piece of user-supplied text as hostile.
 - **Token cost creep.** Every feature wants more context. Set a per-prompt token budget at the abstraction layer and log breaches.
@@ -77,6 +84,7 @@ LLM engineering · prompt versioning · structured outputs · cost control · pr
 - **Prompt version drift.** Don't edit prompts in place. Always create a new versioned file. Old version stays for replay/rollback.
 
 ## Folder additions
+
 ```
 apps/api/src/matchlayer_api/ml/
   llm/
@@ -93,10 +101,12 @@ apps/api/alembic/versions/
 ```
 
 DB additions:
+
 - `llm_calls` table: id, user_id, feature, prompt_version, model, input_hash, output_json, latency_ms, prompt_tokens, completion_tokens, cost_usd, status, created_at.
 - `users.daily_llm_token_count`, `users.daily_llm_token_count_reset_at` (or move to Redis).
 
 ## Work breakdown
+
 1. Add Redis to docker-compose.
 2. Create `ml/llm/` module with provider abstraction + OpenAI implementation.
 3. Define Pydantic schemas for coach output and interview output.
@@ -110,4 +120,5 @@ DB additions:
 11. Document fallback behavior and test it (kill OpenAI key locally).
 
 ## Definition of done
+
 A user can click "Coach me", get structured rewrite suggestions and interview questions in seconds, with every call logged, quota-enforced, and cached. Prompts are versioned in the repo, and the service degrades gracefully when the LLM is unreachable.

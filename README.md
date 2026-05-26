@@ -13,15 +13,15 @@ It's also a portfolio project, deliberately built as a 7-phase progression from 
 
 ## Roadmap
 
-| Phase | Focus | Status |
-|---|---|---|
-| 1 | MVP foundation — Next.js + FastAPI + Postgres + S3, naive ATS scoring | Not started |
-| 2 | NLP & embeddings — sentence-transformers + pgvector | Not started |
-| 3 | LLM layer — resume coach, interview question generator | Not started |
-| 4 | Agentic AI — LangGraph multi-agent workflows | Not started |
-| 5 | AI testing & evaluation — DeepEval, prompt versioning | Not started |
-| 6 | AWS production architecture — ECS, CDK, CI/CD | Not started |
-| 7 | SaaS — Stripe, multi-tenancy, admin, MFA | Not started |
+| Phase | Focus                                                                 | Status      |
+| ----- | --------------------------------------------------------------------- | ----------- |
+| 1     | MVP foundation — Next.js + FastAPI + Postgres + S3, naive ATS scoring | Not started |
+| 2     | NLP & embeddings — sentence-transformers + pgvector                   | Not started |
+| 3     | LLM layer — resume coach, interview question generator                | Not started |
+| 4     | Agentic AI — LangGraph multi-agent workflows                          | Not started |
+| 5     | AI testing & evaluation — DeepEval, prompt versioning                 | Not started |
+| 6     | AWS production architecture — ECS, CDK, CI/CD                         | Not started |
+| 7     | SaaS — Stripe, multi-tenancy, admin, MFA                              | Not started |
 
 Detailed phase docs in [`.kiro/steering/`](./.kiro/steering/).
 

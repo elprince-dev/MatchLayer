@@ -1,0 +1,157 @@
+# MatchLayer — pre-commit hooks (phase-1-foundation, task 8.1)
+#
+# Anchors:
+#   - .kiro/specs/phase-1-foundation/requirements.md  →  Requirement 9 (AC 9.1–9.7)
+#   - .kiro/specs/phase-1-foundation/design.md         →  §10 ("Pre-commit hooks")
+#   - .kiro/steering/security.md                       →  "Pre-commit hook (gitleaks)
+#     scans staged content for secrets. Required hook, not optional."
+#
+# Hook ordering (per task 8.1 and design §10, in this exact order):
+#   1. pre-commit-hooks standard set — file hygiene first so subsequent hooks
+#      see normalized inputs (whitespace stripped, EOF newline present, no
+#      stray merge-conflict markers, valid YAML/JSON, no >5MB blobs).
+#   2. gitleaks — secret scanning runs before any formatter has a chance to
+#      "clean up" a leaked key into a different token.
+#   3. ruff — format then check --fix, Python files only.
+#   4. prettier — JS / TS / JSON / Markdown / YAML files only.
+#
+# Every hook is pinned to a specific tag (no floating refs). steering/security.md
+# "Dependency & supply-chain security" requires "Pinned major versions for all
+# dependencies. No floating ^ for crypto/auth libs." We extend that here to all
+# pre-commit hooks because they execute code (in the case of ruff/prettier) and
+# scan staged content for secrets (in the case of gitleaks).
+#
+# CI re-runs `pre-commit run --all-files` in the `security` job
+# (.github/workflows/ci.yml) so developers who skipped `pre-commit install`
+# locally are still caught — closes the loop on AC 9.6.
+
+minimum_pre_commit_version: "4.0.0"
+
+default_install_hook_types:
+  - pre-commit
+
+repos:
+  # ---------------------------------------------------------------------------
+  # 1. File hygiene — pre-commit/pre-commit-hooks standard set.
+  # Satisfies AC 9.5.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        # Two trailing spaces in Markdown produce a hard line break — keep
+        # them. Other extensions get the default behavior (strip).
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+        # pnpm-lock.yaml is machine-generated and uses anchors heavily;
+        # validating it on every commit is noise. pnpm itself enforces
+        # consistency via `pnpm install --frozen-lockfile` in CI.
+        exclude: ^pnpm-lock\.yaml$
+      - id: check-json
+      - id: check-added-large-files
+        # 5 MB ceiling per task 8.1. Larger artifacts (e.g., demo videos,
+        # eval datasets) belong in S3 / external storage, not git.
+        args: [--maxkb=5120]
+
+  # ---------------------------------------------------------------------------
+  # 2. Secret scanning — gitleaks. Satisfies AC 9.2.
+  #
+  # We use the `gitleaks-system` hook id (not the default `gitleaks` id) so the
+  # hook invokes a `gitleaks` binary already on PATH instead of compiling the
+  # tool from Go source via `go install ./...`. The Go-source path requires
+  # outbound access to `proxy.golang.org`, which the Amazon corporate WSL
+  # resolver returns NXDOMAIN for; the prebuilt binary at
+  # https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/
+  # gitleaks_8.30.1_linux_x64.tar.gz is reachable via plain GitHub release
+  # assets. Same upstream repo, same pinned rev — only the hook id changes.
+  #
+  # Local-install contract (documented in README "Prerequisites" alongside
+  # pnpm/uv/Docker): the developer must have `gitleaks` v8.x on PATH before
+  # running `pre-commit install` / `pre-commit run`. CI installs it via the
+  # `gitleaks/gitleaks-action` GitHub Action (already wired in
+  # .github/workflows/ci.yml `security` job), which ships its own binary.
+  #
+  # The upstream hook entry resolves to:
+  #     gitleaks git --pre-commit --redact --staged --verbose
+  # so secret values are redacted from the hook's own log output.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks-system
+        # Override needed because upstream's `gitleaks-system` hook entry omits
+        # `pass_filenames: false` (the `gitleaks` Go-source variant has it, the
+        # system variant does not). Without this override, pre-commit appends
+        # all staged file paths as positional args and `gitleaks git` (which
+        # accepts only one optional repo path) fails with
+        # "accepts at most 1 arg(s)". The hook scans the repo as a whole via
+        # `--staged` / `--pre-commit`, so individual filenames are unwanted.
+        pass_filenames: false
+
+  # ---------------------------------------------------------------------------
+  # 3. Ruff — Python format then lint+fix. Satisfies AC 9.3 + the
+  # conventions.md mandate ("Format: ruff format. Lint: ruff check.").
+  #
+  # Pinned to v0.15.14 to match the version locked in apps/api/uv.lock —
+  # otherwise a developer running ruff via `uv run ruff` and ruff via
+  # pre-commit could disagree on a single byte of formatting and the
+  # commit/CI loop would oscillate.
+  #
+  # Order note: task 8.1 + design §10 specify "format then check --fix" in
+  # that order. The ruff-pre-commit README's general advice is the opposite
+  # (check --fix before format) because `--fix` can introduce code that
+  # needs reformatting; in practice for this codebase ruff-format produces
+  # no output that ruff-check would then complain about, so the spec's
+  # ordering is safe. If a future commit hits the rare interleaved case,
+  # pre-commit will simply request a re-stage on the second commit.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.14
+    hooks:
+      - id: ruff-format
+        types_or: [python, pyi]
+      - id: ruff-check
+        args: [--fix]
+        types_or: [python, pyi]
+
+  # ---------------------------------------------------------------------------
+  # 4. Prettier — JS / TS / JSON / MD / YAML only. Satisfies AC 9.4.
+  #
+  # rbubley/mirrors-prettier replaced the archived pre-commit/mirrors-prettier
+  # in April 2024 and is the de-facto current source for prettier 3.x as a
+  # pre-commit hook. Pinned to v3.8.3 to match the `prettier` devDependency
+  # declared in the repo-root package.json — same reasoning as ruff: keep
+  # the local pre-commit version and the package-manager-installed version
+  # byte-identical to avoid format-vs-format oscillation.
+  #
+  # Scoping:
+  #   - `types_or` restricts the hook to the five file types named in the
+  #     requirement. The upstream hook's default `types: [text]` is too
+  #     broad and would format CSS, HTML, and other extensions outside the
+  #     spec.
+  #   - `exclude` skips files that are auto-generated or are lockfiles.
+  #     packages/shared-types/.prettierignore already covers the codegen
+  #     output for prettier-CLI invocations; duplicating it here keeps the
+  #     pre-commit invocation path consistent with the package-level
+  #     `pnpm --filter @matchlayer/shared-types format` invocation path.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.8.3
+    hooks:
+      - id: prettier
+        types_or:
+          - javascript
+          - jsx
+          - ts
+          - tsx
+          - json
+          - markdown
+          - yaml
+        exclude: |
+          (?x)^(
+            pnpm-lock\.yaml
+            | packages/shared-types/src/api-types\.ts
+            | packages/shared-types/src/api-schemas\.ts
+          )$

@@ -8,9 +8,11 @@ inclusion: manual
 **Goal:** build the smallest end-to-end working product. User uploads a resume, pastes a job description, gets an ATS score back.
 
 ## Why this phase exists
+
 Get the full vertical slice working — frontend to backend to DB to storage — before adding any intelligence. Infrastructure first, ML/LLM later. A naive scoring algorithm is fine; the point is the plumbing.
 
 ## In scope
+
 - **Frontend (Next.js, App Router, TS)**
   - Login / Register pages
   - Resume upload page (PDF/DOCX, max 5MB)
@@ -59,6 +61,7 @@ Get the full vertical slice working — frontend to backend to DB to storage —
   - Account deletion endpoint (`DELETE /api/v1/users/me`) — soft-delete in Phase 1, purge job in later phase.
 
 ## Explicitly out of scope
+
 - Embeddings, vector search, pgvector
 - Any LLM call (OpenAI, etc.)
 - Agents, LangGraph
@@ -66,26 +69,30 @@ Get the full vertical slice working — frontend to backend to DB to storage —
 - Stripe, multi-tenancy, admin dashboard
 - SQS or any async processing — scoring runs synchronously in the request
 - Real-time updates / WebSockets
-- Email verification (skip for MVP — log a TODO; password reset *is* in scope)
+- Email verification (skip for MVP — log a TODO; password reset _is_ in scope)
 - MFA (Phase 7)
 - Virus scanning of uploads (consider before Phase 7 SaaS launch)
 
 ## Deliverables
+
 1. Deployed app at a public URL — anyone can register, upload a resume, paste a JD, see a score.
 2. README with: architecture diagram, local setup, deploy steps, demo credentials.
 3. CI: lint + tests on every PR (GitHub Actions, even if minimal).
 4. A short "what's next" section in the README pointing at Phase 2.
 
 ## Success criteria
+
 - Cold-start: a new user can go from landing page to ATS score in < 2 minutes.
 - Score endpoint returns in < 3 seconds for a typical 2-page resume.
 - All happy-path flows have at least one integration test.
 - No secrets in git history.
 
 ## Skills demonstrated
+
 Next.js App Router · FastAPI · async SQLAlchemy · JWT auth · S3 file uploads · TF-IDF scoring · Docker + docker-compose · CI basics · public deployment
 
 ## Risks & gotchas
+
 - **Resume parsing accuracy.** PDFs are hostile. `pypdf` handles most but image-only PDFs return empty text. Add a clear error message and reject files with < 100 chars extracted.
 - **Auth security.** Store hashed passwords with `argon2-cffi`. Use **PyJWT** (not `python-jose`) with explicit algorithm allowlist on verify. HttpOnly cookies for refresh; access tokens in memory only (never `localStorage`). Generic auth errors. Rate-limit + account lockout.
 - **File upload size and type.** 5MB limit at reverse proxy AND FastAPI. Validate by magic bytes, not the `Content-Type` header. Sanitize filenames; store under UUID.
@@ -93,6 +100,7 @@ Next.js App Router · FastAPI · async SQLAlchemy · JWT auth · S3 file uploads
 - **TF-IDF is dumb.** It will look impressive only because users haven't seen Phase 2 yet. Be honest in the UI: "Basic keyword match — semantic analysis coming soon."
 
 ## Folder additions (relative to repo root)
+
 ```
 apps/web/                          # Next.js app — initialize fresh
 apps/api/                          # FastAPI app — initialize fresh
@@ -108,6 +116,7 @@ docker-compose.yml                 # postgres + minio
 ```
 
 ## Work breakdown (rough — refine in spec)
+
 1. Repo scaffold: `pnpm-workspace.yaml`, root `package.json`, `apps/web` via `create-next-app`, `apps/api` via `uv init`.
 2. Local dev: `docker-compose.yml` with Postgres + MinIO + Redis, `.env.example`.
 3. Backend: FastAPI skeleton, settings, structlog, request-id middleware, health endpoint.
@@ -126,4 +135,5 @@ docker-compose.yml                 # postgres + minio
 16. Deploy: pick platforms, write deploy docs, wire up env vars (use platform-native secret stores even on free tier — never plaintext env in dashboards).
 
 ## Definition of done
+
 A new visitor can register, upload a resume, paste a JD, and see a score and a matched-skills breakdown — all running on a public URL with HTTPS, with code in `main` and CI green.

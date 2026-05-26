@@ -18,6 +18,7 @@ Python options: pip + venv, poetry, uv.
 ## Rationale
 
 ### pnpm
+
 - **Strict dependency isolation.** pnpm's symlinked `node_modules/` only allows imports of declared dependencies. npm's hoisted layout silently allows phantom dependencies that break in unrelated environments.
 - **Disk efficiency + speed.** Content-addressable global store; same package across multiple workspace projects is stored once. Installs are typically 2–3x faster than npm in monorepos.
 - **First-class workspaces.** `pnpm --filter ./apps/web build` is clean and well-documented.
@@ -25,6 +26,7 @@ Python options: pip + venv, poetry, uv.
 - **Lockfile (`pnpm-lock.yaml`)** is well-defined and committed.
 
 ### uv
+
 - **Speed.** uv is dramatically faster than pip + venv or poetry on resolution and install — important when CI runs on every PR.
 - **Single-binary tool.** Replaces pip, pip-tools, virtualenv, pyenv, and partly poetry.
 - **Lockfile (`uv.lock`)** committed; CI uses `uv sync --frozen`.
@@ -34,10 +36,12 @@ Python options: pip + venv, poetry, uv.
 ## Consequences
 
 **Positive**
+
 - Both tools are fast, both have strict lockfiles, both work cleanly in CI.
 - Both are the modern picks in their respective ecosystems — good resume signal and good AI-assistant familiarity.
 
 **Negative**
+
 - Two different package managers to remember. Mitigated by the same conceptual model: install, lock, sync, run.
 - pnpm has a small ramp from npm. Listed in `conventions.md`.
 - uv is younger than poetry. If uv stalls, falling back to poetry is straightforward (same `pyproject.toml`).

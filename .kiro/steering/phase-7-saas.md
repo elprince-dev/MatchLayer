@@ -9,9 +9,11 @@ inclusion: manual
 **Goal:** turn MatchLayer into a real SaaS product. Subscriptions, multi-tenancy primitives, resume versioning, admin tooling, and a path to recruiter/team mode.
 
 ## Why this phase exists
+
 Up to Phase 6, MatchLayer is a free tool with production-grade infra. Phase 7 is the leap to "could plausibly be a startup". This phase signals product thinking on top of engineering depth.
 
 ## In scope
+
 - **Subscriptions (Stripe)**
   - Plans: Free (1 resume, 5 matches/month, basic coach), Pro ($X/mo, unlimited matches + full coach + interview prep), Team ($Y/mo, deferred).
   - Stripe Checkout for sign-up, Customer Portal for plan management.
@@ -44,6 +46,7 @@ Up to Phase 6, MatchLayer is a free tool with production-grade infra. Phase 7 is
   - Privacy policy + ToS pages (real lawyer review out of scope; templates fine).
 
 ## Explicitly out of scope (still)
+
 - Mobile apps.
 - Browser extensions.
 - LinkedIn/job-board scraping.
@@ -51,6 +54,7 @@ Up to Phase 6, MatchLayer is a free tool with production-grade infra. Phase 7 is
 - Marketplaces / third-party integrations.
 
 ## Deliverables
+
 1. Stripe integration end-to-end with webhooks reconciling state.
 2. Resume versioning with diff + "apply suggestions" flow.
 3. Personal analytics dashboard.
@@ -60,6 +64,7 @@ Up to Phase 6, MatchLayer is a free tool with production-grade infra. Phase 7 is
 7. Updated landing page with pricing.
 
 ## Success criteria
+
 - A user can subscribe, downgrade, cancel, and re-subscribe without manual intervention.
 - Stripe webhook handler is idempotent (replayed events don't double-charge state).
 - Tier checks happen in one place at the service layer, not scattered across routes.
@@ -67,12 +72,14 @@ Up to Phase 6, MatchLayer is a free tool with production-grade infra. Phase 7 is
 - A team admin can invite a member and they can immediately use the shared library.
 
 ## Skills demonstrated
+
 SaaS architecture · Stripe · webhook handling · multi-tenancy · feature flags · analytics · admin tooling · GDPR basics · product engineering
 
 ## Risks & gotchas
+
 - **Stripe complexity.** Subscriptions are deceptively complex (proration, trial-to-paid, mid-cycle upgrades, failed payments, dunning). Use the Stripe Customer Portal as much as possible to offload UX. Don't reimplement what Stripe gives you for free.
 - **Webhook signature.** Always verify the `Stripe-Signature` header before parsing the body. Unverified webhooks are an unauthenticated mutation endpoint — a real attack vector.
-- **Webhook idempotency.** Stripe will redeliver. Persist `stripe_event_id` (unique index) and reject duplicates *after* signature verification.
+- **Webhook idempotency.** Stripe will redeliver. Persist `stripe_event_id` (unique index) and reject duplicates _after_ signature verification.
 - **Tier check leakage.** Easy to scatter `if user.tier == 'pro'` everywhere. Centralize in a `Permissions` service. One bug there = all tiers break — but that's the point: one place to test.
 - **MFA recovery code handling.** Display once, hash in DB. Never log them. Be explicit in support flows: lost recovery codes = identity verification before reset.
 - **Cross-tenant data leakage in team mode.** Every query touching team-owned data must scope by `team_id`. Add a SQLAlchemy event hook or middleware enforcing this where possible.
@@ -81,6 +88,7 @@ SaaS architecture · Stripe · webhook handling · multi-tenancy · feature flag
 - **Resume version explosion.** Garbage-collect orphan versions. Cap free-tier users at 5 versions; paid at 50.
 
 ## Folder additions
+
 ```
 apps/api/src/matchlayer_api/
   api/billing/                      # Stripe webhook + subscription endpoints
@@ -102,6 +110,7 @@ docs/runbooks/stripe-incident.md
 ```
 
 DB additions:
+
 - `subscriptions` (id, user_id, stripe_customer_id, stripe_subscription_id, plan, status, current_period_end, cancel_at_period_end, created_at, updated_at)
 - `stripe_events` (id, stripe_event_id unique, type, payload_json, processed_at)
 - `resume_versions` modeled by adding `parent_resume_id` and `version_number` to `resumes`, or a new `resume_versions` join table — pick one in design phase.
@@ -111,6 +120,7 @@ DB additions:
 - Existing `audit_log` (from Phase 1) extended with billing + team + MFA events.
 
 ## Work breakdown
+
 1. Wire Stripe Checkout → backend webhook handler → `subscriptions` table.
 2. Add `Permissions` service; refactor existing endpoints to use it.
 3. Build pricing page; integrate with Checkout.
@@ -126,4 +136,5 @@ DB additions:
 13. Write the ADR.
 
 ## Definition of done
+
 A new visitor can land on the marketing page, choose a plan, pay through Stripe, use Pro features immediately, manage their subscription, version their resume, and (if on Team) invite a colleague — with admin oversight and audit logging behind the scenes.

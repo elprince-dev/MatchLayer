@@ -25,7 +25,7 @@ Each pair is one JSON file:
   "resume_text": "...",
   "jd_text": "...",
   "expected": {
-    "score_band": "high",          // "low" | "medium" | "high"
+    "score_band": "high", // "low" | "medium" | "high"
     "must_match_skills": ["python", "fastapi", "postgres"],
     "must_miss_skills": []
   },

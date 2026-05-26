@@ -32,12 +32,14 @@ Package managers: **pnpm** for JS/TS, **uv** for Python. No full Nx orchestratio
 ## Consequences
 
 **Positive**
+
 - One PR can touch frontend + backend + infra together — common during refactors.
 - Shared TS types between web and the OpenAPI-generated client live in `packages/shared-types/`.
 - `ml/` and `infra/` remain visually separated, signaling their different lifecycles.
 - pnpm's strict isolation catches phantom dependencies that npm hoisting hides.
 
 **Negative**
+
 - Mixed-language repo means CI workflows are more complex than a single-language repo.
 - pnpm has a small learning curve over npm (covered in conventions).
 - Python and TypeScript tooling don't share dependencies; each has its own lockfile.

@@ -157,15 +157,15 @@ The two workspaces don't share a manifest. They communicate exclusively through 
 
 Top-level scripts in the root `package.json` orchestrate both:
 
-| Script | What it runs |
-|---|---|
-| `pnpm install` | pnpm install across the JS workspace; uv install is left to `apps/api` (covered in README) |
-| `pnpm lint` | `pnpm -r --parallel run lint` |
-| `pnpm typecheck` | `pnpm -r --parallel run typecheck` |
-| `pnpm test` | `pnpm -r --parallel run test` |
-| `pnpm build` | `pnpm -r --parallel run build` |
-| `pnpm codegen` | runs the orchestrator at `packages/shared-types/scripts/codegen.mjs` |
-| `pnpm format` | prettier write across the workspace |
+| Script           | What it runs                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| `pnpm install`   | pnpm install across the JS workspace; uv install is left to `apps/api` (covered in README) |
+| `pnpm lint`      | `pnpm -r --parallel run lint`                                                              |
+| `pnpm typecheck` | `pnpm -r --parallel run typecheck`                                                         |
+| `pnpm test`      | `pnpm -r --parallel run test`                                                              |
+| `pnpm build`     | `pnpm -r --parallel run build`                                                             |
+| `pnpm codegen`   | runs the orchestrator at `packages/shared-types/scripts/codegen.mjs`                       |
+| `pnpm format`    | prettier write across the workspace                                                        |
 
 Satisfies AC 1.1, 1.2, 1.7. AC 1.6 (unrecognized package detection) is satisfied by pnpm's default behavior — any `package.json` not matched by a workspace glob will fail the install with `ERR_PNPM_NO_MATCHING_VERSION` or similar.
 
@@ -177,7 +177,7 @@ Satisfies AC 1.1, 1.2, 1.7. AC 1.6 (unrecognized package detection) is satisfied
 # Shape only — full file produced during implementation
 services:
   postgres:
-    image: postgres:16-alpine          # pinned by digest in implementation
+    image: postgres:16-alpine # pinned by digest in implementation
     environment:
       POSTGRES_USER: matchlayer
       POSTGRES_PASSWORD: dev_only_password
@@ -199,7 +199,7 @@ services:
       retries: 30
 
   minio:
-    image: minio/minio:RELEASE.2025-XX-XX  # pinned in implementation
+    image: minio/minio:RELEASE.2025-XX-XX # pinned in implementation
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: matchlayer
@@ -444,11 +444,18 @@ Initialized with CSS-variables mode and base color "neutral" (the closest match 
 import { Geist, Geist_Mono } from "next/font/google";
 
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+});
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable}`}
+    >
       <body className="bg-bg text-text font-sans antialiased">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
@@ -468,7 +475,9 @@ import { useReducedMotion } from "framer-motion";
 
 export function useMotionSafeProps(props: MotionProps): MotionProps {
   const reduced = useReducedMotion();
-  return reduced ? { ...props, animate: props.initial, transition: { duration: 0 } } : props;
+  return reduced
+    ? { ...props, animate: props.initial, transition: { duration: 0 } }
+    : props;
 }
 ```
 
@@ -496,20 +505,21 @@ Theme toggle uses the shadcn `Button` primitive plus Lucide icons (`Sun`, `Moon`
 
 `proxy.ts` sets headers on every response. Phase 1 CSP is conservative but functional:
 
-| Header | Value |
-|---|---|
-| `Content-Security-Policy` | `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' http://localhost:8000` |
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` (only when request scheme is HTTPS — Vercel sets this automatically; we do too in proxy) |
-| `X-Content-Type-Options` | `nosniff` |
-| `X-Frame-Options` | `DENY` |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` |
-| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+| Header                      | Value                                                                                                                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Content-Security-Policy`   | `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' http://localhost:8000` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` (only when request scheme is HTTPS — Vercel sets this automatically; we do too in proxy)                                          |
+| `X-Content-Type-Options`    | `nosniff`                                                                                                                                                                        |
+| `X-Frame-Options`           | `DENY`                                                                                                                                                                           |
+| `Referrer-Policy`           | `strict-origin-when-cross-origin`                                                                                                                                                |
+| `Permissions-Policy`        | `camera=(), microphone=(), geolocation=()`                                                                                                                                       |
 
 `'unsafe-inline'` for styles and scripts is a Phase 1 concession — Next.js's inline runtime needs it. Tightening CSP to nonces is tracked for Phase 6 alongside CDN setup. Satisfies AC 6.1–6.6.
 
 ### 7.8 Landing page
 
 Hero section with:
+
 - "MatchLayer" wordmark using a gradient text fill (`bg-gradient-to-br from-brand to-brand-2 bg-clip-text text-transparent`).
 - A short tagline ("AI-native ATS, transparent scoring").
 - Theme toggle in the top-right.
@@ -530,9 +540,13 @@ describe("security headers", () => {
     const res = await fetch("http://localhost:3000/");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("x-frame-options")).toBe("DENY");
-    expect(res.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+    expect(res.headers.get("referrer-policy")).toBe(
+      "strict-origin-when-cross-origin",
+    );
     expect(res.headers.get("permissions-policy")).toContain("geolocation=()");
-    expect(res.headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect(res.headers.get("content-security-policy")).toContain(
+      "default-src 'self'",
+    );
   });
 });
 ```
@@ -574,7 +588,8 @@ CI runs `pnpm codegen` then `git diff --exit-code packages/shared-types/src/`. A
 
 ```ts
 import type { paths } from "./api-types";
-export type HealthResponse = paths["/healthz"]["get"]["responses"]["200"]["content"]["application/json"];
+export type HealthResponse =
+  paths["/healthz"]["get"]["responses"]["200"]["content"]["application/json"];
 export { HealthResponseSchema } from "./api-schemas";
 ```
 
@@ -597,13 +612,13 @@ flowchart LR
 
 Job summaries:
 
-| Job | Key steps | Satisfies |
-|---|---|---|
-| `backend` | `uv sync --frozen`, `ruff format --check`, `ruff check`, `mypy`, `pytest` | AC 8.4, 8.11 |
-| `frontend` | `pnpm install --frozen-lockfile`, `pnpm --filter web lint`, `pnpm --filter web typecheck`, `pnpm --filter web test`, `pnpm --filter web build` | AC 8.5, 8.11 |
-| `shared` | `pnpm install --frozen-lockfile`, `pnpm --filter @matchlayer/shared-types lint`, `pnpm --filter @matchlayer/shared-types typecheck`, `pnpm --filter @matchlayer/shared-types test` | AC 8.5 |
-| `security` | `pip-audit` against uv lockfile; `pnpm audit --prod`; `gitleaks` scan against PR diff; CodeQL action for `python` and `javascript-typescript` | AC 8.6–8.9 |
-| `openapi-drift` | `uv sync --frozen`, `pnpm install --frozen-lockfile`, `pnpm codegen`, `git diff --exit-code packages/shared-types/src/` | AC 8.10 |
+| Job             | Key steps                                                                                                                                                                          | Satisfies    |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `backend`       | `uv sync --frozen`, `ruff format --check`, `ruff check`, `mypy`, `pytest`                                                                                                          | AC 8.4, 8.11 |
+| `frontend`      | `pnpm install --frozen-lockfile`, `pnpm --filter web lint`, `pnpm --filter web typecheck`, `pnpm --filter web test`, `pnpm --filter web build`                                     | AC 8.5, 8.11 |
+| `shared`        | `pnpm install --frozen-lockfile`, `pnpm --filter @matchlayer/shared-types lint`, `pnpm --filter @matchlayer/shared-types typecheck`, `pnpm --filter @matchlayer/shared-types test` | AC 8.5       |
+| `security`      | `pip-audit` against uv lockfile; `pnpm audit --prod`; `gitleaks` scan against PR diff; CodeQL action for `python` and `javascript-typescript`                                      | AC 8.6–8.9   |
+| `openapi-drift` | `uv sync --frozen`, `pnpm install --frozen-lockfile`, `pnpm codegen`, `git diff --exit-code packages/shared-types/src/`                                                            | AC 8.10      |
 
 A trailing `required-checks` job depending on all five exists purely so branch protection can target a single check name.
 
@@ -628,6 +643,7 @@ Superseded PR runs are cancelled; main pushes always complete.
 ### 9.4 The 10-minute target
 
 For a no-op markdown PR:
+
 - `backend`: cache hit + ruff/mypy/pytest on a tiny suite — ~2 min.
 - `frontend`: cache hit + lint/tsc/vitest/build — ~3 min.
 - `shared`: cache hit + lint/tsc — ~1 min.
@@ -685,6 +701,7 @@ ENTRYPOINT ["uvicorn", "matchlayer_api.main:app", "--host", "0.0.0.0", "--port",
 ```
 
 Notes:
+
 - Distroless `python3-debian13:nonroot` runs as UID 65532 (≥ 10000, satisfies AC 10.4) and ships Python 3.13, matching the builder stage exactly — no version skew between builder and runtime interpreters.
 - No shell in the final image — HEALTHCHECK uses the python interpreter directly.
 - `--read-only` compatible; uvicorn doesn't write to disk. `/tmp` would be a tmpfs mount in production compose.
@@ -724,19 +741,19 @@ Next is configured with `output: "standalone"` in `next.config.mjs` so the final
 
 Single `.env.example` at repo root, shared between both apps. Web reads `NEXT_PUBLIC_*` for client-exposed values; everything else is server-side only.
 
-| Variable | Owner | Default for local | Secret? | Notes |
-|---|---|---|---|---|
-| `MATCHLAYER_ENVIRONMENT` | api | `development` | no | Drives logging format |
-| `MATCHLAYER_LOG_LEVEL` | api | `info` | no | |
-| `MATCHLAYER_DATABASE_URL` | api | `postgresql+asyncpg://matchlayer:dev_only_password@localhost:5432/matchlayer` | yes (in prod) | |
-| `MATCHLAYER_REDIS_URL` | api | `redis://localhost:6379/0` | yes (in prod) | |
-| `MATCHLAYER_S3_ENDPOINT_URL` | api | `http://localhost:9000` | no | Empty in prod (real S3) |
-| `MATCHLAYER_S3_REGION` | api | `us-east-1` | no | |
-| `MATCHLAYER_S3_ACCESS_KEY_ID` | api | `matchlayer` | yes (in prod) | |
-| `MATCHLAYER_S3_SECRET_ACCESS_KEY` | api | `dev_only_password` | yes | |
-| `MATCHLAYER_S3_BUCKET` | api | `matchlayer-dev` | no | Manual `mc mb` |
-| `MATCHLAYER_CORS_ALLOWED_ORIGINS` | api | `http://localhost:3000` | no | Comma-separated list |
-| `NEXT_PUBLIC_API_BASE_URL` | web | `http://localhost:8000` | no | Frontend → backend |
+| Variable                          | Owner | Default for local                                                             | Secret?       | Notes                   |
+| --------------------------------- | ----- | ----------------------------------------------------------------------------- | ------------- | ----------------------- |
+| `MATCHLAYER_ENVIRONMENT`          | api   | `development`                                                                 | no            | Drives logging format   |
+| `MATCHLAYER_LOG_LEVEL`            | api   | `info`                                                                        | no            |                         |
+| `MATCHLAYER_DATABASE_URL`         | api   | `postgresql+asyncpg://matchlayer:dev_only_password@localhost:5432/matchlayer` | yes (in prod) |                         |
+| `MATCHLAYER_REDIS_URL`            | api   | `redis://localhost:6379/0`                                                    | yes (in prod) |                         |
+| `MATCHLAYER_S3_ENDPOINT_URL`      | api   | `http://localhost:9000`                                                       | no            | Empty in prod (real S3) |
+| `MATCHLAYER_S3_REGION`            | api   | `us-east-1`                                                                   | no            |                         |
+| `MATCHLAYER_S3_ACCESS_KEY_ID`     | api   | `matchlayer`                                                                  | yes (in prod) |                         |
+| `MATCHLAYER_S3_SECRET_ACCESS_KEY` | api   | `dev_only_password`                                                           | yes           |                         |
+| `MATCHLAYER_S3_BUCKET`            | api   | `matchlayer-dev`                                                              | no            | Manual `mc mb`          |
+| `MATCHLAYER_CORS_ALLOWED_ORIGINS` | api   | `http://localhost:3000`                                                       | no            | Comma-separated list    |
+| `NEXT_PUBLIC_API_BASE_URL`        | web   | `http://localhost:8000`                                                       | no            | Frontend → backend      |
 
 The drift checker (§ 9.5) keeps this table honest. Satisfies AC 3.1–3.6.
 

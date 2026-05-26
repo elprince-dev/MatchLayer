@@ -380,15 +380,21 @@ def main() -> int:
 
     if not missing and not stale:
         plural = "s" if len(declared) != 1 else ""
-        print(f"OK: .env.example and codebase agree ({len(declared)} variable{plural}).")
+        print(
+            f"OK: .env.example and codebase agree ({len(declared)} variable{plural})."
+        )
         return 0
 
     sys.stderr.write("error: .env.example drift detected\n")
     if missing:
-        sys.stderr.write("\n  Variables referenced in code but missing from .env.example:\n")
+        sys.stderr.write(
+            "\n  Variables referenced in code but missing from .env.example:\n"
+        )
         sys.stderr.write(_format_list(missing) + "\n")
     if stale:
-        sys.stderr.write("\n  Variables in .env.example but not referenced in code (stale):\n")
+        sys.stderr.write(
+            "\n  Variables in .env.example but not referenced in code (stale):\n"
+        )
         sys.stderr.write(_format_list(stale) + "\n")
     sys.stderr.write(
         "\n"

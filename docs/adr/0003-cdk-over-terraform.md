@@ -26,12 +26,14 @@ Phase 6 productionizes MatchLayer on AWS. Every resource must be defined in code
 ## Consequences
 
 **Positive**
+
 - Faster onboarding to Phase 6.
 - Type-safe constructs catch most config errors at compile time.
 - Tooling (linting, formatting) shared with frontend code.
 - CloudFormation drift detection works out of the box.
 
 **Negative**
+
 - Slower than Terraform for stack-level operations on large stacks (CloudFormation is the bottleneck).
 - AWS-locked. If MatchLayer ever needs another cloud, full rewrite.
 - Resume signal slightly weaker than Terraform — CDK is widely used but Terraform appears in more job postings. Mitigation: a small Terraform side-project later if needed.

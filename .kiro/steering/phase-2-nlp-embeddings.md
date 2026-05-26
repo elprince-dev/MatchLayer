@@ -9,9 +9,11 @@ inclusion: manual
 **Goal:** replace the naive TF-IDF scoring with semantic understanding using open-source embeddings + pgvector.
 
 ## Why this phase exists
+
 TF-IDF only matches exact words. A resume saying "led ML projects" won't match a JD asking for "machine learning experience". Semantic embeddings fix this. Pgvector keeps it in Postgres — one fewer service to operate.
 
 ## In scope
+
 - **Embeddings**
   - Use `sentence-transformers` with `BAAI/bge-small-en-v1.5` (384 dims, MIT license, strong leaderboard performance per dim) or `all-MiniLM-L6-v2` (384 dims, classic, fastest). Default to `bge-small-en-v1.5`.
   - Run the model in-process in the API container for now. Move to a dedicated inference service only if latency becomes a problem.
@@ -21,11 +23,11 @@ TF-IDF only matches exact words. A resume saying "led ML projects" won't match a
   - Same for job descriptions: `match_results.jd_embedding vector(384)`.
   - HNSW index on both for fast cosine similarity.
 - **Skill extraction**
-  - Use spaCy + a curated skills lexicon (start with the Phase 1 lexicon, expand to ~1000 entries from public datasets like O*NET).
+  - Use spaCy + a curated skills lexicon (start with the Phase 1 lexicon, expand to ~1000 entries from public datasets like O\*NET).
   - Optional: small NER model fine-tuned on a public skills dataset (deferred unless the lexicon approach falls short).
 - **Scoring v2**
   - Composite score: `0.6 * semantic_similarity + 0.3 * skill_overlap + 0.1 * keyword_overlap`. Tune weights with eyeballed examples; document as a hyperparameter.
-  - Return per-component breakdown to the frontend so users can see *why* their score is what it is.
+  - Return per-component breakdown to the frontend so users can see _why_ their score is what it is.
 - **Re-scoring path**
   - Add `POST /api/v1/resumes/{id}:reembed` to re-run embedding when models or weights change. Synchronous for now.
 - **Frontend**
@@ -33,6 +35,7 @@ TF-IDF only matches exact words. A resume saying "led ML projects" won't match a
   - Tooltip explaining the score components.
 
 ## Explicitly out of scope
+
 - LLM calls (Phase 3).
 - Multi-document retrieval / RAG (not needed yet).
 - Async processing (Phase 6).
@@ -40,20 +43,24 @@ TF-IDF only matches exact words. A resume saying "led ML projects" won't match a
 - Cross-encoder reranking (consider in Phase 5 if eval shows it helps).
 
 ## Deliverables
+
 1. Resume + JD embedding pipeline running on every match.
 2. Composite score replacing TF-IDF in the API and UI.
 3. Migration adding pgvector and the new tables/columns.
 4. README updated with Phase 2 architecture and benchmarks (latency, score-quality examples).
 
 ## Success criteria
+
 - p95 embedding latency < 500ms per document on a 2-vCPU container.
 - Phase 2 scores beat Phase 1 scores on a hand-curated set of 20 resume/JD pairs (track in `ml/evals/phase2_eyeball_set.json`).
 - pgvector queries return in < 50ms with 10k stored embeddings.
 
 ## Skills demonstrated
+
 NLP · sentence transformers · vector embeddings · pgvector · HNSW · skill extraction · composite scoring · spaCy
 
 ## Risks & gotchas
+
 - **Model size in container.** `bge-small` is ~130MB. Acceptable. Larger models bloat cold starts — don't switch to `bge-large` without measuring.
 - **CPU-only inference.** Fine for `bge-small`, ~50ms per doc. If we ever want larger models, plan for GPU or a dedicated inference service.
 - **Embedding versioning.** When you upgrade the model, all stored embeddings need re-running. Add an `embedding_model_version` column from day one.
@@ -61,6 +68,7 @@ NLP · sentence transformers · vector embeddings · pgvector · HNSW · skill e
 - **Resume length variance.** Long resumes embed differently than short ones. Consider chunking + averaging for resumes > 2000 tokens.
 
 ## Folder additions
+
 ```
 apps/api/src/matchlayer_api/ml/
   embeddings.py                     # model loading, encode functions
@@ -73,6 +81,7 @@ ml/evals/
 ```
 
 ## Work breakdown
+
 1. Add pgvector to docker-compose Postgres image.
 2. Alembic migration: enable extension, add `resume_embeddings`, add `jd_embedding` to `match_results`, create HNSW indexes.
 3. ML module: lazy-loaded sentence-transformer wrapper, batched encode, model version constant.
@@ -84,4 +93,5 @@ ml/evals/
 9. Update README with the new architecture diagram.
 
 ## Definition of done
+
 Composite scoring is live, pgvector is healthy, the eyeball set shows clear improvement over Phase 1, and the new score breakdown is visible to users.

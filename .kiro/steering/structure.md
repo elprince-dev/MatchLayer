@@ -3,6 +3,7 @@
 Single monorepo, single git repo. Nx-style layout but using native package managers (pnpm + uv) rather than full Nx orchestration unless we outgrow that.
 
 ## Top-level layout
+
 ```
 matchlayer/
 ├── .kiro/                  # Kiro steering, specs, hooks
@@ -29,12 +30,14 @@ matchlayer/
 ```
 
 ## Why this shape
+
 - **`apps/` vs `packages/`** — apps are deployable units, packages are libraries imported by apps. Standard Nx convention.
 - **`ml/` is separate from `apps/api/`** — training and evaluation code has different dependencies, different lifecycles, and shouldn't bloat the API container. The API imports trained artifacts (or calls model services), not training code.
 - **`infra/` is separate from app code** — infra changes are reviewed differently and deployed differently.
 - **`docs/`** — ADRs (Architecture Decision Records) live here. Steering docs in `.kiro/steering/` are the always-loaded summary; ADRs are the long-form rationale.
 
 ## Backend structure (`apps/api/`)
+
 ```
 apps/api/
 ├── src/matchlayer_api/
@@ -56,7 +59,9 @@ apps/api/
 ```
 
 ## Frontend structure (`apps/web/`)
+
 Standard Next.js App Router layout:
+
 ```
 apps/web/
 ├── src/
@@ -70,6 +75,7 @@ apps/web/
 ```
 
 ## Naming
+
 - **Folders & files:** `kebab-case` for everything except Python (snake_case) and React components (PascalCase files).
 - **Python packages:** `matchlayer_*` prefix to avoid clashes.
 - **Database tables:** plural snake_case (`users`, `resumes`, `match_results`).
@@ -77,6 +83,7 @@ apps/web/
 - **Branches:** `phase-N/short-description` (e.g., `phase-1/resume-upload`).
 
 ## What goes where — quick rules
+
 - New API endpoint → `apps/api/src/matchlayer_api/api/<feature>/`
 - New page → `apps/web/src/app/<route>/`
 - Shared TS type → `packages/shared-types/` (or generated from OpenAPI)

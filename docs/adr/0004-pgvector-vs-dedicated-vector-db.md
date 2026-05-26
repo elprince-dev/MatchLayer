@@ -26,11 +26,13 @@ Phase 2 introduces semantic embeddings for resume/JD matching. Embeddings need f
 ## Consequences
 
 **Positive**
+
 - Single database, single backup, single connection pool, single set of credentials.
 - Joins between vector results and relational data are native SQL, not application-side stitching.
 - pgvector is open-source and well-maintained.
 
 **Negative**
+
 - Slower than top-tier dedicated vector DBs at very high scale (>1M vectors with sub-10ms requirements).
 - HNSW index parameters require some tuning.
 - Adds one extension to the Postgres dependency, which complicates self-hosting if we ever leave managed Postgres.

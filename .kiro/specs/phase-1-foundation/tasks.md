@@ -21,7 +21,7 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
 
   - [x] 1.2 Author pnpm workspace, root `package.json`, and `tsconfig.base.json`
     - Create `pnpm-workspace.yaml` declaring `apps/*` and `packages/*`.
-    - Create root `package.json` (private, `"name": "matchlayer"`) with `engines.node = ">=24"`, an exact `packageManager` pin (e.g., `"packageManager": "pnpm@9.15.0"` — corepack rejects ranges like `9.x`), dev-only deps for `prettier`, `typescript`, and the two openapi-* codegen tools, and the top-level scripts `lint`, `typecheck`, `test`, `build`, `codegen`, `format` (the codegen script invokes `node packages/shared-types/scripts/codegen.mjs`; the others fan out via `pnpm -r --parallel run`).
+    - Create root `package.json` (private, `"name": "matchlayer"`) with `engines.node = ">=24"`, an exact `packageManager` pin (e.g., `"packageManager": "pnpm@9.15.0"` — corepack rejects ranges like `9.x`), dev-only deps for `prettier`, `typescript`, and the two openapi-\* codegen tools, and the top-level scripts `lint`, `typecheck`, `test`, `build`, `codegen`, `format` (the codegen script invokes `node packages/shared-types/scripts/codegen.mjs`; the others fan out via `pnpm -r --parallel run`).
     - Create `tsconfig.base.json` with `strict`, `noUncheckedIndexedAccess`, `target ES2022`, `module ESNext`, `moduleResolution Bundler`, `skipLibCheck`, and a path alias `@matchlayer/shared-types` → `packages/shared-types/src`.
     - _Requirements: 1.1, 1.2, 1.6, 1.7_
     - _Design: §3, §4_
@@ -204,7 +204,6 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
 - [x] 6. Checkpoint — backend, frontend, and codegen all green locally
   - Run `docker compose up -d --wait`, `uv run --project apps/api uvicorn matchlayer_api.main:app` (must start without error and `curl /healthz` returns 200), `cd apps/api && uv run pytest`, `pnpm --filter @matchlayer/web build && pnpm --filter @matchlayer/web test`, and `pnpm codegen` (zero diff). Ensure all tests pass, ask the user if questions arise.
 
-
 - [x] 7. CI pipeline
   - [x] 7.1 Implement the `.env` drift-detection script
     - Create `tools/check_env_drift.py` (small standalone script, no extra deps beyond stdlib) that walks `apps/api/src` for `MATCHLAYER_*` env-var references (regex over `os.environ` and Pydantic Settings field names) and walks `apps/web/src` for `process.env.MATCHLAYER_*` and `process.env.NEXT_PUBLIC_*` references, then compares the union against the keys present in `.env.example`. Exit non-zero on either missing or stale entries with a message naming each variable.
@@ -233,7 +232,7 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Design: §9; security.md "Dependency & supply-chain security"_
 
 - [ ] 8. Pre-commit hooks
-  - [ ] 8.1 Author `.pre-commit-config.yaml`
+  - [x] 8.1 Author `.pre-commit-config.yaml`
     - Hooks (in order): `pre-commit-hooks` standard set (`trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-json`, `check-added-large-files` with `--maxkb=5120`); `gitleaks` (mirror); `ruff` for `format` then `check --fix` scoped to Python files; `prettier` scoped to JS/TS/JSON/MD/YAML files.
     - Run `pre-commit install` locally and `pre-commit run --all-files` once to verify the foundation tree passes the hooks before the foundation PR is opened.
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
@@ -265,7 +264,7 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Design: §13_
 
   - [ ] 10.2 Update the root `README.md`
-    - Add a "Prerequisites" section: pnpm, Node 24+, Python 3.13+, uv, Docker Engine 24+, `pre-commit` (note WSL on Windows).
+    - Add a "Prerequisites" section: pnpm, Node 24+, Python 3.13+, uv, Docker Engine 24+, `pre-commit`, and `gitleaks` v8.x on PATH (install from https://github.com/gitleaks/gitleaks/releases — the `.pre-commit-config.yaml` uses the `gitleaks-system` hook variant which requires a prebuilt binary rather than compiling from Go source). Note WSL on Windows for the `pre-commit` and `gitleaks` install paths.
     - Replace the existing "Running locally" section with a numbered setup flow: clone → `cp .env.example .env` → `pnpm install` → `uv sync` (in `apps/api`) → `docker compose up -d --wait` → `uv run --project apps/api alembic upgrade head` (no-op against the empty baseline, but exercises wiring) → `pre-commit install` → `uv run --project apps/api uvicorn matchlayer_api.main:app --reload` (port 8000) and `pnpm --filter @matchlayer/web dev` (port 3000).
     - Add a "Branch & PR conventions" pointer that the foundation PR uses branch `phase-1/foundation` and link to `conventions.md`.
     - Add a "GitHub-side configuration" section linking to `docs/runbooks/repo-setup.md`.
