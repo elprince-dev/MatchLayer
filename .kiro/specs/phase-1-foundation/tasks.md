@@ -205,13 +205,13 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
   - Run `docker compose up -d --wait`, `uv run --project apps/api uvicorn matchlayer_api.main:app` (must start without error and `curl /healthz` returns 200), `cd apps/api && uv run pytest`, `pnpm --filter @matchlayer/web build && pnpm --filter @matchlayer/web test`, and `pnpm codegen` (zero diff). Ensure all tests pass, ask the user if questions arise.
 
 
-- [ ] 7. CI pipeline
-  - [ ] 7.1 Implement the `.env` drift-detection script
+- [x] 7. CI pipeline
+  - [x] 7.1 Implement the `.env` drift-detection script
     - Create `tools/check_env_drift.py` (small standalone script, no extra deps beyond stdlib) that walks `apps/api/src` for `MATCHLAYER_*` env-var references (regex over `os.environ` and Pydantic Settings field names) and walks `apps/web/src` for `process.env.MATCHLAYER_*` and `process.env.NEXT_PUBLIC_*` references, then compares the union against the keys present in `.env.example`. Exit non-zero on either missing or stale entries with a message naming each variable.
     - _Requirements: 3.5, 3.6_
     - _Design: §9.5_
 
-  - [ ] 7.2 Author `.github/workflows/ci.yml`
+  - [x] 7.2 Author `.github/workflows/ci.yml`
     - Trigger on `pull_request` (target `main`) and `push` (`main`). Set top-level `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: ${{ github.event_name == 'pull_request' }} }`.
     - Define five parallel jobs:
       - `backend`: `astral-sh/setup-uv@v2` with cache key on `apps/api/uv.lock`, `uv sync --frozen` in `apps/api`, `ruff format --check`, `ruff check`, `mypy`, `pytest`. Run `python tools/check_env_drift.py` as a final step.
@@ -228,7 +228,7 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 3.5, 3.6, 7.8, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.10, 8.11, 8.12_
     - _Design: §9.1, §9.2, §9.3, §9.4_
 
-  - [ ] 7.3 Author `.github/dependabot.yml`
+  - [x] 7.3 Author `.github/dependabot.yml`
     - Enable security-only updates (`open-pull-requests-limit: 0` for non-security ecosystems, `package-ecosystem: "npm"` rooted at `/`, `package-ecosystem: "pip"` rooted at `/apps/api`, `package-ecosystem: "github-actions"` rooted at `/`).
     - _Design: §9; security.md "Dependency & supply-chain security"_
 

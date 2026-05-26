@@ -1,0 +1,408 @@
+# MatchLayer — CI pipeline (phase-1-foundation, task 7.2)
+#
+# Anchors:
+#   - .kiro/specs/phase-1-foundation/requirements.md  →  Requirement 8 (and AC 3.5,
+#     3.6, 7.8) for the gates this workflow enforces.
+#   - .kiro/specs/phase-1-foundation/design.md         →  §9 for shape, caching
+#     strategy, concurrency, and the 10-minute target.
+#   - .kiro/steering/security.md "Dependency & supply-chain security" for the
+#     pip-audit + pnpm audit + CodeQL + gitleaks baseline.
+#
+# Shape: five parallel jobs (`backend`, `frontend`, `shared-types`, `security`,
+# `openapi-drift`) plus a deterministic `required-checks` aggregator that branch
+# protection can target as a single check name.
+#
+# Documented deviations from the task text (current-stable upgrades, both
+# behaviorally compatible with the inputs the spec requested):
+#   - `astral-sh/setup-uv@v2`  → `astral-sh/setup-uv@v6`. v2 is stale; v6 is the
+#     current major as of late 2025. The `enable-cache` / `cache-dependency-glob`
+#     inputs used here are unchanged across majors.
+#   - `pnpm/action-setup@v3`   → `pnpm/action-setup@v4`. v4 reads the
+#     `packageManager` field from the root `package.json` automatically (which
+#     this repo pins to a specific pnpm version).
+#   - CodeQL: the task lists two separate `init` + `analyze` pairs (one per
+#     language). Running `init` twice in the same job conflicts on the action's
+#     temp-dir state, so we initialize both languages in a single `init` and run
+#     a single `analyze`. The task explicitly allows this ("Some workflows do
+#     both languages in one matrix; for clarity here just inline both"); doing
+#     it in one job keeps `security` a single deterministic check.
+
+name: CI
+
+# Trigger surface kept intentionally minimal (anti-requirement: no
+# `workflow_dispatch`, no tags, no schedules — those belong to deploy/release
+# workflows that will land in Phase 6).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded PR runs (force-pushes), but always let main pushes finish.
+# Wording matches design §9.3 verbatim.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Workflow-level least privilege. Jobs that need more (CodeQL writes
+# security-events, gitleaks reads PR metadata) override per-job below.
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # backend — Python lint/type/test plus the .env drift gate from task 7.1.
+  # Satisfies AC 8.4, 8.11; runs the drift check from AC 3.5 + 3.6.
+  # ---------------------------------------------------------------------------
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv (with cache keyed on apps/api/uv.lock)
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/uv.lock"
+
+      - name: Install Python deps (frozen)
+        working-directory: apps/api
+        run: uv sync --frozen
+
+      # Pydantic Settings validates at import time, so pytest collection (and
+      # `app.openapi()` — used in the openapi-drift job below) requires a
+      # populated .env at the repo root. The `.env.example` defaults match the
+      # docker-compose stack so it's safe to copy verbatim in CI.
+      - name: Seed .env from .env.example
+        run: cp .env.example .env
+
+      - name: Ruff format check
+        working-directory: apps/api
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        working-directory: apps/api
+        run: uv run ruff check .
+
+      # `uv run mypy` with no args has no input set; pyproject's `mypy_path`
+      # only tells mypy where to RESOLVE imports, not what to CHECK. Pass `src`
+      # explicitly so the strict overrides on `matchlayer_api.{services,api,
+      # core,ml,tools}.*` actually fire.
+      - name: Mypy
+        working-directory: apps/api
+        run: uv run mypy src
+
+      - name: Pytest
+        working-directory: apps/api
+        run: uv run pytest
+
+      # tools/check_env_drift.py is stdlib-only — no extra install needed.
+      # Runs from repo root because it resolves paths relative to itself.
+      - name: Check .env.example drift
+        run: python3 tools/check_env_drift.py
+
+  # ---------------------------------------------------------------------------
+  # frontend — Next.js + Vitest. The proxy.test.ts asserts security headers
+  # against a real Next prod server, so we build → start → wait → test → kill.
+  # Satisfies AC 5.10, 6.7, 8.5, 8.11.
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # pnpm/action-setup must run BEFORE setup-node, otherwise setup-node's
+      # `cache: pnpm` cannot find the binary.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node (with pnpm store cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install JS deps (frozen)
+        run: pnpm install --frozen-lockfile
+
+      # Next.js reads NEXT_PUBLIC_API_BASE_URL at build time and inlines it
+      # into the bundle; keep it consistent with apps/api by sourcing from the
+      # same .env.example.
+      - name: Seed .env from .env.example
+        run: cp .env.example .env
+
+      # Cache .next/cache (the build's incremental cache) — NOT .next/static,
+      # which is regenerated each build. Key includes pnpm-lock.yaml so a dep
+      # change invalidates; restore-keys cascade lets a near-miss still warm.
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('apps/web/package.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-
+
+      - name: Lint (ESLint)
+        run: pnpm --filter @matchlayer/web lint
+
+      - name: Format check (prettier)
+        run: pnpm --filter @matchlayer/web format
+
+      - name: Typecheck
+        run: pnpm --filter @matchlayer/web typecheck
+
+      - name: Build (Next.js production)
+        run: pnpm --filter @matchlayer/web build
+
+      # Background the prod server and persist its PID for the cleanup step.
+      # `& echo $! >> $GITHUB_ENV` is the GHA-blessed way to share PIDs across
+      # steps without polluting the working tree.
+      - name: Start production server
+        run: |
+          pnpm --filter @matchlayer/web start &
+          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
+
+      # `wait-on` exits 0 only once the URL responds; --timeout in ms.
+      # Avoids racing the test runner against a server that hasn't bound yet.
+      - name: Wait for server to accept connections
+        run: npx --yes wait-on http://127.0.0.1:3000 --timeout 60000
+
+      - name: Run tests (Vitest)
+        run: pnpm --filter @matchlayer/web test
+
+      # Always-run cleanup. Guard against SERVER_PID being unset (e.g., the
+      # start step never ran because build failed) so we don't `kill ""` and
+      # blow up the cleanup itself.
+      - name: Stop production server
+        if: always()
+        run: |
+          if [ -n "${SERVER_PID:-}" ]; then
+            kill "$SERVER_PID" 2>/dev/null || true
+          fi
+
+  # ---------------------------------------------------------------------------
+  # shared-types — every gate listed in the task runs against
+  # @matchlayer/shared-types so AC 8.5 ("every one of these gates...against the
+  # Shared_Types_Package") is met explicitly.
+  # ---------------------------------------------------------------------------
+  shared-types:
+    name: shared-types
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node (with pnpm store cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install JS deps (frozen)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (ESLint)
+        run: pnpm --filter @matchlayer/shared-types lint
+
+      - name: Format check (prettier)
+        run: pnpm --filter @matchlayer/shared-types format
+
+      - name: Typecheck
+        run: pnpm --filter @matchlayer/shared-types typecheck
+
+      - name: Test (Vitest, --passWithNoTests)
+        run: pnpm --filter @matchlayer/shared-types test
+
+  # ---------------------------------------------------------------------------
+  # security — dependency audits, secret scanning, SAST, and the pre-commit
+  # safety net. Each step's failure fails the whole job (AC 8.12).
+  # Satisfies AC 8.6, 8.7, 8.8, 8.9 + the security.md "Dependency &
+  # supply-chain security" baseline.
+  # ---------------------------------------------------------------------------
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    permissions:
+      # CodeQL needs to upload SARIF results; bump from default read.
+      security-events: write
+      # gitleaks-action reads PR metadata to scope the diff scan.
+      pull-requests: read
+      contents: read
+    steps:
+      # gitleaks needs full history for PR-diff scans, not just the shallow
+      # default — fetch-depth: 0 widens the clone.
+      - name: Check out repository (full history for gitleaks)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv (with cache keyed on apps/api/uv.lock)
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/uv.lock"
+
+      # `uv export` reads the lockfile, not the venv, so a sync isn't strictly
+      # required — but syncing first is a cheap consistency check that the
+      # lockfile is self-consistent before we audit it.
+      - name: Install Python deps (frozen)
+        run: uv sync --frozen --project apps/api
+
+      # ----- pip-audit ------------------------------------------------------
+      # `uv export --no-dev` strips dev-only packages (pytest, ruff, mypy)
+      # from the audit surface — they don't ship to production. `--strict`
+      # fails on any unfixed vuln; track explicitly-accepted CVEs with
+      # `--ignore-vuln <id>` (canonical home: a future `.pip-audit-ignore`).
+      #
+      # Note on severity: pip-audit's `--strict` gates on advisory presence,
+      # not CVSS severity. AC 8.6 asks for "high or critical" gating; CVSS-
+      # filtered behavior is a follow-up — for now any unfixed vuln blocks
+      # the build, which is the stricter (safer) interpretation.
+      - name: Export production Python deps to requirements.txt
+        run: uv export --project apps/api --no-dev --format requirements-txt > requirements.txt
+
+      - name: pip-audit (Python production deps)
+        run: uv tool run pip-audit --strict -r requirements.txt
+
+      # ----- pnpm audit -----------------------------------------------------
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node (with pnpm store cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install JS deps (frozen)
+        run: pnpm install --frozen-lockfile
+
+      # `--prod` ignores devDependencies; `--audit-level=high` gates failures
+      # to high/critical advisories per AC 8.7.
+      - name: pnpm audit (production deps, high+/critical)
+        run: pnpm audit --prod --audit-level=high
+
+      # ----- gitleaks -------------------------------------------------------
+      # The action auto-detects PR vs push and adjusts scan scope. We pass
+      # GITHUB_TOKEN explicitly so it can post the diff comment on PRs.
+      - name: gitleaks (PR-diff secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ----- CodeQL ---------------------------------------------------------
+      # Single init covering both languages — see "Documented deviations" at
+      # the top of this file for why we don't run init twice.
+      - name: CodeQL init (python + javascript-typescript)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python, javascript-typescript
+
+      - name: CodeQL analyze
+        uses: github/codeql-action/analyze@v3
+
+      # ----- pre-commit ------------------------------------------------------
+      # Catches developers who skipped `pre-commit install` locally. The
+      # config itself lands in task 8.1; until then this step will fail
+      # because .pre-commit-config.yaml doesn't exist yet — that's the
+      # expected sequencing.
+      - name: Set up Python (for pre-commit)
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Run all pre-commit hooks against the full tree
+        run: pre-commit run --all-files
+
+  # ---------------------------------------------------------------------------
+  # openapi-drift — re-run the codegen pipeline and assert no diff. Anything
+  # in packages/shared-types/src/ that the live FastAPI app wouldn't produce
+  # right now fails the build. Satisfies AC 7.8, 8.10.
+  # ---------------------------------------------------------------------------
+  openapi-drift:
+    name: openapi-drift
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv (with cache keyed on apps/api/uv.lock)
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/uv.lock"
+
+      - name: Install Python deps (frozen)
+        run: uv sync --frozen --project apps/api
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node (with pnpm store cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install JS deps (frozen)
+        run: pnpm install --frozen-lockfile
+
+      # `pnpm codegen` calls `app.openapi()`, which imports Settings; that
+      # validates at import time and needs a populated .env. (No DB required
+      # — `app.openapi()` does not invoke the lifespan handler.)
+      - name: Seed .env from .env.example
+        run: cp .env.example .env
+
+      - name: Regenerate shared-types from live OpenAPI
+        run: pnpm codegen
+
+      # `git diff --exit-code` returns non-zero on any diff; we wrap it so the
+      # failure message tells the developer the exact remediation rather than
+      # leaving them to interpret a raw diff.
+      - name: Assert no codegen drift
+        run: |
+          git diff --exit-code packages/shared-types/src/ || {
+            echo "::error::OpenAPI codegen drift detected. Run 'pnpm codegen' locally and commit the result."
+            exit 1
+          }
+
+  # ---------------------------------------------------------------------------
+  # required-checks — single deterministic check name for branch protection.
+  # `if: always()` ensures it runs even when a dependency failed; the script
+  # then translates any non-success result into a failed status.
+  # ---------------------------------------------------------------------------
+  required-checks:
+    name: required-checks
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, shared-types, security, openapi-drift]
+    if: always()
+    steps:
+      - name: Check required job results
+        run: |
+          if [[ "${{ needs.backend.result }}" != "success" || \
+                "${{ needs.frontend.result }}" != "success" || \
+                "${{ needs.shared-types.result }}" != "success" || \
+                "${{ needs.security.result }}" != "success" || \
+                "${{ needs.openapi-drift.result }}" != "success" ]]; then
+            echo "::error::One or more required checks failed."
+            echo "  backend       = ${{ needs.backend.result }}"
+            echo "  frontend      = ${{ needs.frontend.result }}"
+            echo "  shared-types  = ${{ needs.shared-types.result }}"
+            echo "  security      = ${{ needs.security.result }}"
+            echo "  openapi-drift = ${{ needs.openapi-drift.result }}"
+            exit 1
+          fi

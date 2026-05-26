@@ -1,0 +1,43 @@
+# Dependabot configuration for MatchLayer.
+#
+# Policy: security-only updates.
+#
+# Rationale (steering: security.md "Dependency & supply-chain security"):
+#   "GitHub Dependabot enabled for security updates only (auto-PRs)."
+#
+# How "security-only" is enforced here:
+#   open-pull-requests-limit: 0 disables routine version-bump PRs for each
+#   ecosystem. Per Dependabot docs, security-update PRs are NOT counted
+#   against this limit and are still opened automatically when GitHub
+#   security advisories match a vulnerable dependency, provided
+#   "Dependabot security updates" is enabled at the repository level
+#   (see docs/runbooks/repo-setup.md).
+#
+# Ecosystems covered:
+#   - npm:            pnpm workspace at the repo root (pnpm-workspace.yaml,
+#                     pnpm-lock.yaml, root package.json, and per-package
+#                     package.json files under apps/* and packages/*).
+#   - pip:            uv-managed Python project at apps/api (pyproject.toml,
+#                     uv.lock — Dependabot's pip ecosystem reads both).
+#   - github-actions: workflow files under .github/workflows/.
+
+version: 2
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "pip"
+    directory: "/apps/api"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
