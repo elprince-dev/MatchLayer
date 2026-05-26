@@ -35,7 +35,7 @@ What we explicitly **don't** defend against (yet): nation-state actors, sophisti
 
 ## Network & transport
 - **HTTPS everywhere.** Redirect HTTP → HTTPS. HSTS with `max-age=31536000; includeSubDomains; preload`.
-- **Security headers** on every HTML response (Next.js middleware): `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `X-Frame-Options: DENY`.
+- **Security headers** on every HTML response (Next.js proxy, formerly the `middleware` file convention — renamed in Next.js 16): `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `X-Frame-Options: DENY`.
 - **CORS:** explicit allowlist of origins. Never `*` for authenticated endpoints. Document allowed origins per environment.
 
 ## Input validation & API safety

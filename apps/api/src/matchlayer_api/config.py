@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import AnyHttpUrl, Field, PostgresDsn, RedisDsn, SecretStr, field_validator
@@ -26,6 +27,33 @@ Environment = Literal["development", "staging", "production"]
 
 LogLevel = Literal["debug", "info", "warning", "error"]
 """Allowed values for ``MATCHLAYER_LOG_LEVEL``."""
+
+
+def _find_repo_root_env() -> Path:
+    """Resolve the repo-root ``.env`` path independently of the current CWD.
+
+    ``pydantic-settings`` resolves :attr:`SettingsConfigDict.env_file` against
+    the process's current working directory. That is fragile in a monorepo:
+    the same API is launched from the repo root by ``uvicorn`` and from
+    ``apps/api/`` by ``pytest``. Using a CWD-relative ``.env`` makes the
+    second invocation silently fail to load the only ``.env`` we ship.
+
+    Walk upward from this module looking for a marker that uniquely
+    identifies the repo root (``.env.example`` is committed and lives at
+    the repo root by design — see ``.env.example``'s own header comment).
+    Fall back to the literal ``".env"`` if no marker is found, preserving
+    the historical behavior for any deployment topology that doesn't ship
+    an ``.env.example`` (production runtimes inject env vars directly and
+    don't need an ``.env`` file at all).
+    """
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / ".env.example").exists():
+            return parent / ".env"
+    return Path(".env")
+
+
+_REPO_ROOT_ENV: Path = _find_repo_root_env()
 
 
 class Settings(BaseSettings):
@@ -47,7 +75,11 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="MATCHLAYER_",
-        env_file=".env",
+        # Resolved at import time so the same ``.env`` is read whether the
+        # process starts from the repo root (``uvicorn``) or from
+        # ``apps/api/`` (``pytest`` invoked from inside the API package
+        # directory). See ``_find_repo_root_env`` above for the rationale.
+        env_file=_REPO_ROOT_ENV,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -115,8 +147,9 @@ def get_settings() -> Settings:
     preferably, use FastAPI's dependency override mechanism.
     """
     # ``Settings()`` populates required fields from the environment via
-    # pydantic-settings at runtime; mypy's static view treats them as
-    # missing keyword arguments. The runtime contract is correct — a
-    # missing env var raises ``ValidationError`` at construction, which
-    # is exactly the fail-fast behavior Requirement 4.3 mandates.
-    return Settings()  # type: ignore[call-arg]
+    # pydantic-settings at runtime; the ``pydantic.mypy`` plugin handles
+    # the env-driven init shape so no ``# type: ignore[call-arg]`` is
+    # needed here. A missing env var raises ``ValidationError`` at
+    # construction, which is the fail-fast behavior Requirement 4.3
+    # mandates.
+    return Settings()

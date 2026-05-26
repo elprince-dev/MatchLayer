@@ -1,0 +1,41 @@
+{
+  "name": "@matchlayer/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MatchLayer web app — Next.js (App Router) frontend.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "format": "prettier --check 'src/**/*.{ts,tsx,js,jsx,css,md,json}' '*.{ts,mjs,cjs,json,md}'"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.1.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "lucide-react": "^0.469.0",
+    "next": "16.2.6",
+    "next-themes": "^0.4.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^20.17.10",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.18.0",
+    "eslint-config-next": "16.2.6",
+    "prettier": "^3.3.3",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}

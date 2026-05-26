@@ -1,0 +1,114 @@
+/*
+ * MatchLayer global stylesheet.
+ *
+ * Tokens are defined as space-separated `R G B` triplets on `:root` (light) and
+ * `.dark` (dark). Tailwind v4's `@theme inline` block re-exports each token as
+ * `rgb(var(--color-*) / <alpha-value>)` so utilities like `bg-bg/65` and
+ * `text-brand/80` work uniformly.
+ *
+ * `bg-glass` is intentionally stored as a plain RGB triplet (matching `bg`/
+ * `bg-elevated`) instead of the `rgba(...)` form quoted in the steering design
+ * doc. The frosted-nav effect is then composed via opacity utilities, e.g.
+ * `bg-bg-glass/65 backdrop-blur`. Keeping every color in the same shape lets
+ * Tailwind's `<alpha-value>` template work for glass too, and matches the
+ * design intent ("frosted surface over bg") without baking a fixed alpha.
+ *
+ * Dark mode is class-based — activated when `<html class="dark">`. The
+ * next-themes provider wired in `layout.tsx` (task 4.4) toggles that class.
+ */
+
+@import "tailwindcss";
+
+/* Class-based dark mode: the `dark` variant matches `html.dark` (and any
+ * descendant of `.dark`). Tailwind v4 needs this told explicitly because the
+ * default `@media (prefers-color-scheme: dark)` strategy can't be flipped by a
+ * theme toggle. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Surfaces */
+  --color-bg: 255 255 255;
+  --color-bg-elevated: 248 249 251;
+  --color-bg-glass: 255 255 255;
+
+  /* Borders */
+  --color-border: 229 231 235;
+  --color-border-strong: 209 213 219;
+
+  /* Text */
+  --color-text: 10 10 11;
+  --color-text-muted: 82 82 91;
+  --color-text-subtle: 113 113 122;
+
+  /* Brand + accents */
+  --color-brand: 124 58 237;
+  --color-brand-2: 6 182 212;
+
+  /* Status */
+  --color-success: 16 185 129;
+  --color-warning: 245 158 11;
+  --color-danger: 239 68 68;
+}
+
+.dark {
+  /* Surfaces */
+  --color-bg: 10 10 11;
+  --color-bg-elevated: 17 17 20;
+  --color-bg-glass: 20 20 24;
+
+  /* Borders */
+  --color-border: 31 31 35;
+  --color-border-strong: 42 42 48;
+
+  /* Text */
+  --color-text: 244 244 245;
+  --color-text-muted: 161 161 170;
+  --color-text-subtle: 113 113 122;
+
+  /* Brand + accents */
+  --color-brand: 139 92 246;
+  --color-brand-2: 34 211 238;
+
+  /* Status */
+  --color-success: 52 211 153;
+  --color-warning: 251 191 36;
+  --color-danger: 248 113 113;
+}
+
+/*
+ * Re-export every token as a Tailwind theme color. The `<alpha-value>`
+ * placeholder is substituted by Tailwind when utilities like `bg-bg/50` are
+ * used, defaulting to `1` otherwise.
+ *
+ * Fonts are bound to the next/font CSS variables exposed by `layout.tsx`
+ * (task 4.4) — once the layout sets `--font-geist-sans` / `--font-geist-mono`
+ * on `<html>`, `font-sans` and `font-mono` resolve correctly here.
+ */
+@theme inline {
+  /* Surfaces */
+  --color-bg: rgb(var(--color-bg) / <alpha-value>);
+  --color-bg-elevated: rgb(var(--color-bg-elevated) / <alpha-value>);
+  --color-bg-glass: rgb(var(--color-bg-glass) / <alpha-value>);
+
+  /* Borders */
+  --color-border: rgb(var(--color-border) / <alpha-value>);
+  --color-border-strong: rgb(var(--color-border-strong) / <alpha-value>);
+
+  /* Text */
+  --color-text: rgb(var(--color-text) / <alpha-value>);
+  --color-text-muted: rgb(var(--color-text-muted) / <alpha-value>);
+  --color-text-subtle: rgb(var(--color-text-subtle) / <alpha-value>);
+
+  /* Brand + accents */
+  --color-brand: rgb(var(--color-brand) / <alpha-value>);
+  --color-brand-2: rgb(var(--color-brand-2) / <alpha-value>);
+
+  /* Status */
+  --color-success: rgb(var(--color-success) / <alpha-value>);
+  --color-warning: rgb(var(--color-warning) / <alpha-value>);
+  --color-danger: rgb(var(--color-danger) / <alpha-value>);
+
+  /* Fonts (next/font variables wired in layout.tsx — task 4.4) */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}

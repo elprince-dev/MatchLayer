@@ -8,7 +8,7 @@ This spec deliberately stops short of any domain logic. There are no users, no r
 
 Scope boundaries:
 
-- **In scope:** monorepo workspace, `docker-compose.yml` (Postgres 16, Redis 7, MinIO), `.env.example`, FastAPI baseline (app factory, Pydantic Settings, structlog, request-id middleware, `/healthz`, async SQLAlchemy session, Alembic configured with no domain migrations), Next.js baseline (App Router, Tailwind, shadcn/ui, security-headers middleware, placeholder landing page), OpenAPI → TypeScript + Zod codegen with a CI drift check, GitHub Actions CI (lint, type-check, tests, dependency audits, CodeQL, gitleaks, drift check), pre-commit hooks (gitleaks, ruff format, prettier, file hygiene), production Dockerfiles, branch-protection runbook, root README.
+- **In scope:** monorepo workspace, `docker-compose.yml` (Postgres 16, Redis 7, MinIO), `.env.example`, FastAPI baseline (app factory, Pydantic Settings, structlog, request-id middleware, `/healthz`, async SQLAlchemy session, Alembic configured with no domain migrations), Next.js baseline (App Router, Tailwind, shadcn/ui, security-headers proxy, placeholder landing page), OpenAPI → TypeScript + Zod codegen with a CI drift check, GitHub Actions CI (lint, type-check, tests, dependency audits, CodeQL, gitleaks, drift check), pre-commit hooks (gitleaks, ruff format, prettier, file hygiene), production Dockerfiles, branch-protection runbook, root README.
 - **Out of scope:** any auth flow, any domain database table, any resume upload or parsing, any scoring logic, any deployment to Vercel or Fly.io, any LLM or embedding code.
 
 ## Glossary
@@ -25,7 +25,7 @@ Scope boundaries:
 - **Container_Image_Builder** — The set of production Dockerfiles for the API_App and the Web_App, plus their build configuration.
 - **Healthcheck_Endpoint** — The `GET /healthz` endpoint exposed by the API_App.
 - **Request_Id_Middleware** — The FastAPI middleware that assigns or propagates a request-id and binds it to logs.
-- **Security_Headers_Middleware** — The Next.js middleware that sets the security headers required by the security steering doc.
+- **Security_Headers_Proxy** — The Next.js proxy (file convention; formerly `middleware`) that sets the security headers required by the security steering doc.
 - **Repo_Setup_Runbook** — The markdown document at `docs/runbooks/repo-setup.md` describing manual GitHub-side configuration (branch protection, secret scanning, etc.).
 - **Root_README** — The `README.md` file at the repository root.
 - **PII** — Personally identifiable information as classified in `security.md` (resume contents, names, emails, phone numbers, etc.).
@@ -119,12 +119,12 @@ Scope boundaries:
 
 #### Acceptance Criteria
 
-1. THE Security_Headers_Middleware SHALL set a `Content-Security-Policy` header on every HTML response served by the Web_App.
-2. WHILE the Web_App is served over HTTPS, THE Security_Headers_Middleware SHALL set `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` on every response.
-3. THE Security_Headers_Middleware SHALL set `X-Content-Type-Options: nosniff` on every response.
-4. THE Security_Headers_Middleware SHALL set `X-Frame-Options: DENY` on every response.
-5. THE Security_Headers_Middleware SHALL set `Referrer-Policy: strict-origin-when-cross-origin` on every response.
-6. THE Security_Headers_Middleware SHALL set `Permissions-Policy: camera=(), microphone=(), geolocation=()` on every response.
+1. THE Security_Headers_Proxy SHALL set a `Content-Security-Policy` header on every HTML response served by the Web_App.
+2. WHILE the Web_App is served over HTTPS, THE Security_Headers_Proxy SHALL set `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` on every response.
+3. THE Security_Headers_Proxy SHALL set `X-Content-Type-Options: nosniff` on every response.
+4. THE Security_Headers_Proxy SHALL set `X-Frame-Options: DENY` on every response.
+5. THE Security_Headers_Proxy SHALL set `Referrer-Policy: strict-origin-when-cross-origin` on every response.
+6. THE Security_Headers_Proxy SHALL set `Permissions-Policy: camera=(), microphone=(), geolocation=()` on every response.
 7. THE Web_App SHALL include an automated test that asserts the presence and exact value of each security header listed in acceptance criteria 1 through 6 on the landing-page response.
 
 ### Requirement 7: Shared Types and OpenAPI Codegen Pipeline

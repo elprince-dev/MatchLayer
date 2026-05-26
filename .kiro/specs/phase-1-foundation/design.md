@@ -114,7 +114,7 @@ matchlayer/
 │           │   ├── layout.tsx                       (c)
 │           │   ├── page.tsx                         (c) — landing
 │           │   └── globals.css                      (c) — tokens + Tailwind v4
-│           ├── middleware.ts                        (c) — security headers
+│           ├── proxy.ts                             (c) — security headers
 │           ├── components/
 │           │   ├── theme-provider.tsx               (c)
 │           │   ├── theme-toggle.tsx                 (c)
@@ -383,7 +383,7 @@ apps/web/src/
 │   ├── layout.tsx           # ThemeProvider, font wiring, global styles
 │   ├── page.tsx             # Landing
 │   └── globals.css          # Tailwind v4 + tokens
-├── middleware.ts            # security headers
+├── proxy.ts                 # security headers
 ├── components/
 │   ├── theme-provider.tsx
 │   ├── theme-toggle.tsx
@@ -492,14 +492,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 Theme toggle uses the shadcn `Button` primitive plus Lucide icons (`Sun`, `Moon`). Satisfies AC 5.6.
 
-### 7.7 Security headers middleware
+### 7.7 Security headers proxy
 
-`middleware.ts` sets headers on every response. Phase 1 CSP is conservative but functional:
+`proxy.ts` sets headers on every response. Phase 1 CSP is conservative but functional:
 
 | Header | Value |
 |---|---|
 | `Content-Security-Policy` | `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' http://localhost:8000` |
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` (only when request scheme is HTTPS — Vercel sets this automatically; we do too in middleware) |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` (only when request scheme is HTTPS — Vercel sets this automatically; we do too in proxy) |
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
@@ -519,10 +519,10 @@ Satisfies AC 5.8, 5.11.
 
 ### 7.9 Tests
 
-Vitest + Testing Library. The single asserted test in this spec validates the security headers middleware:
+Vitest + Testing Library. The single asserted test in this spec validates the security headers proxy:
 
 ```ts
-// shape — tests/middleware.test.ts
+// shape — tests/proxy.test.ts
 import { describe, it, expect } from "vitest";
 
 describe("security headers", () => {

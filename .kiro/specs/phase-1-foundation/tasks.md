@@ -109,8 +109,8 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 4.7, 4.8, 4.9, 4.14_
     - _Design: §6.5_
 
-- [ ] 4. Frontend baseline (`apps/web`)
-  - [ ] 4.1 Scaffold the Next.js App Router project
+- [x] 4. Frontend baseline (`apps/web`)
+  - [x] 4.1 Scaffold the Next.js App Router project
     - Initialize `apps/web` (Next.js latest, TypeScript, App Router, ESLint, Tailwind v4, src/ layout, no experimental flags). Replace any default `tailwind.config.ts` with the design's CSS-first approach.
     - Set the package manifest fields explicitly: `"name": "@matchlayer/web"`, `"private": true`, `"type": "module"`. The `@matchlayer/web` name is referenced by every `pnpm --filter` invocation in CI and Dockerfiles.
     - Set `next.config.mjs` with `output: "standalone"` (required by §11.2 Dockerfile).
@@ -120,56 +120,57 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 5.1, 5.9, 5.10_
     - _Design: §7.1_
 
-  - [ ] 4.2 Wire Tailwind v4 with brand tokens via `globals.css`
+  - [x] 4.2 Wire Tailwind v4 with brand tokens via `globals.css`
     - Author `apps/web/src/app/globals.css` with `@import "tailwindcss";`, `:root` and `.dark` blocks defining every token from `design.md` (`--color-bg`, `--color-bg-elevated`, `--color-bg-glass`, `--color-border`, `--color-border-strong`, `--color-text`, `--color-text-muted`, `--color-text-subtle`, `--color-brand`, `--color-brand-2`, `--color-success`, `--color-warning`, `--color-danger`) as `R G B` triplets, plus an `@theme inline` block that re-exports them as Tailwind theme colors and binds `--font-sans`/`--font-mono` to the next/font CSS variables.
     - _Requirements: 5.2, 5.7, 5.11_
     - _Design: §7.2_
 
-  - [ ] 4.3 Initialize shadcn/ui with the Button primitive and `cn()` helper
+  - [x] 4.3 Initialize shadcn/ui with the Button primitive and `cn()` helper
     - Add `apps/web/components.json` (CSS-variables mode, base color `neutral`, paths under `src/components/ui`).
     - Add `apps/web/src/lib/utils.ts` exporting `cn(...inputs)` based on `clsx` + `tailwind-merge`.
     - Add `apps/web/src/components/ui/button.tsx` (the standard shadcn Button primitive).
     - _Requirements: 5.3_
     - _Design: §7.3_
 
-  - [ ] 4.4 Wire Geist Sans + Geist Mono and the root `layout.tsx`
+  - [x] 4.4 Wire Geist Sans + Geist Mono and the root `layout.tsx`
     - In `apps/web/src/app/layout.tsx`, import `Geist` and `Geist_Mono` from `next/font/google`, expose them as `--font-geist-sans` / `--font-geist-mono`, set `<html lang="en" suppressHydrationWarning>` with both CSS variables on `className`, set `<body>` to use `bg-bg text-text font-sans antialiased`, and wrap `{children}` in the `ThemeProvider` from §4.5.
     - Import `globals.css` at the top of the file.
     - _Requirements: 5.4_
     - _Design: §7.4_
 
-  - [ ] 4.5 Add the next-themes provider and theme toggle
+  - [x] 4.5 Add the next-themes provider and theme toggle
     - Create `apps/web/src/components/theme-provider.tsx` (`'use client'`) wrapping `next-themes`'s `ThemeProvider` with `attribute="class"`, `defaultTheme="system"`, `enableSystem`.
     - Create `apps/web/src/components/theme-toggle.tsx` (`'use client'`) using the shadcn `Button` primitive plus the `Sun` / `Moon` Lucide icons.
     - _Requirements: 5.6_
     - _Design: §7.6_
 
-  - [ ] 4.6 Add the reduced-motion-aware Framer Motion helper
+  - [x] 4.6 Add the reduced-motion-aware Framer Motion helper
     - Create `apps/web/src/components/motion-safe.tsx` (`'use client'`) exporting a `useMotionSafeProps(props)` hook that returns the input props unchanged unless `useReducedMotion()` is true, in which case it forces `animate = initial` and zero-duration transitions.
     - _Requirements: 5.5_
     - _Design: §7.5_
 
-  - [ ] 4.7 Implement the security-headers middleware
-    - Create `apps/web/src/middleware.ts` that runs on every request and sets `Content-Security-Policy` (the §7.7 value), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, and conditionally `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` when the request scheme is HTTPS.
-    - Configure the middleware `matcher` to apply to all paths.
+  - [x] 4.7 Implement the security-headers proxy
+    - Create `apps/web/src/proxy.ts` that runs on every request and sets `Content-Security-Policy` (the §7.7 value), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, and conditionally `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` when the request scheme is HTTPS.
+    - Configure the `proxy` `matcher` to apply to all paths.
+    - Note: this reflects the Next.js 16 file-convention rename (`middleware.ts` → `proxy.ts`, function `middleware` → `proxy`); behavior, `config.matcher`, and `NextRequest`/`NextResponse` imports are unchanged. See https://nextjs.org/docs/app/api-reference/file-conventions/proxy.
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
     - _Design: §7.7_
 
-  - [ ] 4.8 Build the placeholder landing page
+  - [x] 4.8 Build the placeholder landing page
     - Author `apps/web/src/app/page.tsx` rendering a hero section that contains the literal string `"MatchLayer"` rendered with the violet → cyan brand gradient (`bg-gradient-to-br from-brand to-brand-2 bg-clip-text text-transparent`), a tagline ("AI-native ATS, transparent scoring"), the theme toggle from §4.5, and a Framer Motion fade-up on the hero text wired through `useMotionSafeProps`.
     - Use only design-system tokens (`bg-bg`, `text-text`, `text-muted`, `bg-bg-elevated`); no hex literals.
     - Verify WCAG AA contrast in both themes for every text element.
     - _Requirements: 5.5, 5.7, 5.8, 5.11_
     - _Design: §7.8_
 
-  - [ ] 4.9 Write the security-headers vitest test
-    - Add `apps/web/tests/middleware.test.ts` (or equivalent under `src/`) that asserts every header from §4.7 is present with its exact value on a fetch to `/`.
+  - [x] 4.9 Write the security-headers vitest test
+    - Add `apps/web/tests/proxy.test.ts` (or equivalent under `src/`) that asserts every header from §4.7 is present with its exact value on a fetch to `/`.
     - The test runs against a real built+started Next server; the CI `frontend` job (§7.2) handles `pnpm --filter @matchlayer/web build` → `pnpm --filter @matchlayer/web start &` → wait-for-server → `pnpm --filter @matchlayer/web test`. Document this convention in a top-of-file comment in the test so a developer running tests locally knows to start the server first.
     - _Requirements: 6.7_
     - _Design: §7.9_
 
-- [ ] 5. Shared types + codegen pipeline (`packages/shared-types`)
-  - [ ] 5.1 Initialize the `@matchlayer/shared-types` package
+- [x] 5. Shared types + codegen pipeline (`packages/shared-types`)
+  - [x] 5.1 Initialize the `@matchlayer/shared-types` package
     - Create `packages/shared-types/package.json` (`"name": "@matchlayer/shared-types"`, `"private": true`, `"type": "module"`) with scripts `lint` (`eslint .`), `typecheck` (`tsc --noEmit`), `test` (`vitest run --passWithNoTests`), `format` (`prettier --check 'src/**/*.{ts,json,md}' 'scripts/**/*.mjs'`), `codegen` (`node ./scripts/codegen.mjs`). Every script must exist so the root `pnpm -r --parallel run` fan-outs from §1.2 don't silently skip this package and so the CI `shared-types` job (§7.2) can invoke each one.
     - Declare devDeps: `openapi-typescript`, `openapi-zod-client`, `execa`, `typescript`, `zod`, `eslint`, `prettier`, `vitest`.
     - Create `packages/shared-types/tsconfig.json` extending `../../tsconfig.base.json`, with `include: ["src"]` and `noEmit: true`.
@@ -178,14 +179,14 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 7.1, 8.5_
     - _Design: §3, §8, §9.1_
 
-  - [ ] 5.2 Author the codegen orchestrator
+  - [x] 5.2 Author the codegen orchestrator
     - Create `packages/shared-types/scripts/codegen.mjs` (Node ESM). At the top of the script, resolve its own directory with `fileURLToPath(import.meta.url)` and set the working directory used by all subsequent shell-outs to `packages/shared-types/` (the parent of `scripts/`) so the relative paths below resolve regardless of where `pnpm codegen` is invoked from.
     - In order: (1) shell out via `execa("uv", ["run", "--project", "../../apps/api", "python", "-m", "matchlayer_api.tools.dump_openapi"], { cwd: <packages/shared-types> })` and pipe stdout into `openapi.json`; (2) run `openapi-typescript openapi.json --output src/api-types.ts`; (3) run `openapi-zod-client openapi.json --output src/api-schemas.ts --with-alias`; (4) delete `openapi.json` on success.
     - Any non-zero exit from steps 1–3 must propagate. Never read or fall back to a pre-existing `openapi.json` — always re-derive from the live FastAPI app.
     - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.6, 7.7_
     - _Design: §8.1, §8.2_
 
-  - [ ] 5.3 Run `pnpm codegen` once and commit the generated artifacts
+  - [x] 5.3 Run `pnpm codegen` once and commit the generated artifacts
     - Prerequisites: `apps/api` deps installed (§3.1) and `.env` present at the repo root (`cp .env.example .env`). Postgres does NOT need to be running — `app.openapi()` does not invoke the lifespan or open a DB connection.
     - From the repo root, run `pnpm codegen`.
     - Commit the resulting `packages/shared-types/src/api-types.ts` and `packages/shared-types/src/api-schemas.ts`. These will be regenerated by the CI drift check on every PR.
@@ -193,15 +194,15 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 7.3, 7.4_
     - _Design: §8.1_
 
-  - [ ] 5.4 Author the curated `index.ts`
+  - [x] 5.4 Author the curated `index.ts`
     - Create `packages/shared-types/src/index.ts` that imports the `paths` type from `./api-types` and exports a named `HealthResponse` alias derived from `paths["/healthz"]["get"]["responses"]["200"]["content"]["application/json"]`.
     - Re-export `HealthResponseSchema` (or whatever name `openapi-zod-client` produces for the `/healthz` 200 response) from `./api-schemas` under the same curated name.
     - Verify `pnpm --filter @matchlayer/shared-types typecheck` passes.
     - _Requirements: 7.9_
     - _Design: §8.4_
 
-- [ ] 6. Checkpoint — backend, frontend, and codegen all green locally
-  - Run `docker compose up -d --wait`, `uv run --project apps/api uvicorn matchlayer_api.main:app` (must start without error and `curl /healthz` returns 200), `uv run --project apps/api pytest`, `pnpm --filter @matchlayer/web build && pnpm --filter @matchlayer/web test`, and `pnpm codegen` (zero diff). Ensure all tests pass, ask the user if questions arise.
+- [x] 6. Checkpoint — backend, frontend, and codegen all green locally
+  - Run `docker compose up -d --wait`, `uv run --project apps/api uvicorn matchlayer_api.main:app` (must start without error and `curl /healthz` returns 200), `cd apps/api && uv run pytest`, `pnpm --filter @matchlayer/web build && pnpm --filter @matchlayer/web test`, and `pnpm codegen` (zero diff). Ensure all tests pass, ask the user if questions arise.
 
 
 - [ ] 7. CI pipeline
@@ -303,22 +304,20 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
 - Each task references the granular requirement IDs it satisfies and the design section it implements, so traceability is preserved without duplicating design content.
 - Sequential ordering: every task can be executed without forward references. The codegen task (5.3) sits after both `apps/api` exposes the OpenAPI dump (3.10) and `packages/shared-types` exists with an orchestrator (5.1, 5.2). The CI workflow (7.2) sits after the source it tests exists.
 - Sibling specs `phase-1-auth` and `phase-1-matching` consume this scaffold; do not pull their work (auth flows, resume upload, scoring, MinIO bucket bootstrap, Alembic domain migrations) into this spec.
-- Tasks completed before this refresh: 1.1, 1.2, 2.1, 2.2, 3.1. The dependency graph below contains only the remaining incomplete leaf sub-tasks.
+- Tasks completed before this refresh: sections 1 through 5 (repo + workspace bootstrap, local dev stack, backend baseline, frontend baseline, shared types + codegen). The dependency graph below contains only the remaining incomplete leaf sub-tasks under sections 6 through 11.
 
 ## Task Dependency Graph
 
 ```json
 {
   "waves": [
-    { "id": 0, "tasks": ["3.2", "4.1", "5.1"] },
-    { "id": 1, "tasks": ["3.3", "3.6", "3.9", "4.2", "4.3", "4.6", "4.7", "5.2"] },
-    { "id": 2, "tasks": ["3.4", "3.5", "4.4", "4.5", "4.9"] },
-    { "id": 3, "tasks": ["3.7", "4.8"] },
-    { "id": 4, "tasks": ["3.8", "7.1", "7.3", "8.1", "9.2", "10.1"] },
-    { "id": 5, "tasks": ["3.10", "3.11", "7.2", "9.1"] },
-    { "id": 6, "tasks": ["5.3"] },
-    { "id": 7, "tasks": ["5.4", "10.2"] },
-    { "id": 8, "tasks": ["11.1", "11.2", "11.3"] }
+    { "id": 0, "tasks": ["6", "7.1", "7.3", "8.1", "9.1", "9.2"] },
+    { "id": 1, "tasks": ["7.2"] },
+    { "id": 2, "tasks": ["10.1"] },
+    { "id": 3, "tasks": ["10.2"] },
+    { "id": 4, "tasks": ["11.1", "11.2"] },
+    { "id": 5, "tasks": ["11.3"] },
+    { "id": 6, "tasks": ["11.4"] }
   ]
 }
 ```

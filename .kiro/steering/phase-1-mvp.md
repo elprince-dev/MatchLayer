@@ -51,7 +51,7 @@ Get the full vertical slice working — frontend to backend to DB to storage —
   - DB: managed Postgres on the same provider, or Supabase free tier.
 
 - **Frontend security baseline**
-  - Next.js middleware setting CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options: DENY`.
+  - Next.js proxy (formerly the `middleware` file convention; renamed in Next.js 16) setting CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options: DENY`.
   - Refresh token in `HttpOnly`, `Secure`, `SameSite=Lax` cookie. Access token in memory only (never `localStorage`).
   - CSRF token on cookie-auth mutating endpoints.
 - **Privacy/legal**
@@ -115,12 +115,12 @@ docker-compose.yml                 # postgres + minio
 5. Backend: auth module (register, login, refresh, logout, password reset, password hashing, JWT issuance via PyJWT, rate limiting, lockout).
 6. Backend: resume upload — multipart parsing, S3 client, magic-byte validation, text extraction service.
 7. Backend: match service — TF-IDF scoring, keyword overlap, persist results.
-8. Frontend: Next.js skeleton, Tailwind, shadcn/ui setup, layout, security-headers middleware.
+8. Frontend: Next.js skeleton, Tailwind, shadcn/ui setup, layout, security-headers proxy (Next.js 16 file convention; formerly `middleware`).
 9. Frontend: auth pages + cookie/session handling. Zod schemas + TS types auto-generated from OpenAPI via `openapi-typescript` and `openapi-zod-client` into `packages/shared-types/`.
 10. Frontend: resume upload page, JD input, results page.
 11. CI: GitHub Actions running ruff, mypy, pytest, eslint, vitest, **`pip-audit`, `pnpm audit --prod`, CodeQL**.
 12. Pre-commit: `gitleaks` hook configured locally and in CI.
-13. Frontend: security headers middleware, CSRF token wiring, privacy + ToS pages.
+13. Frontend: security headers proxy (Next.js 16 file convention; formerly `middleware`), CSRF token wiring, privacy + ToS pages.
 14. **Build the eyeball set:** populate `ml/evals/datasets/eyeball/` with 3–5 hand-curated resume + JD pairs (strong match, clear mismatch, partial match, adversarial keyword-stuffed). Use public datasets (Kaggle resume + JD datasets) — your own data goes in the gitignored `private/` folder if used.
 15. **Eyeball-test the deployed Phase 1:** verify scores look reasonable on the eyeball set before declaring Phase 1 done.
 16. Deploy: pick platforms, write deploy docs, wire up env vars (use platform-native secret stores even on free tier — never plaintext env in dashboards).
