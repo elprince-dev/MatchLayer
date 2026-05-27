@@ -199,11 +199,47 @@ as a `remote: error` on `git push` — covered by the smoke test in section 7.
 >
 > Reference: GitHub docs,
 > [Configuring default setup for code scanning](https://docs.github.com/en/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning).
->
-> The `security` job in `.github/workflows/ci.yml` already runs CodeQL on every PR via
-> `github/codeql-action/init` + `analyze`. Enabling default setup at the repository level adds
-> a redundant, GitHub-managed schedule and ensures contributors who fork the repo get scanning
-> without having to inspect the workflow.
+
+**Do not enable CodeQL default setup on this repository.** The canonical CodeQL scanner
+for `MatchLayer` is the **advanced workflow** in `.github/workflows/ci.yml` — the
+`security` job runs `github/codeql-action/init@v3` + `analyze@v3` for `python,
+javascript-typescript` on every push and PR, and uploads a SARIF result that the
+`required-checks` aggregator gates on. Enabling default setup at the repository level is
+**mutually exclusive** with that advanced workflow, not redundant: GitHub silently
+suppresses SARIF uploads from any in-tree workflow that calls `codeql-action/init`
+whenever default setup is configured, and the `security` job fails with an
+`HTTP 409: code scanning is not configured for advanced setup` error on the upload step.
+The two configurations cannot coexist; pick one, and on this repo it is the in-tree
+advanced workflow.
+
+**No action is required in Phase 1 for default setup.** Confirm it is _off_ and move on.
+
+**Verification**:
+
+```bash
+gh api /repos/elprince-dev/MatchLayer/code-scanning/default-setup --jq '.state'
+# Expected: not-configured
+```
+
+If the command returns `configured`, default setup has been enabled and the in-tree
+`security` job will be failing on every PR until it is disabled. To disable it: open
+_Settings → Security → Advanced Security → Code Security → CodeQL analysis_, click the
+**⋯** menu, and choose **Disable CodeQL** (or **Switch to advanced** if that option is
+offered — both have the same effect on this repo because the advanced workflow already
+exists in `ci.yml`). Then push an empty commit on any open PR to clear the stale failing
+`security` runs.
+
+The repository's **Security** tab → **Code scanning** still populates an alerts page
+(or "no alerts found") on the next push to `main`; the alerts come from the in-tree
+workflow's SARIF upload, not from default setup.
+
+### 4a. Fallback — if you can't run the advanced workflow
+
+If the in-tree advanced workflow cannot run (for example on a fork where Actions are
+disabled organization-wide, or on a stripped-down clone with no `.github/workflows/`
+directory), default setup is the acceptable fallback. **In that case, and only in that
+case**, follow the steps below. Do not run this on the canonical `elprince-dev/MatchLayer`
+repository — it will break the in-tree `security` job until it is reverted.
 
 1. In the left sidebar, under **Security**, click **Advanced Security**.
 2. Scroll to the **Code Security** sub-section.
@@ -213,20 +249,20 @@ as a `remote: error` on `git push` — covered by the smoke test in section 7.
    - In **Languages**, confirm both **Python** and **JavaScript/TypeScript** are selected. If a
      language is missing because the auto-detector cannot see it (for example on a fork where
      the language detector hasn't run yet), close the dialog and switch to **Advanced** —
-     see fallback below.
+     see the second fallback below.
    - In **Query suites**, select **Default**.
 5. Click **Enable CodeQL**. GitHub triggers a workflow run to test the new configuration.
 
-**Fallback when default setup is unavailable** (per Requirement 11.4):
+**Second fallback — Advanced setup as a generated workflow** (per Requirement 11.4):
 
 If the **Default** option is greyed out, fails to detect one of the languages, or the **Set up**
 menu only offers **Advanced**, switch to **Advanced** setup. To the right of **CodeQL
 analysis**, click **Set up ▾ → Advanced**. GitHub generates a `.github/workflows/codeql.yml`
 on a branch and opens a PR; review and merge it, keeping the languages set to `python` and
-`javascript-typescript`. This advanced workflow runs alongside the in-tree `security` job;
-that's intentional — the redundancy is the point.
+`javascript-typescript`. On a fork that has no in-tree advanced workflow yet, this is the
+preferred path because it lands the workflow file in the repo where it can be evolved.
 
-**Verification**: from the **Code Security** sub-section, click the **⋯** menu next to
+**Verification (fallback only)**: from the **Code Security** sub-section, click the **⋯** menu next to
 **CodeQL analysis** and choose **View CodeQL configuration**. The configuration shows both
 languages with the **Default** query suite. The repository's **Security** tab → **Code
 scanning** populates an alerts page (or "no alerts found") on the next push to `main` or the
