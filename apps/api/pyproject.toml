@@ -10,7 +10,7 @@ license = { text = "MIT" }
 # "Pinned major versions for all dependencies; lockfiles committed and CI installs with frozen lockfile."
 # Lower bound = a known-good current minor; upper bound = next major.
 dependencies = [
-    "fastapi>=0.115,<0.120",
+    "fastapi>=0.133,<0.140,!=0.136.3",
     "uvicorn[standard]>=0.30,<0.40",
     "pydantic>=2.9,<3.0",
     "pydantic-settings>=2.6,<3.0",
