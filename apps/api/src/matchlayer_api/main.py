@@ -88,6 +88,7 @@ from matchlayer_api.core.db import verify_database_connection
 from matchlayer_api.core.errors import register_exception_handlers
 from matchlayer_api.core.logging import configure_logging
 from matchlayer_api.core.middleware import RequestIdMiddleware
+import os, sys  # smoke-test: deliberate ruff E401 failure
 
 # Module-level logger. The startup probe runs *before* any HTTP
 # request, so the contextvar fields the request-id middleware binds
