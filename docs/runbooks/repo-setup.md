@@ -199,11 +199,47 @@ as a `remote: error` on `git push` — covered by the smoke test in section 7.
 >
 > Reference: GitHub docs,
 > [Configuring default setup for code scanning](https://docs.github.com/en/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning).
->
-> The `security` job in `.github/workflows/ci.yml` already runs CodeQL on every PR via
-> `github/codeql-action/init` + `analyze`. Enabling default setup at the repository level adds
-> a redundant, GitHub-managed schedule and ensures contributors who fork the repo get scanning
-> without having to inspect the workflow.
+
+**Do not enable CodeQL default setup on this repository.** The canonical CodeQL scanner
+for `MatchLayer` is the **advanced workflow** in `.github/workflows/ci.yml` — the
+`security` job runs `github/codeql-action/init@v3` + `analyze@v3` for `python,
+javascript-typescript` on every push and PR, and uploads a SARIF result that the
+`required-checks` aggregator gates on. Enabling default setup at the repository level is
+**mutually exclusive** with that advanced workflow, not redundant: GitHub silently
+suppresses SARIF uploads from any in-tree workflow that calls `codeql-action/init`
+whenever default setup is configured, and the `security` job fails with an
+`HTTP 409: code scanning is not configured for advanced setup` error on the upload step.
+The two configurations cannot coexist; pick one, and on this repo it is the in-tree
+advanced workflow.
+
+**No action is required in Phase 1 for default setup.** Confirm it is _off_ and move on.
+
+**Verification**:
+
+```bash
+gh api /repos/elprince-dev/MatchLayer/code-scanning/default-setup --jq '.state'
+# Expected: not-configured
+```
+
+If the command returns `configured`, default setup has been enabled and the in-tree
+`security` job will be failing on every PR until it is disabled. To disable it: open
+_Settings → Security → Advanced Security → Code Security → CodeQL analysis_, click the
+**⋯** menu, and choose **Disable CodeQL** (or **Switch to advanced** if that option is
+offered — both have the same effect on this repo because the advanced workflow already
+exists in `ci.yml`). Then push an empty commit on any open PR to clear the stale failing
+`security` runs.
+
+The repository's **Security** tab → **Code scanning** still populates an alerts page
+(or "no alerts found") on the next push to `main`; the alerts come from the in-tree
+workflow's SARIF upload, not from default setup.
+
+### 4a. Fallback — if you can't run the advanced workflow
+
+If the in-tree advanced workflow cannot run (for example on a fork where Actions are
+disabled organization-wide, or on a stripped-down clone with no `.github/workflows/`
+directory), default setup is the acceptable fallback. **In that case, and only in that
+case**, follow the steps below. Do not run this on the canonical `elprince-dev/MatchLayer`
+repository — it will break the in-tree `security` job until it is reverted.
 
 1. In the left sidebar, under **Security**, click **Advanced Security**.
 2. Scroll to the **Code Security** sub-section.
@@ -213,20 +249,20 @@ as a `remote: error` on `git push` — covered by the smoke test in section 7.
    - In **Languages**, confirm both **Python** and **JavaScript/TypeScript** are selected. If a
      language is missing because the auto-detector cannot see it (for example on a fork where
      the language detector hasn't run yet), close the dialog and switch to **Advanced** —
-     see fallback below.
+     see the second fallback below.
    - In **Query suites**, select **Default**.
 5. Click **Enable CodeQL**. GitHub triggers a workflow run to test the new configuration.
 
-**Fallback when default setup is unavailable** (per Requirement 11.4):
+**Second fallback — Advanced setup as a generated workflow** (per Requirement 11.4):
 
 If the **Default** option is greyed out, fails to detect one of the languages, or the **Set up**
 menu only offers **Advanced**, switch to **Advanced** setup. To the right of **CodeQL
 analysis**, click **Set up ▾ → Advanced**. GitHub generates a `.github/workflows/codeql.yml`
 on a branch and opens a PR; review and merge it, keeping the languages set to `python` and
-`javascript-typescript`. This advanced workflow runs alongside the in-tree `security` job;
-that's intentional — the redundancy is the point.
+`javascript-typescript`. On a fork that has no in-tree advanced workflow yet, this is the
+preferred path because it lands the workflow file in the repo where it can be evolved.
 
-**Verification**: from the **Code Security** sub-section, click the **⋯** menu next to
+**Verification (fallback only)**: from the **Code Security** sub-section, click the **⋯** menu next to
 **CodeQL analysis** and choose **View CodeQL configuration**. The configuration shows both
 languages with the **Default** query suite. The repository's **Security** tab → **Code
 scanning** populates an alerts page (or "no alerts found") on the next push to `main` or the
@@ -336,3 +372,87 @@ No action required in Phase 1.
 The repository is now configured. Re-run sections 1–5 in order on any future fork or transfer;
 re-run section 7 after any change to `ci.yml`'s required jobs or to the `Protect main`
 ruleset.
+
+---
+
+## 8. Troubleshooting — `ci.yml` doesn't trigger on the smoke PR
+
+> Source: discovered while running section 7. Documenting because the failure mode is
+> invisible from the standard _Settings → Actions → General_ surface.
+
+If section 7 stalls because no GitHub Actions run ever appears on the smoke PR — `gh pr checks 1`
+shows only the always-on apps (CodeQL default-setup, GitGuardian, etc.) and `gh run list --branch
+phase-1/smoke-required-checks` is empty — the most likely cause is that **the `CI` workflow has
+been disabled at the per-workflow level**.
+
+GitHub silently puts a workflow into `disabled_manually` state when:
+
+- An admin clicks **Disable workflow** on the workflow's page in the **Actions** tab (the
+  three-dot ⋯ menu). This is a per-workflow toggle separate from _Settings → Actions →
+  General_'s "Allow all actions and reusable workflows" radio buttons. The repo-level setting
+  can be `enabled` while a specific workflow is `disabled_manually`.
+- A workflow file is detected as having syntax that GitHub considers structurally invalid (rare).
+- A scheduled workflow has not run for 60 days on a public repository (does not apply to
+  `pull_request`/`push`-triggered workflows like ours, but worth knowing).
+
+The disable does **not** show up in:
+
+- _Settings → Actions → General_ (which only governs the global enabled/allowed-actions policy,
+  not per-workflow state).
+- The Actions tab list of workflows in the left sidebar (the workflow still appears, just
+  without a "Run" badge).
+
+It is visible at:
+
+- _Actions tab_ → click the workflow name → if disabled, a yellow banner reads "This workflow
+  was disabled manually. To re-enable it, click Enable workflow."
+- API: `gh api /repos/<owner>/<repo>/actions/workflows/ci.yml --jq '.state'` returns
+  `disabled_manually` instead of `active`.
+
+### Diagnosis
+
+Run, in order:
+
+```bash
+# 1. Is the workflow file present on the smoke branch?
+git show phase-1/smoke-required-checks:.github/workflows/ci.yml | head -50
+# Expected: identical (or near-identical) to main's ci.yml.
+
+# 2. Has GitHub recorded any workflow_run for the smoke branch?
+gh api "/repos/<owner>/<repo>/actions/runs?branch=phase-1/smoke-required-checks&per_page=20" \
+  --jq '.workflow_runs | length'
+# Expected: > 0 once CI has triggered. If 0 here but > 0 on main, the gate is repo-wide
+# and the next query confirms it.
+
+# 3. What state is the CI workflow in?
+gh api "/repos/<owner>/<repo>/actions/workflows/ci.yml" --jq '{name, path, state}'
+# Smoking gun: state == "disabled_manually".
+```
+
+### Fix
+
+Re-enable the workflow, then push an empty commit on the smoke branch to retrigger it (the
+disable does not retroactively trigger missed runs):
+
+```bash
+gh api -X PUT "/repos/<owner>/<repo>/actions/workflows/ci.yml/enable"
+gh api "/repos/<owner>/<repo>/actions/workflows/ci.yml" --jq '.state'  # should be "active"
+
+git checkout phase-1/smoke-required-checks
+git commit --allow-empty -m "chore: retrigger CI for smoke test verification"
+git push
+```
+
+Within a minute, `gh api "/repos/<owner>/<repo>/actions/runs?branch=phase-1/smoke-required-checks"`
+should report a new run, and section 7 step 4 can resume.
+
+The web-UI equivalent is _Actions tab → CI → Enable workflow_ on the yellow banner.
+
+### Why this is documented as a solo-dev gotcha
+
+In a multi-person repo, someone else disabling a workflow leaves a UI breadcrumb (the banner)
+that a reviewer would notice on the next push. Solo dev workflows hit this trap when the
+disable was done weeks earlier — for example to mute a noisy CI run during heavy local work —
+and was forgotten by the time the next PR opens. The smoke test is exactly when that becomes
+visible, because branch protection requires a check that the disabled workflow would have
+produced.
