@@ -1,0 +1,53 @@
+# Build-context exclusions for `docker build` from the repo root.
+#
+# The container image Dockerfiles in infra/docker/ COPY explicit paths, so this list is
+# about (a) keeping the context small/fast and (b) preventing host-only artifacts from
+# being uploaded to the build daemon. Anything secret-bearing (e.g., `.env`) MUST be
+# excluded here even though it is never COPY'd into the image — the build context is
+# uploaded to the daemon in full.
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# VCS metadata
+.git
+.gitignore
+.gitattributes
+
+# Editor / IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Python virtualenvs and caches (generated locally; rebuilt inside the image)
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+
+# Node / pnpm (Web image rebuilds these inside its own builder stage)
+**/node_modules
+**/.next
+**/.turbo
+**/.pnpm-store
+
+# Build output and coverage
+**/dist
+**/build
+**/coverage
+
+# Docker tooling
+docker-compose.yml
+docker-compose.*.yml
+infra/docker/*.dockerignore
+
+# Top-level docs and Kiro spec metadata — not needed for any image build
+.kiro
+docs
+README.md
+LICENSE
