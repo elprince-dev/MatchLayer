@@ -286,13 +286,13 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 7.5, 7.8_
     - _Design: §8.3_
 
-  - [-] 11.3 Open the foundation PR and verify CI is green
+  - [x] 11.3 Open the foundation PR and verify CI is green
     - Push branch `phase-1/foundation`, open a PR targeting `main`, and confirm all five required CI jobs (`backend`, `frontend`, `shared-types`, `security`, `openapi-drift`) plus the `required-checks` aggregator pass green.
     - Then run the manual deliberate-failure smoke test documented in `docs/runbooks/repo-setup.md` §10.1 step (7) on a separate throwaway branch to confirm branch protection blocks merge on a red `required-checks`.
     - _Requirements: 8.2, 8.3, 8.12_
     - _Design: §9, §13_
 
-  - [ ] 11.4 Final checkpoint — Ensure all tests pass
+  - [x] 11.4 Final checkpoint — Ensure all tests pass
     - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
