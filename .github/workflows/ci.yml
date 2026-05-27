@@ -269,8 +269,14 @@ jobs:
       # not CVSS severity. AC 8.6 asks for "high or critical" gating; CVSS-
       # filtered behavior is a follow-up — for now any unfixed vuln blocks
       # the build, which is the stricter (safer) interpretation.
+      # `--no-emit-project` strips the `-e .` line for matchlayer-api itself.
+      # Without it, pip-audit's isolated-env install (which runs under modern
+      # pip with --require-hashes when any line carries hashes) refuses the
+      # editable directory because there's no single file to hash. The audit
+      # surface we care about is third-party deps; the project itself isn't
+      # on PyPI and has no advisories to match.
       - name: Export production Python deps to requirements.txt
-        run: uv export --project apps/api --no-dev --format requirements-txt > requirements.txt
+        run: uv export --project apps/api --no-dev --no-emit-project --format requirements-txt > requirements.txt
 
       - name: pip-audit (Python production deps)
         run: uv tool run pip-audit --strict -r requirements.txt
