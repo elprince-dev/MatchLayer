@@ -238,8 +238,8 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
     - _Design: §10_
 
-- [ ] 9. Production container images
-  - [ ] 9.1 Author `infra/docker/api.Dockerfile`
+- [x] 9. Production container images
+  - [x] 9.1 Author `infra/docker/api.Dockerfile`
     - Multi-stage: builder `python:3.13-slim` pinned by digest, copy in `uv` from `ghcr.io/astral-sh/uv`, `uv sync --frozen --no-dev`, copy `apps/api/src` and `apps/api/alembic*`. Final stage `gcr.io/distroless/python3-debian13:nonroot` pinned by digest (this image ships Python 3.13, matching the builder), copy the resolved `.venv` and the source/alembic dirs, set `PATH` and `PYTHONPATH`, `USER nonroot`, `EXPOSE 8000`, `HEALTHCHECK` that GETs `http://127.0.0.1:8000/healthz` via `python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status == 200 else 1)"`, `ENTRYPOINT` running uvicorn against `matchlayer_api.main:app` on `0.0.0.0:8000`.
     - Document the `--read-only` runtime contract in a top-of-file comment: the image must be runnable as `docker run --read-only --tmpfs /tmp ...`. uvicorn does not write to disk; `/tmp` is mounted as tmpfs for any transient interpreter scratch.
     - Verify locally:
@@ -248,7 +248,7 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 10.1, 10.3, 10.4, 10.5, 10.6, 10.7, 10.9_
     - _Design: §11.1_
 
-  - [ ] 9.2 Author `infra/docker/web.Dockerfile`
+  - [x] 9.2 Author `infra/docker/web.Dockerfile`
     - Multi-stage: builder `node:24-bookworm-slim` pinned by digest, `corepack enable`, copy lockfile + workspace files, `pnpm install --frozen-lockfile`, copy the rest, `pnpm --filter @matchlayer/web build` (relies on `output: "standalone"` from §4.1). Final stage `gcr.io/distroless/nodejs24-debian12:nonroot` pinned by digest, copy `.next/standalone`, `.next/static`, `public` from the builder, `USER nonroot`, `EXPOSE 3000`, `HEALTHCHECK` GETting `http://127.0.0.1:3000/`, `ENTRYPOINT ["/nodejs/bin/node", "apps/web/server.js"]`.
     - Document the `--read-only` runtime contract in a top-of-file comment: the image must be runnable as `docker run --read-only --tmpfs /tmp ...`. The Next.js standalone server does not write to disk at runtime; `/tmp` is mounted as tmpfs for any transient scratch.
     - Verify locally:
@@ -257,13 +257,13 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 10.2, 10.3, 10.4, 10.5, 10.6, 10.8, 10.9_
     - _Design: §11.2_
 
-- [ ] 10. Documentation
-  - [ ] 10.1 Author `docs/runbooks/repo-setup.md`
+- [x] 10. Documentation
+  - [x] 10.1 Author `docs/runbooks/repo-setup.md`
     - Numbered, re-runnable checklist covering (1) branch protection on `main` (require PR with 1 approval, require the `required-checks` aggregator job, require linear history, disallow force pushes/deletions); (2) Secret Scanning + Push Protection; (3) Dependabot security updates; (4) CodeQL default setup for Python and JavaScript-TypeScript; (5) repository topics; (6) a placeholder section for environments deferred to Phase 6; (7) a documented manual smoke test: open a throwaway branch with a deliberate lint or test failure, push it, confirm the `required-checks` aggregator fails, and confirm branch protection blocks merge — all as a post-setup validation.
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
     - _Design: §13_
 
-  - [ ] 10.2 Update the root `README.md`
+  - [x] 10.2 Update the root `README.md`
     - Add a "Prerequisites" section: pnpm, Node 24+, Python 3.13+, uv, Docker Engine 24+, `pre-commit`, and `gitleaks` v8.x on PATH (install from https://github.com/gitleaks/gitleaks/releases — the `.pre-commit-config.yaml` uses the `gitleaks-system` hook variant which requires a prebuilt binary rather than compiling from Go source). Note WSL on Windows for the `pre-commit` and `gitleaks` install paths.
     - Replace the existing "Running locally" section with a numbered setup flow: clone → `cp .env.example .env` → `pnpm install` → `uv sync` (in `apps/api`) → `docker compose up -d --wait` → `uv run --project apps/api alembic upgrade head` (no-op against the empty baseline, but exercises wiring) → `pre-commit install` → `uv run --project apps/api uvicorn matchlayer_api.main:app --reload` (port 8000) and `pnpm --filter @matchlayer/web dev` (port 3000).
     - Add a "Branch & PR conventions" pointer that the foundation PR uses branch `phase-1/foundation` and link to `conventions.md`.
@@ -273,7 +273,7 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Design: §13_
 
 - [ ] 11. Final QA / smoke
-  - [ ] 11.1 Walk the README setup flow on a simulated fresh clone
+  - [x] 11.1 Walk the README setup flow on a simulated fresh clone
     - From the foundation branch, simulate a fresh clone in a way that does NOT touch the live working tree: clone the repo into a sibling temp directory (`git clone . ../matchlayer-smoke && cd ../matchlayer-smoke`), then run only `cp .env.example .env` and proceed with the README steps in order.
     - Do NOT run `git clean -xdf` on the primary working tree — it destroys uncommitted work.
     - Execute every numbered step in the README in order. Record any deviation, fix the README in this same task, and re-run until the steps pass verbatim.
@@ -281,12 +281,12 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 12.2_
     - _Design: §13_
 
-  - [ ] 11.2 Confirm `pnpm codegen` is a no-op on a clean tree
+  - [x] 11.2 Confirm `pnpm codegen` is a no-op on a clean tree
     - From a clean checkout of the foundation branch, run `pnpm codegen` and `git diff --exit-code packages/shared-types/src/`. Both must succeed.
     - _Requirements: 7.5, 7.8_
     - _Design: §8.3_
 
-  - [ ] 11.3 Open the foundation PR and verify CI is green
+  - [-] 11.3 Open the foundation PR and verify CI is green
     - Push branch `phase-1/foundation`, open a PR targeting `main`, and confirm all five required CI jobs (`backend`, `frontend`, `shared-types`, `security`, `openapi-drift`) plus the `required-checks` aggregator pass green.
     - Then run the manual deliberate-failure smoke test documented in `docs/runbooks/repo-setup.md` §10.1 step (7) on a separate throwaway branch to confirm branch protection blocks merge on a red `required-checks`.
     - _Requirements: 8.2, 8.3, 8.12_
