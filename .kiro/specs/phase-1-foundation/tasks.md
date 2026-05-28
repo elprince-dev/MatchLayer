@@ -231,7 +231,7 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - Enable security-only updates (`open-pull-requests-limit: 0` for non-security ecosystems, `package-ecosystem: "npm"` rooted at `/`, `package-ecosystem: "pip"` rooted at `/apps/api`, `package-ecosystem: "github-actions"` rooted at `/`).
     - _Design: §9; security.md "Dependency & supply-chain security"_
 
-- [ ] 8. Pre-commit hooks
+- [x] 8. Pre-commit hooks
   - [x] 8.1 Author `.pre-commit-config.yaml`
     - Hooks (in order): `pre-commit-hooks` standard set (`trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-json`, `check-added-large-files` with `--maxkb=5120`); `gitleaks` (mirror); `ruff` for `format` then `check --fix` scoped to Python files; `prettier` scoped to JS/TS/JSON/MD/YAML files.
     - Run `pre-commit install` locally and `pre-commit run --all-files` once to verify the foundation tree passes the hooks before the foundation PR is opened.
@@ -272,7 +272,7 @@ Languages (fixed by `tech.md` and the design): **Python 3.13** for the API, **Ty
     - _Requirements: 12.1, 12.2, 12.3, 12.4_
     - _Design: §13_
 
-- [ ] 11. Final QA / smoke
+- [x] 11. Final QA / smoke
   - [x] 11.1 Walk the README setup flow on a simulated fresh clone
     - From the foundation branch, simulate a fresh clone in a way that does NOT touch the live working tree: clone the repo into a sibling temp directory (`git clone . ../matchlayer-smoke && cd ../matchlayer-smoke`), then run only `cp .env.example .env` and proceed with the README steps in order.
     - Do NOT run `git clean -xdf` on the primary working tree — it destroys uncommitted work.
