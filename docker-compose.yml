@@ -28,6 +28,11 @@ services:
       - "5432:5432"
     volumes:
       - matchlayer-postgres-data:/var/lib/postgresql/data
+      # Postgres runs every ``.sql`` file in this directory on first
+      # boot of the data volume. ``01-create-app-role.sql`` provisions
+      # the least-privilege ``matchlayer_app`` role the auth migration
+      # GRANT/REVOKEs against (task 16.4).
+      - ./infra/docker/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U matchlayer -d matchlayer"]
       interval: 2s

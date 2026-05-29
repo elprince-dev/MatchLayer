@@ -108,7 +108,7 @@ After the prerequisites are installed:
    uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
    ```
 
-   `alembic.ini` lives inside `apps/api/`, so the explicit `-c` flag is required when running from the repo root — without it Alembic can't find `script_location`. This is a no-op against the empty Phase 1 baseline, but exercises the migration wiring so drift shows up early.
+   `alembic.ini` lives inside `apps/api/`, so the explicit `-c` flag is required when running from the repo root — without it Alembic can't find `script_location`. Phase 1 ships migration `0001_users_and_auth` which creates `users`, `refresh_tokens`, `password_reset_tokens`, and the append-only `audit_events` table (with role-scoped grants — see [Audit log notes](#audit-log) below).
 
 7. **Install pre-commit hooks.**
 
@@ -127,6 +127,54 @@ After the prerequisites are installed:
    # Web — http://localhost:3000
    pnpm --filter @matchlayer/web dev
    ```
+
+## Phase 1 auth — local development helpers
+
+### Environment variables
+
+`cp .env.example .env` covers every variable the auth surface needs, including the `MATCHLAYER_JWT_SECRET` placeholder (33 bytes, satisfies the 32-byte floor) and `MATCHLAYER_ENVIRONMENT=development` (required for the cookie `Secure`-flag carve-out on `http://localhost`). No further edits are needed for local dev.
+
+### Retrieve a dev-mode reset link
+
+Phase 1 has no email provider. The password-reset request flow logs the link via the dev-mode store. Retrieve the most recent link with:
+
+```bash
+curl http://localhost:8000/api/v1/dev/last-reset-link
+```
+
+Returns `{ "link": "http://localhost:3000/reset-password?token=...", "created_at": "..." }` or both fields `null` when no reset has been requested since the API process started.
+
+This endpoint is **only** mounted when `MATCHLAYER_ENVIRONMENT=development`. In any other environment the path returns the standard 404 envelope.
+
+### Inspect recent audit events
+
+Every security-relevant action (register, login success/failure, refresh rotation, password reset, etc.) writes an append-only row to `audit_events`. Inspect them with:
+
+```bash
+psql "$MATCHLAYER_DATABASE_URL" -c "SELECT created_at, event_type, user_id, payload FROM audit_events ORDER BY created_at DESC LIMIT 20;"
+```
+
+The audit log is retained for at least 1 year. Archiving to S3 is deferred to Phase 6.
+
+### Audit log
+
+The `audit_events` table is append-only by construction. The migration grants `INSERT` and `SELECT` to `MATCHLAYER_DATABASE_APP_ROLE` (the app's runtime role) and explicitly revokes `UPDATE`, `DELETE`, and `TRUNCATE`. A successful auth path produces exactly one row per documented event type per request.
+
+The docker-compose `POSTGRES_USER` is the role the migration grants `INSERT, SELECT` on `audit_events` to — keep them in sync if you change either value.
+
+### Run the local timing test (INV-5)
+
+The login-timing-equality invariant (Requirement 2.4) and the Argon2id p95 hash-latency budget (Requirement 15.2) are both verified by local-only timing tests that are excluded from CI by the `not timing` pytest marker (CI runners are too noisy for sub-30ms timing assertions):
+
+```bash
+cd apps/api && uv run pytest -m timing
+```
+
+Run it on a quiet developer laptop. Expects ≤ 25ms median delta between the unknown-email and known-but-wrong-password code paths and Argon2id p95 hash latency under the §15.2 / Requirement 15.2 budget. The `cd apps/api &&` prefix matches CI's `working-directory: apps/api` so `asyncio_mode = "auto"` from `apps/api/pyproject.toml` is honored (see task 16.8).
+
+### Skip-if-no-infra tests
+
+Integration tests under `apps/api/tests/integration/` and infra-dependent property tests under `apps/api/tests/property/` skip when Postgres or Redis isn't reachable. Bring up `docker compose up -d --wait` to run them locally; CI runs them automatically.
 
 ## Branch & PR conventions
 

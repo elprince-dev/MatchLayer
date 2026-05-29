@@ -41,17 +41,100 @@ when ``app`` ever moves to a wider scope.
 
 from __future__ import annotations
 
+import asyncio
+import warnings
 from collections.abc import AsyncIterator, Callable, Iterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from hypothesis import settings as hypothesis_settings
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from matchlayer_api.core.db import get_session
 from matchlayer_api.main import create_app
+
+# ---------------------------------------------------------------------------
+# Session-end event-loop cleanup (task 16.9).
+#
+# ``pytest-asyncio`` (function loop scope) closes each test's event loop on
+# teardown and then immediately installs a *fresh* replacement loop as the
+# policy's current loop (see ``pytest_asyncio/plugin.py`` ``new_event_loop``).
+# That replacement keeps the loop API usable for any between-test code, but
+# the LAST replacement created in the session is never superseded — nothing
+# closes it. At interpreter shutdown CPython GC-collects that orphaned
+# ``_UnixSelectorEventLoop`` while it is still open, and
+# ``BaseEventLoop.__del__`` emits ``ResourceWarning: unclosed event loop``
+# plus two ``ResourceWarning: unclosed <socket.socket ... family=1>`` for the
+# loop's AF_UNIX self-pipe (``socket.socketpair()`` in
+# ``selector_events._make_self_pipe``). ``filterwarnings = ["error"]`` then
+# promotes those three unraisable warnings into a session-end
+# ``ExceptionGroup`` that makes pytest exit non-zero even though every test
+# body passed — failing the foundation's ``backend`` CI check.
+#
+# Confirmed via ``PYTHONTRACEMALLOC=25``: all three leaked resources trace to
+# ``pytest_asyncio/plugin.py`` ``_provide_clean_event_loop`` →
+# ``policy.new_event_loop()``, not to any MatchLayer fixture or production
+# code. pytest-asyncio installs a fresh "clean" loop after every async test
+# so between-test ``get_event_loop()`` calls don't see a closed loop; the
+# final such loop is never superseded and never closed.
+#
+# The fix closes that orphaned loop in ``pytest_unconfigure`` (which runs
+# during ``config._ensure_unconfigure()``, before the unraisable-exception
+# plugin's cleanup callback forces the ``gc.collect()`` that would otherwise
+# surface the warning). ``gc.collect()`` is called first so any other
+# dereferenced-but-not-finalized loops are reclaimed deterministically while
+# warnings are suppressed, then the policy's current loop is closed. Both
+# steps are guarded and idempotent.
+# ---------------------------------------------------------------------------
+
+
+def _close_orphaned_event_loop() -> None:
+    """Close the leftover pytest-asyncio replacement loop (task 16.9)."""
+    import gc
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        # Reclaim any dereferenced-but-unfinalized loops while warnings are
+        # suppressed, so their __del__ doesn't fire during the later
+        # unraisable-collection gc pass that runs under error-as-warning.
+        gc.collect()
+        try:
+            loop = asyncio.get_event_loop_policy().get_event_loop()
+        except Exception:
+            return
+        if loop is not None and not loop.is_closed():
+            loop.close()
+        gc.collect()
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Close the orphaned event loop before unraisable-warning collection (task 16.9)."""
+    _close_orphaned_event_loop()
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Close the leftover pytest-asyncio replacement event loop (task 16.9)."""
+    _close_orphaned_event_loop()
+
+
+# ---------------------------------------------------------------------------
+# Hypothesis configuration for the property-based test suite (phase-1-auth).
+#
+# Argon2id at the design's parameters (m=64MiB, t=2) takes >=80 ms per hash on
+# a developer laptop. Hypothesis's default per-example deadline (200 ms) is
+# too tight for hash-roundtrip properties, so the "auth" profile disables it.
+# We also bump max_examples to 200 so the property is exercised meaningfully
+# without dragging the suite past CI budgets.
+# ---------------------------------------------------------------------------
+hypothesis_settings.register_profile(
+    "auth",
+    deadline=None,
+    max_examples=200,
+)
+hypothesis_settings.load_profile("auth")
 
 # Type alias for the factory the override fixture exposes. Tests call
 # the returned callable with either no argument (success path) or a

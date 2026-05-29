@@ -22,6 +22,9 @@ from typing import Annotated, Literal
 from pydantic import AnyHttpUrl, Field, PostgresDsn, RedisDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+# Re-export for downstream convenience.
+__all__ = ["Environment", "LogLevel", "Settings", "get_settings"]
+
 Environment = Literal["development", "staging", "production"]
 """Allowed values for ``MATCHLAYER_ENVIRONMENT``."""
 
@@ -111,6 +114,54 @@ class Settings(BaseSettings):
     # strings. ``NoDecode`` disables ``pydantic-settings``'s automatic JSON
     # parsing for this field so the validator below can accept both shapes.
     cors_allowed_origins: Annotated[list[AnyHttpUrl], NoDecode] = Field(default_factory=list)
+
+    # ---- authentication (phase-1-auth §17.1) -----------------------------
+    jwt_secret: SecretStr
+    auth_access_token_ttl_seconds: int = 900
+    auth_refresh_token_ttl_seconds: int = 604800
+    auth_lockout_threshold: int = 10
+    auth_lockout_window_seconds: int = 900
+    auth_lockout_duration_seconds: int = 900
+    web_base_url: AnyHttpUrl = AnyHttpUrl("http://localhost:3000")
+    database_app_role: str = "matchlayer_app"
+    # Password used by the integration test suite (and any local
+    # tooling) to open a connection authenticated as
+    # ``database_app_role`` for INV-1 audit-grant verification
+    # (task 16.4). The dev-stack value mirrors the password the
+    # ``infra/docker/postgres-init/01-create-app-role.sql`` bootstrap
+    # script seeds; production deployments inject a Secrets Manager-
+    # backed value.
+    database_app_role_password: SecretStr = SecretStr("dev_only_app_role_password")
+
+    # ---- rate limiting (phase-1-auth §17.1) ------------------------------
+    auth_rate_limit_register_ip_limit: int = 10
+    auth_rate_limit_register_ip_window_seconds: int = 900
+    auth_rate_limit_login_email_limit: int = 10
+    auth_rate_limit_login_email_window_seconds: int = 900
+    auth_rate_limit_login_ip_limit: int = 50
+    auth_rate_limit_login_ip_window_seconds: int = 900
+    auth_rate_limit_refresh_ip_limit: int = 60
+    auth_rate_limit_refresh_ip_window_seconds: int = 60
+    auth_rate_limit_reset_request_email_limit: int = 5
+    auth_rate_limit_reset_request_email_window_seconds: int = 3600
+    auth_rate_limit_reset_request_ip_limit: int = 20
+    auth_rate_limit_reset_request_ip_window_seconds: int = 3600
+    auth_rate_limit_reset_confirm_ip_limit: int = 20
+    auth_rate_limit_reset_confirm_ip_window_seconds: int = 3600
+
+    # ---- validators ------------------------------------------------------
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def _jwt_secret_min_length(cls, v: SecretStr) -> SecretStr:
+        """Reject secrets shorter than 32 bytes UTF-8 at startup."""
+        byte_len = len(v.get_secret_value().encode("utf-8"))
+        if byte_len < 32:
+            raise ValueError(
+                "MATCHLAYER_JWT_SECRET must be at least 32 bytes when "
+                f"UTF-8 encoded; received {byte_len} bytes"
+            )
+        return v
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod

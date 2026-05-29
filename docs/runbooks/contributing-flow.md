@@ -265,3 +265,45 @@ git checkout phase-1/oops-recovery # back to your work, now on the right branch
 If you already pushed to `main`, the ruleset should have rejected it. If it
 somehow didn't, revert the commit on `main` via a PR — never `git push --force`
 on `main`.
+
+## Auth-specific gotchas (Phase 1)
+
+The phase-1-auth landing surfaced two extra traps worth flagging on top of the
+generic flow above. Both are documented behavior, not bugs.
+
+### Auth_Router signature changes require a fresh `pnpm codegen`
+
+The general `pnpm codegen` gotcha above applies to every router on the FastAPI
+surface, but the auth router is the most-touched one in early phases and the
+one whose drift is most user-visible (login/register/refresh contracts feed
+directly into `apps/web/src/lib/api.ts` and the React Hook Form + Zod
+resolvers). Any time you touch a Pydantic model or path under
+`apps/api/src/matchlayer_api/api/auth/`, re-run codegen and inspect the diff:
+
+```bash
+pnpm codegen
+git diff packages/shared-types/src/   # commit the regenerated TS + Zod output
+```
+
+If you forget, the `openapi-drift` CI job fails on the PR. Fix locally, push
+the regenerated files in the same branch, and the job retriggers automatically.
+
+### `localhost` and the auth cookies' `Secure`-flag carve-out
+
+`matchlayer_refresh` and `matchlayer_csrf` are emitted with `Secure` set in
+every environment **except** `MATCHLAYER_ENVIRONMENT=development`, where the
+flag is dropped so the browser keeps the cookies on plain `http://localhost`
+(see design §9.2). Two consequences worth knowing about:
+
+- If your local `.env` has `MATCHLAYER_ENVIRONMENT` unset or set to anything
+  other than `development`, the browser will silently drop the refresh cookie
+  on `http://localhost:3000`, login will appear to succeed, and the silent
+  refresh on `lib/api.ts` will then 401. Symptom: "I just signed in but the
+  next request says I'm logged out." Fix: `MATCHLAYER_ENVIRONMENT=development`
+  in `.env`.
+- The carve-out is `development`-only on purpose. Do not extend it to
+  `staging`/`production`/CI. The cookie-emission helpers in
+  `core/security/cookies.py` are the single source of truth for the attribute
+  set; if you find yourself reaching for an additional carve-out, change the
+  helper rather than the call site, and update §9.2 of the design doc to keep
+  the table honest.
