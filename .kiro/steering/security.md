@@ -92,6 +92,7 @@ What we explicitly **don't** defend against (yet): nation-state actors, sophisti
 - **Production:** AWS Secrets Manager. App reads via IAM role at startup, not from env.
 - **Rotation:** JWT signing keys rotate every 90 days. DB password rotates every 180 days (Secrets Manager managed rotation).
 - **No secret in error messages, stack traces, logs, or LLM telemetry.**
+- **Synthetic test secrets:** test fixtures that must look like secrets (JWT length-floor keys, password literals) are exempted per-value, never by disabling a scanner. Annotate the line `# gitleaks:allow — <reason>` AND add a scoped `secret.ignored-matches` entry to `.gitguardian.yaml` (GitGuardian ignores gitleaks annotations). Full procedure in `conventions.md` → "Handling synthetic test secrets". Never use `git commit --no-verify` to bypass a secret-scan failure.
 
 ## Logging & audit
 

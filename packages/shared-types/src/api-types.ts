@@ -43,10 +43,152 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register */
+        post: operations["register_api_v1_auth_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_v1_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Me */
+        get: operations["get_me_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Me */
+        patch: operations["patch_me_api_v1_auth_me_patch"];
+        trace?: never;
+    };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh */
+        post: operations["refresh_api_v1_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Password Reset Request */
+        post: operations["password_reset_request_api_v1_auth_password_reset_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Password Reset Confirm */
+        post: operations["password_reset_confirm_api_v1_auth_password_reset_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dev/last-reset-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Last Reset Link */
+        get: operations["last_reset_link_api_v1_dev_last_reset_link_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
         /**
          * HealthResponse
          * @description Body returned on the success path: ``{"status": "ok"}``.
@@ -88,6 +230,275 @@ export interface components {
              */
             reason: "database_unreachable";
         };
+        /**
+         * LastResetLinkResponse
+         * @description Body of ``GET /api/v1/dev/last-reset-link`` (dev-only).
+         *
+         *     Returns the most recently generated password-reset link, or both
+         *     fields ``null`` when the in-process store is empty (Requirement
+         *     13.3, Dev-Mode Reset-Link Surface §12.1). The router that exposes
+         *     this endpoint is only mounted onto the FastAPI app when
+         *     ``MATCHLAYER_ENVIRONMENT=development``; in any other environment
+         *     the path returns the foundation 404 envelope (Requirement 13.4).
+         */
+        LastResetLinkResponse: {
+            /**
+             * Link
+             * @description Plaintext reset link including the single-use token, or null when no reset has been requested since the API process started.
+             */
+            link?: string | null;
+            /**
+             * Created At
+             * @description When the link was recorded, or null when the store is empty.
+             */
+            created_at?: string | null;
+        };
+        /**
+         * LoginRequest
+         * @description Body of ``POST /api/v1/auth/login`` (Requirement 2.1).
+         *
+         *     The login schema deliberately does **not** enforce the registration
+         *     minimum-length floor on the supplied password: doing so would be an
+         *     enumeration vector -- ``"a"`` would 422 instantly while a 12-char
+         *     wrong password would burn the dummy-Argon2id-verify path (§8.3).
+         *     The schema only checks that the field is non-empty so FastAPI's
+         *     request parser doesn't dispatch to the service with an empty string.
+         */
+        LoginRequest: {
+            /**
+             * Email
+             * Format: email
+             * @description RFC 5321-compliant email address.
+             */
+            email: string;
+            /**
+             * Password
+             * @description Plaintext password. No upper-floor length enforcement here -- the dummy-hash timing equalizer in Auth_Service relies on every non-empty input reaching the verify step (Password Handling §8.3).
+             */
+            password: string;
+        };
+        /**
+         * MePatchRequest
+         * @description Body of ``PATCH /api/v1/auth/me`` (Requirement 6.5).
+         *
+         *     Per Requirement 6.5 ``display_name`` is the "optional field"; this
+         *     is what makes the endpoint forward-compatible -- adding a second
+         *     optional field in a later spec is a non-breaking change. In
+         *     Phase 1 the only writable column is ``display_name``, so a request
+         *     with no fields set is a no-op (returns 200 with the unchanged
+         *     user); Auth_Service only emits the ``display_name_changed`` audit
+         *     event when the field is actually present.
+         */
+        MePatchRequest: {
+            /**
+             * Display Name
+             * @description New display name. When present, validated per Requirement 6.6: non-empty after strip, <=64 chars after strip, characters limited to Unicode classes L, M, N, Pd, Pc, Zs.
+             */
+            display_name?: string | null;
+        };
+        /**
+         * MeResponse
+         * @description Body of ``GET /api/v1/auth/me`` and ``PATCH /api/v1/auth/me``.
+         *
+         *     Identical field set to :class:`UserResponse` -- the redundancy is
+         *     deliberate. Declaring a distinct class produces a distinct OpenAPI
+         *     schema name, so the curated frontend re-export
+         *     ``packages/shared-types/src/index.ts`` produces a top-level
+         *     ``MeResponse`` type rather than aliasing the embedded
+         *     auth-response shape. ``conventions.md`` "Shared schemas" requires
+         *     that re-export to be a precise type, not a path-derived alias.
+         */
+        MeResponse: {
+            /**
+             * Id
+             * @description UUIDv7 of the User_Account, encoded as a string.
+             */
+            id: string;
+            /**
+             * Email
+             * @description Email address as submitted at registration.
+             */
+            email: string;
+            /**
+             * Display Name
+             * @description Display name.
+             */
+            display_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             * @description Registration timestamp (timezone-aware).
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description Last-modified timestamp (timezone-aware).
+             */
+            updated_at: string;
+        };
+        /**
+         * PasswordResetConfirmRequest
+         * @description Body of ``POST /api/v1/auth/password-reset/confirm`` (Requirement 5.5).
+         *
+         *     Fields:
+         *       * ``token`` -- opaque reset token produced by the request endpoint.
+         *         Validated server-side by hashing and looking up
+         *         ``password_reset_tokens.token_hash``; missing / expired / used
+         *         all collapse to a single ``invalid_reset_token`` envelope
+         *         (Requirements 5.6, 5.7, 5.8) so the client can't distinguish.
+         *       * ``new_password`` -- same 12-codepoint floor as registration
+         *         (Requirement 5.9 references Requirement 1.4 + 1.5 directly).
+         */
+        PasswordResetConfirmRequest: {
+            /**
+             * Token
+             * @description Opaque reset token from the issued reset link.
+             */
+            token: string;
+            /**
+             * New Password
+             * @description New plaintext password; minimum 12 codepoints. Blocklist enforcement runs server-side after NFKC normalization.
+             */
+            new_password: string;
+        };
+        /**
+         * PasswordResetRequestRequest
+         * @description Body of ``POST /api/v1/auth/password-reset/request`` (Requirement 5.1).
+         *
+         *     Single field: the email address requesting a reset link. The
+         *     response is always 202 with an empty body whether or not the
+         *     address matches a User_Account (Requirement 5.2 -- anti-enumeration
+         *     per ``security.md`` "no account enumeration").
+         */
+        PasswordResetRequestRequest: {
+            /**
+             * Email
+             * Format: email
+             * @description Email address to issue a reset link for.
+             */
+            email: string;
+        };
+        /**
+         * RegisterRequest
+         * @description Body of ``POST /api/v1/auth/register`` (Requirement 1.1).
+         *
+         *     Fields:
+         *       * ``email`` -- :class:`pydantic.EmailStr` triggers RFC 5321 validation
+         *         through ``email-validator``, which is what Requirement 1.3 requires.
+         *         A syntactically valid but RFC-5321-non-compliant address (e.g. a
+         *         local part longer than 64 octets) raises a Pydantic
+         *         ``ValidationError`` and FastAPI maps it to 422 via the foundation
+         *         RFC 7807 envelope.
+         *       * ``password`` -- minimum 12 *codepoints* (Requirement 1.4). The
+         *         blocklist check (Requirement 1.5) runs deeper in
+         *         :class:`Password_Hasher`, not here, because §8.5 evaluates it
+         *         against the post-NFKC case-folded form.
+         *       * ``display_name`` -- optional. When omitted, :class:`Auth_Service`
+         *         defaults it to the local part of the email (Requirement 1.7).
+         *         When present, it is validated against Requirement 6.6 by
+         *         :func:`_validate_display_name`.
+         */
+        RegisterRequest: {
+            /**
+             * Email
+             * Format: email
+             * @description RFC 5321-compliant email address. Stored as submitted; lookups are case-insensitive via the functional unique index.
+             */
+            email: string;
+            /**
+             * Password
+             * @description Plaintext password; minimum 12 codepoints (Requirement 1.4). Blocklist enforcement runs server-side after NFKC normalization.
+             */
+            password: string;
+            /**
+             * Display Name
+             * @description Optional display name. Defaults to the local part of the email when omitted. Validated per Requirement 6.6 when present.
+             */
+            display_name?: string | null;
+        };
+        /**
+         * TokenPairResponse
+         * @description Body of register / login / refresh on success.
+         *
+         *     Shape per Design §7.3 mermaid line 370 -- ``{access_token, user}``.
+         *     The refresh token is **not** in the body: it rides the
+         *     ``matchlayer_refresh`` HttpOnly cookie set on the same response
+         *     (CSRF Strategy §9.2). The CSRF token rides a sibling
+         *     ``matchlayer_csrf`` cookie. This split is what lets the access
+         *     token live in a JS-readable in-memory store on the frontend
+         *     (``security.md`` forbids ``localStorage`` for JWTs) while the
+         *     refresh token stays out of every JS surface entirely.
+         */
+        TokenPairResponse: {
+            /**
+             * Access Token
+             * @description Short-lived (15 min by default) JWT for Authorization Bearer use. Held in memory on the frontend, never persisted.
+             */
+            access_token: string;
+            /** @description The authenticated User_Account projection. */
+            user: components["schemas"]["UserResponse"];
+        };
+        /**
+         * UserResponse
+         * @description User_Account projection embedded in auth responses.
+         *
+         *     Carries exactly the five fields Requirements 1.7, 2.5, 3.8, and
+         *     6.3 enumerate: ``id``, ``email``, ``display_name``, ``created_at``,
+         *     ``updated_at``. ``password_hash``, ``failed_login_count``,
+         *     ``locked_until``, and ``deleted_at`` are intentionally absent
+         *     (Requirement 6.8 + ``security.md`` "Logging").
+         *
+         *     Datetimes serialize as ISO 8601 with timezone (the database column
+         *     is ``timestamptz``); the foundation convention "ISO 8601 UTC with Z
+         *     suffix" is honored on the wire by Pydantic's default datetime
+         *     formatter when the source value is timezone-aware.
+         *
+         *     ``from_attributes=True`` lets the router build a response directly
+         *     from the SQLAlchemy ``User`` row via ``UserResponse.model_validate(user)``.
+         */
+        UserResponse: {
+            /**
+             * Id
+             * @description UUIDv7 of the User_Account, encoded as a string.
+             */
+            id: string;
+            /**
+             * Email
+             * @description Email address as submitted at registration.
+             */
+            email: string;
+            /**
+             * Display Name
+             * @description Display name. Always populated; defaults to the local part of the email when not supplied at registration.
+             */
+            display_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             * @description Registration timestamp (timezone-aware).
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description Last-modified timestamp (timezone-aware). Bumped on display-name change and password change.
+             */
+            updated_at: string;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
+        };
     };
     responses: never;
     parameters: never;
@@ -122,6 +533,247 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthUnhealthyResponse"];
+                };
+            };
+        };
+    };
+    register_api_v1_auth_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPairResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_api_v1_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPairResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_me_api_v1_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    patch_me_api_v1_auth_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MePatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_api_v1_auth_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPairResponse"];
+                };
+            };
+        };
+    };
+    logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    password_reset_request_api_v1_auth_password_reset_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_reset_confirm_api_v1_auth_password_reset_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    last_reset_link_api_v1_dev_last_reset_link_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastResetLinkResponse"];
                 };
             };
         };

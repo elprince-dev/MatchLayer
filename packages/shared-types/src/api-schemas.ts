@@ -11,13 +11,215 @@ const HealthUnhealthyResponse = z
     reason: z.string(),
   })
   .passthrough();
+const RegisterRequest = z.object({
+  email: z.string().email(),
+  password: z.string().min(12),
+  display_name: z.union([z.string(), z.null()]).optional(),
+});
+const UserResponse = z
+  .object({
+    id: z.string(),
+    email: z.string(),
+    display_name: z.string(),
+    created_at: z.string().datetime({ offset: true }),
+    updated_at: z.string().datetime({ offset: true }),
+  })
+  .passthrough();
+const TokenPairResponse = z.object({
+  access_token: z.string(),
+  user: UserResponse,
+});
+const ValidationError = z
+  .object({
+    loc: z.array(z.union([z.string(), z.number()])),
+    msg: z.string(),
+    type: z.string(),
+    input: z.unknown().optional(),
+    ctx: z.object({}).partial().passthrough().optional(),
+  })
+  .passthrough();
+const HTTPValidationError = z
+  .object({ detail: z.array(ValidationError) })
+  .partial()
+  .passthrough();
+const LoginRequest = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+const MeResponse = z
+  .object({
+    id: z.string(),
+    email: z.string(),
+    display_name: z.string(),
+    created_at: z.string().datetime({ offset: true }),
+    updated_at: z.string().datetime({ offset: true }),
+  })
+  .passthrough();
+const MePatchRequest = z
+  .object({ display_name: z.union([z.string(), z.null()]) })
+  .partial();
+const PasswordResetRequestRequest = z.object({ email: z.string().email() });
+const PasswordResetConfirmRequest = z.object({
+  token: z.string().min(1),
+  new_password: z.string().min(12),
+});
+const LastResetLinkResponse = z
+  .object({
+    link: z.union([z.string(), z.null()]),
+    created_at: z.union([z.string(), z.null()]),
+  })
+  .partial();
 
 export const schemas = {
   HealthResponse,
   HealthUnhealthyResponse,
+  RegisterRequest,
+  UserResponse,
+  TokenPairResponse,
+  ValidationError,
+  HTTPValidationError,
+  LoginRequest,
+  MeResponse,
+  MePatchRequest,
+  PasswordResetRequestRequest,
+  PasswordResetConfirmRequest,
+  LastResetLinkResponse,
 };
 
 const endpoints = makeApi([
+  {
+    method: "post",
+    path: "/api/v1/auth/login",
+    alias: "login_api_v1_auth_login_post",
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "body",
+        type: "Body",
+        schema: LoginRequest,
+      },
+    ],
+    response: TokenPairResponse,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "post",
+    path: "/api/v1/auth/logout",
+    alias: "logout_api_v1_auth_logout_post",
+    requestFormat: "json",
+    response: z.void(),
+  },
+  {
+    method: "get",
+    path: "/api/v1/auth/me",
+    alias: "get_me_api_v1_auth_me_get",
+    requestFormat: "json",
+    response: MeResponse,
+  },
+  {
+    method: "patch",
+    path: "/api/v1/auth/me",
+    alias: "patch_me_api_v1_auth_me_patch",
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "body",
+        type: "Body",
+        schema: MePatchRequest,
+      },
+    ],
+    response: MeResponse,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "post",
+    path: "/api/v1/auth/password-reset/confirm",
+    alias: "password_reset_confirm_api_v1_auth_password_reset_confirm_post",
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "body",
+        type: "Body",
+        schema: PasswordResetConfirmRequest,
+      },
+    ],
+    response: z.void(),
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "post",
+    path: "/api/v1/auth/password-reset/request",
+    alias: "password_reset_request_api_v1_auth_password_reset_request_post",
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "body",
+        type: "Body",
+        schema: z.object({ email: z.string().email() }),
+      },
+    ],
+    response: z.unknown(),
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "post",
+    path: "/api/v1/auth/refresh",
+    alias: "refresh_api_v1_auth_refresh_post",
+    requestFormat: "json",
+    response: TokenPairResponse,
+  },
+  {
+    method: "post",
+    path: "/api/v1/auth/register",
+    alias: "register_api_v1_auth_register_post",
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "body",
+        type: "Body",
+        schema: RegisterRequest,
+      },
+    ],
+    response: TokenPairResponse,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "get",
+    path: "/api/v1/dev/last-reset-link",
+    alias: "last_reset_link_api_v1_dev_last_reset_link_get",
+    requestFormat: "json",
+    response: LastResetLinkResponse,
+  },
   {
     method: "get",
     path: "/healthz",

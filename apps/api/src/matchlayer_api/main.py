@@ -83,6 +83,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from matchlayer_api.api.health import router as health_router
+from matchlayer_api.auth.router import router as auth_router
 from matchlayer_api.config import Settings, get_settings
 from matchlayer_api.core.db import verify_database_connection
 from matchlayer_api.core.errors import register_exception_handlers
@@ -211,6 +212,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Step 6 — mount the only Phase 1 router. No prefix: container
     # healthchecks probe ``/healthz`` directly (Design §11.1).
     app.include_router(health_router)
+
+    # Auth router — always mounted.
+    app.include_router(auth_router)
+
+    # Dev router — only in development (Design §12.3, Requirement 13.4).
+    if cfg.environment == "development":
+        from matchlayer_api.dev.router import router as dev_router
+
+        app.include_router(dev_router)
 
     return app
 

@@ -291,6 +291,53 @@ def register_exception_handlers(
     # by ``isinstance``, picking the most specific registered handler
     # for the raised exception's MRO. Most-specific-first registration
     # mirrors the conceptual stack and keeps the file readable.
+
+    # Auth dependency exceptions.
+    from matchlayer_api.core.dependencies import (
+        CsrfMismatchError,
+        RateLimited,
+        RateLimiterUnavailableError,
+        UnauthenticatedError,
+    )
+
+    async def unauthenticated_handler(_request: Request, exc: Exception) -> JSONResponse:
+        return _problem_response(
+            type_="unauthenticated",
+            title="Unauthenticated",
+            detail="Missing or invalid authentication credentials.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    async def csrf_mismatch_handler(_request: Request, exc: Exception) -> JSONResponse:
+        return _problem_response(
+            type_="csrf_mismatch",
+            title="CSRF Mismatch",
+            detail="CSRF token validation failed.",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    async def rate_limited_handler(_request: Request, exc: Exception) -> JSONResponse:
+        if not isinstance(exc, RateLimited):  # pragma: no cover
+            raise exc
+        return _problem_response(
+            type_="rate_limited",
+            title="Rate Limited",
+            detail="Too many requests. Try again later.",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    async def rate_limiter_unavailable_handler(_request: Request, exc: Exception) -> JSONResponse:
+        return _problem_response(
+            type_="rate_limiter_unavailable",
+            title="Service Unavailable",
+            detail="Rate limiter temporarily unavailable.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    app.add_exception_handler(UnauthenticatedError, unauthenticated_handler)
+    app.add_exception_handler(CsrfMismatchError, csrf_mismatch_handler)
+    app.add_exception_handler(RateLimited, rate_limited_handler)
+    app.add_exception_handler(RateLimiterUnavailableError, rate_limiter_unavailable_handler)
     app.add_exception_handler(MatchLayerError, matchlayer_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)

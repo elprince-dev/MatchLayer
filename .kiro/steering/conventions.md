@@ -69,6 +69,17 @@
 - API keys (OpenAI, etc.) are accessed through a single config object — never read from env directly in business logic.
 - Secrets must never appear in error messages, stack traces, log lines, or LLM telemetry.
 
+### Handling synthetic test secrets
+
+Some tests must embed values that _look_ like secrets because the code under test validates their shape — e.g. a 32-byte JWT signing key for the `Settings` length-floor validator, or password literals for the Argon2id round-trip and blocklist tests. Two scanners run against the repo (`gitleaks` as a pre-commit hook + CI `security` job, and the GitGuardian GitHub App), and both will flag these. The procedure to clear a flagged synthetic value — never `--no-verify`, never disabling a scanner:
+
+1. **Confirm it is genuinely synthetic.** It must never be reused as a real credential anywhere (local `.env`, CI, or production). If there's any doubt, rotate it and treat it as a real leak.
+2. **Annotate the line for gitleaks:** append `# gitleaks:allow — <reason>` to the source line. This satisfies the pre-commit hook and the CI `security` job.
+3. **Register it with GitGuardian:** add a `secret.ignored-matches` entry (with a descriptive `name`) to the committed `.gitguardian.yaml`. GitGuardian does **not** read gitleaks annotations, so this is a separate, required step. Keep the `ignored-paths` scope limited to `apps/api/tests/**` so a real secret in application code is still caught.
+4. **Call it out in the PR description** so a reviewer can sanity-check the value is synthetic.
+
+If GitGuardian still reports the finding on an already-pushed commit (the config only applies to scans run after it lands), dismiss it once in the GitGuardian dashboard as a known test value — but the `.gitguardian.yaml` entry is what prevents it recurring on future commits.
+
 ## Security defaults (cross-cutting)
 
 - See `security.md` for the full security baseline. Highlights enforced as conventions:

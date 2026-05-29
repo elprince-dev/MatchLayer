@@ -22,6 +22,16 @@ dependencies = [
     "structlog>=24.4,<26.0",
     # Stdlib doesn't ship UUIDv7 yet; uuid_utils provides it (design §6.4).
     "uuid_utils>=0.9,<1.0",
+    # phase-1-auth dependencies.
+    # email-validator: required for Pydantic EmailStr to validate (RFC 5321).
+    "email-validator>=2.1,<3.0",
+    # argon2-cffi: password hashing. ONLY imported by core/security/passwords.py.
+    "argon2-cffi>=23.1,<24.0",
+    # PyJWT: JWT signing/verification. ONLY imported by core/security/jwt.py.
+    "PyJWT>=2.9,<3.0",
+    # redis: rate-limiter backend (sliding-window via SORTED SET + Lua).
+    # ONLY imported by core/rate_limit.py.
+    "redis[hiredis]>=5.0,<6.0",
 ]
 
 [project.optional-dependencies]
@@ -33,6 +43,9 @@ dev = [
     "pytest-asyncio>=0.24,<1.0",
     "httpx>=0.27,<1.0",
     "pip-audit>=2.7,<3.0",
+    # phase-1-auth: property-based testing + time-controlled tests.
+    "hypothesis>=6.100,<7.0",
+    "freezegun>=1.3,<2.0",
 ]
 
 [dependency-groups]
@@ -45,6 +58,9 @@ dev = [
     "pytest-asyncio>=0.24,<1.0",
     "httpx>=0.27,<1.0",
     "pip-audit>=2.7,<3.0",
+    # phase-1-auth: property-based testing + time-controlled tests.
+    "hypothesis>=6.100,<7.0",
+    "freezegun>=1.3,<2.0",
 ]
 
 [build-system]
@@ -150,6 +166,9 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
+]
+markers = [
+    "timing: timing-sensitive tests (e.g., login-timing INV-5); excluded from CI via -m 'not timing'",
 ]
 filterwarnings = [
     "error",
