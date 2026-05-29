@@ -389,7 +389,7 @@ This plan keeps the work granular: each leaf sub-task is a single PR-ready unit 
   - _Requirements: 1.7, 2.5, 3.8, 4.5, 5.4, 5.10, 6.3, 11.3, 13.3, 14.6_
   - _Design: Components and Interfaces, Audit Log §11.2, Dev-Mode Reset-Link Surface §12.1_
 
-- [-] 15.2 Confirm CI is green on the foundation's six required checks
+- [x] 15.2 Confirm CI is green on the foundation's six required checks
   - Push branch `phase-1/auth`, open a PR targeting `main`, and confirm the same six required CI jobs the foundation locked in (`backend`, `frontend`, `shared-types`, `security`, `openapi-drift`, plus the `required-checks` aggregator) pass green. The new auth tests run inside the existing `backend` job; no new CI workflow file is added.
   - _Requirements: 14.4, 14.5_
   - _Design: OpenAPI Codegen Impact, Configuration and Environment Variables §17.1_
