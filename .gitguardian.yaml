@@ -1,0 +1,40 @@
+# GitGuardian configuration.
+#
+# Purpose: tell GitGuardian (and the ggshield CLI, if/when it runs in CI)
+# that a small set of SYNTHETIC values committed under `apps/api/tests/`
+# are deliberate, non-production test fixtures — not leaked credentials.
+#
+# Policy (see docs: "Handling synthetic test secrets" in conventions.md):
+#   - Real secrets NEVER live in the repo. They live in `.env` (gitignored)
+#     locally and AWS Secrets Manager in production.
+#   - Test fixtures that LOOK like secrets (JWT signing keys for the
+#     length-floor test, password literals for the hashing/blocklist
+#     tests) are unavoidable: the code under test validates their shape.
+#   - Each such value is annotated inline for gitleaks (`# gitleaks:allow`)
+#     AND listed here for GitGuardian. Both scanners stay enabled; only
+#     these specific, reviewed values are exempted.
+#
+# When adding a new test fixture that trips a scanner:
+#   1. Confirm it is genuinely synthetic (no production reuse).
+#   2. Add `# gitleaks:allow` on the line.
+#   3. Add a `secret.ignored-matches` entry below with a descriptive name.
+#   4. Note it in the PR description.
+
+version: 2
+
+secret:
+  # Scope the exemptions to the test tree so a real secret committed in
+  # application code is still caught.
+  ignored-paths:
+    - "apps/api/tests/**"
+
+  ignored-matches:
+    - name: "Synthetic JWT signing secret (32-byte-floor test fixture)"
+      # Used by test_jwt.py and test_cookies.py to exercise the
+      # Settings._jwt_secret_min_length validator. Not a production key.
+      match: "test-jwt-secret-32-byte-floor-pad"
+
+    - name: "Synthetic password fixture (Argon2id round-trip / latency tests)"
+      # Used by test_passwords.py. Deliberately shaped to look unlike the
+      # SecLists corpus so it is not on the blocklist.
+      match: "Smoke-Test-Pw!42"

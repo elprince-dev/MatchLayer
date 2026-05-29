@@ -55,7 +55,7 @@ from matchlayer_api.core.security.passwords import (
 # (mixed alpha + digits + ASCII punctuation) is chosen to look nothing
 # like the obvious patterns ("password", "qwerty", date strings) the
 # SecLists corpus is built from.
-_VALID_ASCII_PASSWORD = "Smoke-Test-Pw!42"
+_VALID_ASCII_PASSWORD = "Smoke-Test-Pw!42"  # gitleaks:allow — synthetic test fixture
 
 # A blocklist entry guaranteed to be in the shipped file: ``password``
 # is one of the most-common passwords in any leaked-credentials corpus,
