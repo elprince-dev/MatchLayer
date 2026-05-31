@@ -46,14 +46,20 @@ import { getAccessToken, setAccessToken } from "./auth";
  * vars (the `NEXT_PUBLIC_` prefix family) at build time, and `pnpm --filter
  * @matchlayer/web build` runs in CI without a populated `.env`. Throwing at
  * module load would break the CI build for a value that has a perfectly
- * sensible local default (the FastAPI dev server, matched by the `connect-src`
- * entry in `apps/web/src/proxy.ts`). Production deploys are responsible for
- * setting the variable explicitly through the host platform (Vercel/Fly env
- * config); a misconfiguration there will surface on the first network call
- * rather than at boot, which is acceptable for a public, non-secret URL.
+ * sensible default. Production deploys set the variable explicitly through the
+ * host platform (Vercel/Fly env config).
+ *
+ * Empty string = "use same-origin relative URLs". In local dev the web app and
+ * API run on different ports (cross-origin), which breaks cookie-based auth
+ * (the browser can't read the API-origin CSRF cookie). To fix that, the Next
+ * dev server proxies `/api/*` to the API (see `next.config.mjs` rewrites), and
+ * `NEXT_PUBLIC_API_BASE_URL` is left blank so this module emits *relative*
+ * `/api/...` URLs that hit the page's own origin and are therefore
+ * first-party. A blank value is the intended "go through the same-origin
+ * proxy" signal, so we deliberately keep `""` rather than substituting a
+ * cross-origin default.
  */
-export const apiBaseUrl: string =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+export const apiBaseUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 // ---------------------------------------------------------------------------
 // Public types

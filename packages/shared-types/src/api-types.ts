@@ -163,6 +163,228 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/resumes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Resumes
+         * @description List the caller's non-deleted resumes (cursor-paginated).
+         *
+         *     ``limit`` is constrained to ``1..100`` by :class:`~fastapi.Query`; an
+         *     out-of-range or non-numeric value raises FastAPI's
+         *     ``RequestValidationError``, which the foundation handler renders as the
+         *     422 ``validation_error`` envelope (Requirement 4.3). Results are scoped
+         *     to the caller, ordered ``created_at`` descending, and projected onto the
+         *     safe :class:`ResumeResponse` shape -- no ``extracted_text`` or
+         *     ``storage_key`` (Requirements 4.1, 4.2).
+         *
+         *     Args:
+         *         user: The authenticated owner.
+         *         session: The request-scoped session (read-only path, no commit).
+         *         settings: Active settings.
+         *         limit: Page size, ``1..100`` (default 20).
+         *         cursor: Opaque cursor from a prior page, or ``None`` for the first.
+         *
+         *     Returns:
+         *         A :class:`ResumeListResponse` page plus the next cursor.
+         */
+        get: operations["list_resumes_api_v1_resumes_get"];
+        put?: never;
+        /**
+         * Create Resume
+         * @description Upload one resume; 201 with the safe field set.
+         *
+         *     Pre-service guards run in the order the design's upload sequence
+         *     prescribes -- the per-user rate limit (dependency) and the 413
+         *     declared-length check both short-circuit before any object is written
+         *     (Requirement 2.2) -- followed by idempotency replay, then the service
+         *     orchestration (quota -> MIME -> zip-bomb -> store -> insert -> extract
+         *     -> audit).
+         *
+         *     On a quota breach the service stages a ``quota_rejected`` audit row and
+         *     raises :class:`QuotaExceededError`; this handler commits that row before
+         *     re-raising so the audit lands even though the 429 short-circuits the
+         *     upload (Requirement 11.6). On success the ``resumes`` row and the
+         *     ``resume_uploaded`` audit row commit together (Requirement 2.7), and the
+         *     response carries only the safe field set -- never ``extracted_text``,
+         *     ``storage_key``, or the raw bytes (Requirement 2.9).
+         *
+         *     Args:
+         *         request: The active request (used for the ``Content-Length``
+         *             fallback in the 413 guard).
+         *         file: The multipart ``file`` part (Requirement 2.1).
+         *         user: The authenticated owner.
+         *         session: The request-scoped session (this handler owns the commit).
+         *         settings: Active settings (the ``resume_max_bytes`` ceiling).
+         *         idempotency_store: Redis-backed store for idempotent replay.
+         *         idempotency_key: Optional ``Idempotency-Key`` header (Requirement
+         *             2.8).
+         *
+         *     Returns:
+         *         The created (or replayed) :class:`ResumeResponse`.
+         *
+         *     Raises:
+         *         PayloadTooLargeError: Declared length over ``MATCHLAYER_RESUME_MAX_BYTES``
+         *             (413 ``payload_too_large``).
+         *         QuotaExceededError: Daily Upload_Quota reached (429 ``quota_exceeded``).
+         */
+        post: operations["create_resume_api_v1_resumes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resumes/{resume_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Resume
+         * @description Return a single owned, non-deleted resume, or 404.
+         *
+         *     The service collapses a missing row, a soft-deleted row, and a row
+         *     owned by another User_Account into the same
+         *     :class:`~matchlayer_api.core.errors.NotFoundError` (404 ``not_found``),
+         *     so the existence of another account's resource is never disclosed
+         *     (Requirements 1.5, 1.6, 4.4).
+         *
+         *     Args:
+         *         resume_id: The resume id from the path.
+         *         user: The authenticated owner.
+         *         session: The request-scoped session (read-only path, no commit).
+         *         settings: Active settings.
+         *
+         *     Returns:
+         *         The owned :class:`ResumeResponse`.
+         */
+        get: operations["get_resume_api_v1_resumes__resume_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Resume
+         * @description Soft-delete the caller's resume; 204, idempotent.
+         *
+         *     Delegates to the idempotent
+         *     :meth:`~matchlayer_api.services.resumes.Resume_Service.soft_delete_resume`:
+         *     an active owned row is stamped ``deleted_at`` and emits one
+         *     ``resume_deleted`` audit row (Requirement 4.5); an already-soft-deleted
+         *     owned row is a no-op with no second audit row (Requirement 4.6); a
+         *     missing or other-owner id raises
+         *     :class:`~matchlayer_api.core.errors.NotFoundError` (404, no disclosure).
+         *     The commit persists ``deleted_at`` and the audit row together; on the
+         *     no-op and 404 paths there is nothing staged to commit.
+         *
+         *     Args:
+         *         resume_id: The resume id from the path.
+         *         user: The authenticated owner.
+         *         session: The request-scoped session (this handler owns the commit).
+         *         settings: Active settings.
+         */
+        delete: operations["delete_resume_api_v1_resumes__resume_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Matches
+         * @description Return one cursor-paginated page of the caller's non-deleted matches.
+         *
+         *     Ordered by ``created_at`` descending (ties broken by ``id`` descending),
+         *     scoped to the requesting user (Requirements 1.4, 9.1). ``limit`` outside
+         *     1..100 fails query validation → 422 ``validation_error``. Each item is a
+         *     :class:`MatchListItem`, which omits ``job_description_text`` (Requirement
+         *     9.2). ``next_cursor`` is ``None`` on the last page.
+         */
+        get: operations["list_matches_api_v1_matches_get"];
+        put?: never;
+        /**
+         * Create Match
+         * @description Score a resume against a job description and persist the Match_Result.
+         *
+         *     The request body is validated by :class:`CreateMatchRequest`, whose
+         *     ``job_description`` field validator enforces the trimmed-length window
+         *     ``MATCHLAYER_JD_MIN_CHARS``..``MATCHLAYER_JD_MAX_CHARS`` — a violation (or
+         *     any other Pydantic failure) surfaces as 422 ``validation_error`` before this
+         *     handler runs (Requirements 8.2, 8.3).
+         *
+         *     Idempotency (Requirement 8.9): when an ``Idempotency-Key`` header matches a
+         *     record stored for this user within the preceding 24h, the original 201
+         *     response is replayed without creating a second Match_Result. Otherwise the
+         *     service creates the match, the router commits, and the response is stored
+         *     under the key for future replays.
+         *
+         *     Failure mapping:
+         *       * ``resume_id`` that is malformed, or does not resolve to an owned,
+         *         non-deleted resume → 404 ``not_found`` (Requirement 8.4; no disclosure).
+         *       * referenced resume whose ``extraction_status != 'succeeded'`` → 422
+         *         ``resume_not_extractable`` (Requirement 8.5).
+         *       * daily Scoring_Quota reached → 429 ``quota_exceeded``; the service stages
+         *         a ``quota_rejected`` audit row which this handler commits before the
+         *         error propagates (Requirement 11.6 audit; the ``detail`` + ``Retry-After``
+         *         are owned by the service/dependency layer).
+         */
+        post: operations["create_match_api_v1_matches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches/{match_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Match
+         * @description Return one owned, non-deleted Match_Result.
+         *
+         *     A missing, soft-deleted, or other-owner match (or a malformed id) yields the
+         *     ``not_found`` envelope, so another account's match is indistinguishable from
+         *     one that does not exist (Requirements 1.5, 1.6, 9.3). The match is returned
+         *     even when its referenced resume was later soft-deleted — the score and
+         *     analysis are retained independently of the resume's lifecycle (Requirement
+         *     9.6, guaranteed by the service's query, which does not filter on the
+         *     resume's ``deleted_at``).
+         */
+        get: operations["get_match_api_v1_matches__match_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Match
+         * @description Soft-delete an owned Match_Result; idempotent (Requirements 9.4, 9.5).
+         *
+         *     On the first delete of an owned, non-deleted match the service sets
+         *     ``deleted_at`` and stages a ``match_deleted`` audit row; the router commits
+         *     so both land together. A match that is already soft-deleted, does not exist,
+         *     is owned by another user, or carries a malformed id is a silent no-op that
+         *     emits no second audit row — every case returns 204 uniformly, disclosing
+         *     nothing about another account's data (Requirements 1.4, 9.5).
+         */
+        delete: operations["delete_match_api_v1_matches__match_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dev/last-reset-link": {
         parameters: {
             query?: never;
@@ -184,6 +406,47 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_create_resume_api_v1_resumes_post */
+        Body_create_resume_api_v1_resumes_post: {
+            /**
+             * File
+             * @description The resume file (PDF or DOCX).
+             */
+            file: string;
+        };
+        /**
+         * CreateMatchRequest
+         * @description Body of ``POST /api/v1/matches`` (Requirement 8.1).
+         *
+         *     Fields:
+         *       * ``resume_id`` -- the string UUIDv7 of one of the caller's resumes.
+         *         Ownership / existence / extractability are resolved server-side by
+         *         the Scoring_Service (404 ``not_found`` for a missing, deleted, or
+         *         other-owner resume per Requirement 8.4; 422 ``resume_not_extractable``
+         *         when the resume's ``extraction_status`` is not ``succeeded`` per
+         *         Requirement 8.5). The schema validates only that a non-empty string
+         *         was supplied.
+         *       * ``job_description`` -- the pasted job-description text. A baseline
+         *         ``min_length=1`` floor protects FastAPI's request parser from an
+         *         empty string; the real window is enforced by
+         *         :meth:`_check_job_description_length`, which trims and checks the
+         *         length against ``MATCHLAYER_JD_MIN_CHARS``..``MATCHLAYER_JD_MAX_CHARS``
+         *         (Requirement 8.3). A violation raises ``ValueError``, which Pydantic
+         *         surfaces as a 422 ``validation_error`` through the foundation RFC
+         *         7807 handler (Requirement 8.2).
+         */
+        CreateMatchRequest: {
+            /**
+             * Resume Id
+             * @description UUIDv7 (string) of the resume to score. Ownership and extractability are resolved server-side; the schema only checks that a non-empty string was supplied.
+             */
+            resume_id: string;
+            /**
+             * Job Description
+             * @description Pasted job-description text. The trimmed length must fall within MATCHLAYER_JD_MIN_CHARS..MATCHLAYER_JD_MAX_CHARS (defaults 30..50000); a violation returns 422 validation_error.
+             */
+            job_description: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -231,6 +494,31 @@ export interface components {
             reason: "database_unreachable";
         };
         /**
+         * KeywordOut
+         * @description One analyzed keyword and its weight (``{term, weight}``).
+         *
+         *     Mirrors the scorer's ``Keyword`` dataclass and the
+         *     ``match_results.matched_keywords`` / ``missing_keywords`` JSONB shape.
+         *     Lists of these are returned ordered by descending weight so the most
+         *     important terms appear first (Requirement 6.6).
+         *
+         *     ``from_attributes=True`` lets the router validate this either from the
+         *     JSONB list-of-dicts loaded off the ORM row or from the scorer's
+         *     ``Keyword`` dataclass attributes, without renaming.
+         */
+        KeywordOut: {
+            /**
+             * Term
+             * @description Normalized keyword term (case-folded; lexicon-canonical for known skills).
+             */
+            term: string;
+            /**
+             * Weight
+             * @description Relative importance of the term (lexicon weight for a known skill, otherwise the term's TF-IDF score).
+             */
+            weight: number;
+        };
+        /**
          * LastResetLinkResponse
          * @description Body of ``GET /api/v1/dev/last-reset-link`` (dev-only).
          *
@@ -276,6 +564,144 @@ export interface components {
              * @description Plaintext password. No upper-floor length enforcement here -- the dummy-hash timing equalizer in Auth_Service relies on every non-empty input reaching the verify step (Password Handling §8.3).
              */
             password: string;
+        };
+        /**
+         * MatchListItem
+         * @description Trimmed Match_Result projection for the list view (Requirement 9.2).
+         *
+         *     Carries the minimum fields Requirement 9.2 enumerates: ``id``,
+         *     ``resume_id``, ``score``, and ``created_at``. ``job_description_text``
+         *     is **omitted** (Restricted PII; the list never carries it), as are the
+         *     heavier JSONB columns (breakdown, keywords, suggestions) which belong on
+         *     the single-match detail view rather than every list row.
+         *
+         *     ``from_attributes=True`` lets the router build each item from the
+         *     SQLAlchemy ``MatchResult`` row; the unlisted columns are simply never
+         *     read.
+         */
+        MatchListItem: {
+            /**
+             * Id
+             * @description UUIDv7 of the Match_Result, encoded as a string.
+             */
+            id: string;
+            /**
+             * Resume Id
+             * @description UUIDv7 (string) of the resume that was scored.
+             */
+            resume_id: string;
+            /**
+             * Score
+             * @description The final match score, an integer in [0, 100].
+             */
+            score: number;
+            /**
+             * Created At
+             * Format: date-time
+             * @description Scoring timestamp (timezone-aware).
+             */
+            created_at: string;
+        };
+        /**
+         * MatchListResponse
+         * @description Body of ``GET /api/v1/matches`` (Requirement 9.1).
+         *
+         *     A single page of the requesting User_Account's non-deleted
+         *     Match_Results, ordered by ``created_at`` descending, plus an opaque
+         *     ``next_cursor`` for cursor-based pagination per ``conventions.md``
+         *     "Pagination" (offset pagination is explicitly avoided). ``next_cursor``
+         *     is an opaque token the client echoes back via the ``cursor`` query
+         *     parameter to fetch the following page; it is ``None`` when there are no
+         *     further pages.
+         *
+         *     Each item is a :class:`MatchListItem`, so no row in the list carries
+         *     ``job_description_text`` (Requirement 9.2).
+         */
+        MatchListResponse: {
+            /**
+             * Items
+             * @description The matches on this page, ordered by created_at descending.
+             */
+            items: components["schemas"]["MatchListItem"][];
+            /**
+             * Next Cursor
+             * @description Opaque pagination cursor for the next page, or null when this is the last page. Echo back via the ?cursor= query parameter.
+             */
+            next_cursor?: string | null;
+        };
+        /**
+         * MatchResponse
+         * @description Full Match_Result projection (Requirement 8.7).
+         *
+         *     Carries **exactly** the ten fields Requirement 8.7 enumerates: ``id``,
+         *     ``resume_id``, ``score``, ``score_breakdown``, ``matched_keywords``,
+         *     ``missing_keywords``, ``suggestions``, ``scorer_version``,
+         *     ``created_at``, and ``updated_at``. Returned by ``POST /api/v1/matches``
+         *     (201) and ``GET /api/v1/matches/{id}`` (Requirement 9.3).
+         *
+         *     ``job_description_text`` is intentionally absent. It is Restricted PII
+         *     per ``security.md`` "Data classification" and the design deliberately
+         *     keeps it out of every match response body (Requirement 8.8); this
+         *     exclusion is a security control, not a convenience.
+         *
+         *     ``from_attributes=True`` lets the router build a response directly from
+         *     the SQLAlchemy ``MatchResult`` row via
+         *     ``MatchResponse.model_validate(match)``. The JSONB columns
+         *     (``score_breakdown`` as a dict, ``matched_keywords`` /
+         *     ``missing_keywords`` / ``suggestions`` as lists of dicts) validate
+         *     against the nested models above, and the excluded ``job_description_text``
+         *     column is simply never read.
+         */
+        MatchResponse: {
+            /**
+             * Id
+             * @description UUIDv7 of the Match_Result, encoded as a string.
+             */
+            id: string;
+            /**
+             * Resume Id
+             * @description UUIDv7 (string) of the resume that was scored.
+             */
+            resume_id: string;
+            /**
+             * Score
+             * @description The final match score, an integer in [0, 100].
+             */
+            score: number;
+            /** @description The explainable component/weight breakdown behind the score. */
+            score_breakdown: components["schemas"]["ScoreBreakdownOut"];
+            /**
+             * Matched Keywords
+             * @description Analyzed keywords present in the resume, ordered by descending weight.
+             */
+            matched_keywords: components["schemas"]["KeywordOut"][];
+            /**
+             * Missing Keywords
+             * @description Analyzed keywords absent from the resume, ordered by descending weight.
+             */
+            missing_keywords: components["schemas"]["KeywordOut"][];
+            /**
+             * Suggestions
+             * @description Rule-based improvement suggestions, ordered by descending missing-keyword weight.
+             */
+            suggestions: components["schemas"]["SuggestionOut"][];
+            /**
+             * Scorer Version
+             * @description The Scorer_Version (algorithm + lexicon version) the score was produced under, making the stored score reproducible.
+             */
+            scorer_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             * @description Scoring timestamp (timezone-aware).
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description Last-modified timestamp (timezone-aware).
+             */
+            updated_at: string;
         };
         /**
          * MePatchRequest
@@ -416,6 +842,168 @@ export interface components {
              * @description Optional display name. Defaults to the local part of the email when omitted. Validated per Requirement 6.6 when present.
              */
             display_name?: string | null;
+        };
+        /**
+         * ResumeListResponse
+         * @description Body of ``GET /api/v1/resumes`` (Requirement 4.1).
+         *
+         *     A single page of the requesting User_Account's non-deleted resumes,
+         *     ordered by ``created_at`` descending, plus an opaque ``next_cursor``
+         *     for cursor-based pagination per ``conventions.md`` "Pagination"
+         *     (offset pagination is explicitly avoided). ``next_cursor`` is an
+         *     opaque token the client echoes back via the ``cursor`` query
+         *     parameter to fetch the following page; it is ``None`` when there are
+         *     no further pages.
+         *
+         *     Each item is a :class:`ResumeResponse`, so the same field-exclusion
+         *     guarantees (no ``extracted_text``, no ``storage_key``) apply to every
+         *     row in the list (Requirement 4.2).
+         */
+        ResumeListResponse: {
+            /**
+             * Items
+             * @description The resumes on this page, ordered by created_at descending.
+             */
+            items: components["schemas"]["ResumeResponse"][];
+            /**
+             * Next Cursor
+             * @description Opaque pagination cursor for the next page, or null when this is the last page. Echo back via the ?cursor= query parameter.
+             */
+            next_cursor?: string | null;
+        };
+        /**
+         * ResumeResponse
+         * @description Safe Resume projection (Requirements 2.9, 4.2).
+         *
+         *     Carries exactly the seven fields Requirements 2.9 and 4.2 enumerate:
+         *     ``id``, ``original_filename``, ``content_type``, ``byte_size``,
+         *     ``extraction_status``, ``created_at``, ``updated_at``.
+         *
+         *     ``extracted_text`` and ``storage_key`` are intentionally absent. Both
+         *     are sensitive per ``security.md``: ``extracted_text`` is Restricted
+         *     PII (parsed resume content) and ``storage_key`` is the internal
+         *     object-storage location. Neither may ever appear in an API response
+         *     body. This exclusion is a hard security control, not a convenience --
+         *     Property 17 (``tasks.md`` 10.2) asserts the response never exposes
+         *     them.
+         *
+         *     ``original_filename`` is Restricted PII for *logging* purposes (it is
+         *     never written to a log line or audit payload, per Requirement 2.6),
+         *     but it is the user's own filename returned to that same user over the
+         *     authenticated, non-indexed API surface for display, so it belongs in
+         *     the response body (Requirements 2.9, 4.2).
+         *
+         *     Datetimes serialize as ISO 8601 with timezone (the database columns
+         *     are ``timestamptz``); the ``conventions.md`` "ISO 8601 UTC with Z
+         *     suffix" rule is honored on the wire by Pydantic's default datetime
+         *     formatter when the source value is timezone-aware.
+         *
+         *     ``from_attributes=True`` lets the router build a response directly
+         *     from the SQLAlchemy ``Resume`` row via
+         *     ``ResumeResponse.model_validate(resume)``; since the ORM attribute
+         *     set is a strict superset of these fields, the excluded sensitive
+         *     columns are simply never read.
+         */
+        ResumeResponse: {
+            /**
+             * Id
+             * @description UUIDv7 of the Resume, encoded as a string.
+             */
+            id: string;
+            /**
+             * Original Filename
+             * @description Client-supplied filename, retained for display only. Never used to derive the storage key or any filesystem path.
+             */
+            original_filename: string;
+            /**
+             * Content Type
+             * @description Validated media type of the uploaded file (magic-byte-detected, not the client Content-Type header).
+             */
+            content_type: string;
+            /**
+             * Byte Size
+             * @description Size of the stored file in bytes.
+             */
+            byte_size: number;
+            /**
+             * Extraction Status
+             * @description Text-extraction outcome: 'pending' before extraction runs, 'succeeded' when non-whitespace text was stored, 'failed' when extraction errored, timed out, or yielded only whitespace.
+             * @enum {string}
+             */
+            extraction_status: "pending" | "succeeded" | "failed";
+            /**
+             * Created At
+             * Format: date-time
+             * @description Upload timestamp (timezone-aware).
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description Last-modified timestamp (timezone-aware). Bumped when extraction columns are written and on soft delete.
+             */
+            updated_at: string;
+        };
+        /**
+         * ScoreBreakdownOut
+         * @description The explainable breakdown behind a score (Requirement 5.5).
+         *
+         *     Mirrors the scorer's ``ScoreBreakdown`` dataclass and the
+         *     ``match_results.score_breakdown`` JSONB shape field-for-field. The
+         *     similarity and keyword-coverage components are the raw ``[0, 1]`` values
+         *     before weighting, so a reader can recompute
+         *     ``round(100 * (weight_similarity * similarity_component +
+         *     weight_keyword * keyword_coverage_component))`` and arrive at
+         *     ``final_score`` without re-running the algorithm.
+         */
+        ScoreBreakdownOut: {
+            /**
+             * Similarity Component
+             * @description TF-IDF cosine similarity of resume and JD, in [0, 1].
+             */
+            similarity_component: number;
+            /**
+             * Keyword Coverage Component
+             * @description Fraction of the analyzed keyword set present in the resume, in [0, 1].
+             */
+            keyword_coverage_component: number;
+            /**
+             * Weight Similarity
+             * @description Weight applied to the similarity component (default 0.6).
+             */
+            weight_similarity: number;
+            /**
+             * Weight Keyword
+             * @description Weight applied to the keyword-coverage component (default 0.4).
+             */
+            weight_keyword: number;
+            /**
+             * Final Score
+             * @description The combined, clamped integer score in [0, 100]; equals the enclosing MatchResponse.score.
+             */
+            final_score: number;
+        };
+        /**
+         * SuggestionOut
+         * @description One rule-based improvement suggestion (``{keyword, text}``).
+         *
+         *     Mirrors the scorer's ``Suggestion`` dataclass and the
+         *     ``match_results.suggestions`` JSONB shape. ``keyword`` is the missing
+         *     term the suggestion addresses (empty only for the single affirmative
+         *     suggestion emitted when nothing is missing, per Requirement 7.3);
+         *     ``text`` is the plain-text, user-facing guidance.
+         */
+        SuggestionOut: {
+            /**
+             * Keyword
+             * @description The missing keyword this suggestion addresses; empty only for the affirmative 'already covered' suggestion.
+             */
+            keyword: string;
+            /**
+             * Text
+             * @description Plain-text guidance phrased as an action for the user to take. Never fabricates experience, employers, dates, or credentials.
+             */
+            text: string;
         };
         /**
          * TokenPairResponse
@@ -739,6 +1327,260 @@ export interface operations {
                 "application/json": components["schemas"]["PasswordResetConfirmRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_resumes_api_v1_resumes_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_resume_api_v1_resumes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_create_resume_api_v1_resumes_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resume_api_v1_resumes__resume_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_resume_api_v1_resumes__resume_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_matches_api_v1_matches_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_match_api_v1_matches_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_match_api_v1_matches__match_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_match_api_v1_matches__match_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             204: {

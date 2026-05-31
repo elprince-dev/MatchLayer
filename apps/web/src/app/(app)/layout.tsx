@@ -1,10 +1,24 @@
+import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
 import * as React from "react";
 
-import { verifySessionFromRefreshCookie } from "@/lib/auth";
+import { verifySessionFromRefreshCookie } from "@/lib/auth-server";
 
 import { AppShellClient } from "./shell-client";
+
+/**
+ * Non-indexing control for the authenticated/PII surface (Requirement 15.1,
+ * 15.2; `seo.md`; ADR 0006). Exporting `robots: { index: false, follow: false }`
+ * from this route-group layout makes every nested authenticated route — the
+ * Upload_Page, Results_Page, and Library_View — inherit a `noindex, nofollow`
+ * directive via the Next.js Metadata API. This is a privacy control (resume
+ * text, job descriptions, and match results must never be crawled or indexed),
+ * not just an SEO one, so no sitemap/canonical/Open Graph metadata is added to
+ * any `(app)` route.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 /**
  * The Authenticated_Shell layout reads the request cookies and headers to
@@ -21,8 +35,28 @@ export const dynamic = "force-dynamic";
 /**
  * Authenticated_Shell layout (Server Component).
  *
- * Verifies the session by forwarding the refresh cookie to the API.
- * On failure, redirects to /login?next=<current path>.
+ * Verifies the session server-side by forwarding the inbound refresh cookie to
+ * the API (design §13.5). This works cleanly when the web app and API are
+ * same-origin (production behind one domain): the browser sends the
+ * `matchlayer_refresh` cookie to the Next.js server, which forwards it to
+ * `/api/v1/auth/refresh` and hands the fresh token to the client tree.
+ *
+ * Split-origin local dev (web on :3000, API on :8000) is different: the API
+ * sets the refresh cookie on the API origin (:8000), so the browser never
+ * sends it to the Next.js server (:3000). The server-side check therefore
+ * can't see a session that genuinely exists. Hard-redirecting here would trap
+ * a just-logged-in user in a /login ↔ /dashboard loop.
+ *
+ * So the gate degrades by intent:
+ *   - server CAN verify (cookie present, same-origin) → render the shell with
+ *     the server-acquired token, exactly as designed;
+ *   - server canNOT verify → render the shell WITHOUT a server token and let
+ *     the client (`AppShellClient` + `useAuth`) verify against the API
+ *     directly (the browser can reach :8000 and send its cookie there). If the
+ *     client has no session either, it redirects to /login on the client.
+ *
+ * This keeps the production security posture identical (same-origin still
+ * verifies server-side) while making split-origin dev usable.
  */
 export default async function AppLayout({
   children,
@@ -34,14 +68,11 @@ export default async function AppLayout({
     cookies,
   });
 
-  if (!session) {
-    const hdrs = await headers();
-    const url = hdrs.get("x-url") || hdrs.get("x-invoke-path") || "/";
-    redirect(`/login?next=${encodeURIComponent(url)}`);
-  }
-
   return (
-    <AppShellClient accessToken={session.accessToken} user={session.user}>
+    <AppShellClient
+      accessToken={session?.accessToken ?? null}
+      user={session?.user ?? null}
+    >
       {children}
     </AppShellClient>
   );

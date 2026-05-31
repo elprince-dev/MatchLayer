@@ -13,3 +13,4 @@ Each ADR follows: Status, Date, Context, Decision, Consequences, Alternatives. N
 - [0003 — IaC: AWS CDK over Terraform](./0003-cdk-over-terraform.md)
 - [0004 — Vector storage: pgvector over a dedicated vector DB](./0004-pgvector-vs-dedicated-vector-db.md)
 - [0005 — Package managers: pnpm + uv](./0005-package-managers.md)
+- [0006 — SEO strategy and the public/authenticated indexing split](./0006-seo-and-indexing-policy.md)

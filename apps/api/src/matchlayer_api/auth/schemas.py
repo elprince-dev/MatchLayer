@@ -63,10 +63,11 @@ Requirements covered: 1.1, 1.2, 1.3, 2.1, 5.1, 5.5, 6.5, 6.6.
 from __future__ import annotations
 
 import unicodedata
+import uuid
 from datetime import datetime
-from typing import Final
+from typing import Annotated, Final
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, PlainSerializer, field_validator
 
 # ---------------------------------------------------------------------------
 # Display-name validator (Requirement 6.6).
@@ -322,7 +323,7 @@ class UserResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: str = Field(
+    id: Annotated[uuid.UUID, PlainSerializer(str, return_type=str)] = Field(
         description="UUIDv7 of the User_Account, encoded as a string.",
     )
     email: str = Field(
@@ -379,7 +380,7 @@ class MeResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: str = Field(
+    id: Annotated[uuid.UUID, PlainSerializer(str, return_type=str)] = Field(
         description="UUIDv7 of the User_Account, encoded as a string.",
     )
     email: str = Field(

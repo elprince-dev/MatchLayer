@@ -120,6 +120,50 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     _close_orphaned_event_loop()
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_teardown(item: pytest.Item) -> Iterator[None]:
+    """Close pytest-asyncio's orphaned replacement loop after *every* test.
+
+    The session-end hooks above only catch the final leaked loop. The real
+    failure mode is *mid-session*: after each async test, pytest-asyncio
+    closes that test's loop and installs a fresh ``_UnixSelectorEventLoop``
+    as the policy's current loop (an open, unused "clean" loop so any
+    between-test ``get_event_loop()`` keeps working). When the *next* test
+    installs its own replacement, the previous one is dereferenced and
+    garbage-collected — and ``BaseEventLoop.__del__`` emits
+    ``ResourceWarning: unclosed event loop`` plus two
+    ``ResourceWarning: unclosed <socket.socket ...>`` for its AF_UNIX
+    self-pipe. The builtin ``unraisableexception`` plugin collects those
+    during teardown and ``filterwarnings = ["error"]`` escalates them into a
+    session-failing ``ExceptionGroup`` attributed to whatever test happened
+    to trigger the GC pass (hence the "floating" failure).
+
+    This wrapper's post-``yield`` body runs after all fixture finalizers for
+    the test (including pytest-asyncio's loop swap), so the policy's current
+    loop is the freshly-installed, never-run replacement. Closing it here —
+    while it is still referenced, so before it can be GC-collected — means no
+    ``__del__`` warning ever fires, and it runs before the builtin unraisable
+    plugin's own teardown-phase collection (conftest hookwrappers nest inside
+    builtin ones, so their post-yield runs first). Closing an unused,
+    not-running loop is safe: the next async test installs its own loop, and
+    any between-test ``get_event_loop()`` call simply creates a new one.
+    """
+    yield
+    _close_current_loop_if_idle()
+
+
+def _close_current_loop_if_idle() -> None:
+    """Close the policy's current event loop when it is open and not running."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            loop = asyncio.get_event_loop_policy().get_event_loop()
+        except Exception:
+            return
+        if loop is not None and not loop.is_running() and not loop.is_closed():
+            loop.close()
+
+
 # ---------------------------------------------------------------------------
 # Hypothesis configuration for the property-based test suite (phase-1-auth).
 #

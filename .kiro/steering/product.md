@@ -21,6 +21,7 @@ Real ATS systems are opaque. Candidates optimize blindly. MatchLayer makes the m
 - **Infrastructure before intelligence.** Get the end-to-end flow working with simple logic, then layer in ML/LLMs.
 - **Open-source first.** Use OpenAI/paid APIs only when open-source can't deliver. Cost control is a real requirement.
 - **Evaluate everything AI.** Once LLMs enter the system, every prompt and output is versioned and measured.
+- **Discoverable in public, invisible in private.** Public marketing surfaces are built for search-engine discoverability; authenticated, PII-bearing surfaces are never indexed. See `seo.md` and ADR 0006.
 
 ## 7-phase roadmap
 

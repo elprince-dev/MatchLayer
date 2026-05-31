@@ -107,6 +107,16 @@ jobs:
       - name: Check .env.example drift
         run: python3 tools/check_env_drift.py
 
+      # tools/check_lexicon_drift.py is stdlib-only too. It fails the build if
+      # the committed API copy of the Skill_Lexicon
+      # (apps/api/src/matchlayer_api/scoring/data/skill_lexicon.v1.json) is no
+      # longer byte-identical to the ml/ source of truth
+      # (ml/lexicon/skill_lexicon.v1.json), or if either is stale vs the build
+      # pipeline. Mirrors the .env / OpenAPI drift gates (phase-1-matching
+      # Requirement 10.3).
+      - name: Check skill_lexicon drift
+        run: python3 tools/check_lexicon_drift.py
+
   # ---------------------------------------------------------------------------
   # frontend — Next.js + Vitest. The proxy.test.ts asserts security headers
   # against a real Next prod server, so we build → start → wait → test → kill.

@@ -1,0 +1,19 @@
+{
+  "id": "strong_match_backend_engineer",
+  "kind": "strong_match",
+  "description": "A backend-engineer resume that closely fits the job description: it covers every key JD skill in real prose. The naive Phase 1 scorer should rate this highly.",
+  "jd_key_skills": [
+    "python",
+    "fastapi",
+    "postgresql",
+    "docker",
+    "aws",
+    "ci/cd",
+    "pytest",
+    "redis",
+    "kubernetes",
+    "rest"
+  ],
+  "job_description": "We are hiring a Senior Backend Engineer to design and build scalable REST APIs in Python using the FastAPI framework. You will model data in PostgreSQL, containerize services with Docker, and deploy to AWS. Strong experience with CI/CD pipelines and automated testing with pytest is required. Familiarity with Redis caching and Kubernetes is preferred.",
+  "resume": "Senior Backend Engineer with eight years of experience building scalable REST APIs in Python. I have shipped production services with the FastAPI framework, modeled relational data in PostgreSQL, and containerized every service with Docker. I deployed and operated these systems on AWS, owning the CI/CD pipeline end to end and writing thorough pytest suites. I have also used Redis for caching and run workloads on Kubernetes."
+}

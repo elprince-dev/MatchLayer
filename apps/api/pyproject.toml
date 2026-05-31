@@ -32,6 +32,27 @@ dependencies = [
     # redis: rate-limiter backend (sliding-window via SORTED SET + Lua).
     # ONLY imported by core/rate_limit.py.
     "redis[hiredis]>=5.0,<6.0",
+    # phase-1-matching dependencies (req 5.8, 10.5). Pinned by major.
+    # NO sentence-transformers / spaCy / embedding / LLM deps in Phase 1.
+    # scikit-learn: TF-IDF vectorization + cosine similarity. The ONLY
+    # third-party dependency permitted in scoring/ (imports as `sklearn`).
+    "scikit-learn>=1.5,<2.0",
+    # boto3: S3-compatible client (MinIO local, AWS S3 prod). ONLY imported
+    # by core/storage.py.
+    "boto3>=1.34,<2.0",
+    # pypdf: bounded PDF text extraction. ONLY imported by services/extraction.py.
+    "pypdf>=6.10.2,<7.0",
+    # python-docx: bounded DOCX text extraction (imports as `docx`). ONLY
+    # imported by services/extraction.py.
+    "python-docx>=1.1,<2.0",
+    # filetype: magic-byte MIME sniffing, independent of client Content-Type.
+    # ONLY imported by core/mime.py.
+    "filetype>=1.2,<2.0",
+    # python-multipart: Starlette/FastAPI multipart form parsing, required by
+    # the POST /api/v1/resumes ``UploadFile`` part (Requirement 2.1). FastAPI
+    # raises at route-definition time if it is absent. ONLY used by the
+    # multipart resume-upload route.
+    "python-multipart>=0.0.9,<0.1",
 ]
 
 [project.optional-dependencies]

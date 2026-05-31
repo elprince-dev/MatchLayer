@@ -89,7 +89,11 @@ def _build_settings(environment: Environment) -> Settings:
 
 REFRESH_NAME = "matchlayer_refresh"
 CSRF_NAME = "matchlayer_csrf"
-COOKIE_PATH = "/api/v1/auth"
+# The HttpOnly refresh cookie stays scoped to the auth surface; the non-secret
+# CSRF cookie is broadened to `/` so JS on any page can read it to echo the
+# double-submit header (see cookies.py rationale).
+REFRESH_COOKIE_PATH = "/api/v1/auth"
+CSRF_COOKIE_PATH = "/"
 
 # Every environment that should emit ``Secure`` (i.e., everything but
 # the development carve-out). Used by parametrized tests so a future
@@ -148,14 +152,15 @@ def _assert_common_attrs(
     attrs: dict[str, str | bool],
     *,
     expect_secure: bool,
+    expect_path: str,
 ) -> None:
     """Attribute assertions shared by every helper.
 
-    ``Path``, ``SameSite``, and ``Domain`` are identical across all
-    four helpers (CSRF Strategy §9.2). ``Secure`` flips with the
-    environment.
+    ``SameSite`` and ``Domain`` are identical across all four helpers (CSRF
+    Strategy §9.2). ``Secure`` flips with the environment, and ``Path`` differs
+    by cookie (refresh scoped to the auth surface, CSRF broadened to ``/``).
     """
-    assert attrs.get("path") == COOKIE_PATH
+    assert attrs.get("path") == expect_path
     # SameSite values are case-insensitive per RFC 6265bis; normalize
     # for comparison so the test passes whether Starlette emits "Lax"
     # or "lax".
@@ -197,7 +202,7 @@ class TestSetRefreshCookie:
         assert value == "opaque-jwt"
         assert attrs.get("max-age") == "604800"
         assert attrs.get("httponly") is True
-        _assert_common_attrs(attrs, expect_secure=True)
+        _assert_common_attrs(attrs, expect_secure=True, expect_path=REFRESH_COOKIE_PATH)
 
     def test_secure_false_in_development(self) -> None:
         """``Secure`` is omitted under the documented dev carve-out.
@@ -220,7 +225,7 @@ class TestSetRefreshCookie:
         assert value == "opaque-jwt"
         assert attrs.get("max-age") == "604800"
         assert attrs.get("httponly") is True
-        _assert_common_attrs(attrs, expect_secure=False)
+        _assert_common_attrs(attrs, expect_secure=False, expect_path=REFRESH_COOKIE_PATH)
 
     def test_max_age_passes_through_unchanged(self) -> None:
         """Caller-supplied ``max_age`` round-trips into ``Max-Age``.
@@ -266,7 +271,7 @@ class TestSetCsrfCookie:
         # CSRF cookie MUST NOT be HttpOnly — frontend reads it to mirror
         # the value into the X-CSRF-Token header (CSRF Strategy §9.2).
         assert "httponly" not in attrs
-        _assert_common_attrs(attrs, expect_secure=True)
+        _assert_common_attrs(attrs, expect_secure=True, expect_path=CSRF_COOKIE_PATH)
 
     def test_secure_false_in_development(self) -> None:
         response = Response()
@@ -283,7 +288,7 @@ class TestSetCsrfCookie:
         assert value == "random-csrf"
         assert attrs.get("max-age") == "604800"
         assert "httponly" not in attrs
-        _assert_common_attrs(attrs, expect_secure=False)
+        _assert_common_attrs(attrs, expect_secure=False, expect_path=CSRF_COOKIE_PATH)
 
     def test_max_age_passes_through_unchanged(self) -> None:
         response = Response()
@@ -321,6 +326,7 @@ class TestClearRefreshCookie:
         _assert_common_attrs(
             attrs,
             expect_secure=environment in SECURE_ENVIRONMENTS,
+            expect_path=REFRESH_COOKIE_PATH,
         )
 
 
@@ -349,4 +355,5 @@ class TestClearCsrfCookie:
         _assert_common_attrs(
             attrs,
             expect_secure=environment in SECURE_ENVIRONMENTS,
+            expect_path=CSRF_COOKIE_PATH,
         )

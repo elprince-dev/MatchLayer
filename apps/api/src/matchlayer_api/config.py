@@ -15,11 +15,20 @@ dependencies (Design §6.2).
 from __future__ import annotations
 
 import json
+import math
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import AnyHttpUrl, Field, PostgresDsn, RedisDsn, SecretStr, field_validator
+from pydantic import (
+    AnyHttpUrl,
+    Field,
+    PostgresDsn,
+    RedisDsn,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Re-export for downstream convenience.
@@ -149,6 +158,50 @@ class Settings(BaseSettings):
     auth_rate_limit_reset_confirm_ip_limit: int = 20
     auth_rate_limit_reset_confirm_ip_window_seconds: int = 3600
 
+    # ---- resume upload & extraction bounds (phase-1-matching §"Settings
+    #      additions") ----------------------------------------------------
+    # Hard upload size ceiling enforced at the router before any object
+    # write (Requirement 2.2 → 413 ``payload_too_large``). 5 MiB.
+    resume_max_bytes: int = 5_242_880
+    # DOCX zip-bomb guards (Requirement 2.4 → 422 ``malformed_upload``):
+    # total uncompressed size (50 MiB) and entry-count ceilings checked
+    # via stdlib ``zipfile`` before extraction.
+    resume_max_decompressed_bytes: int = 52_428_800
+    resume_max_archive_entries: int = 256
+    # Wall-clock bound on synchronous in-request extraction (Requirement
+    # 3.2) and the retained-character ceiling extracted text is truncated
+    # to (Requirement 3.3).
+    resume_extraction_timeout_seconds: int = 15
+    resume_max_extracted_chars: int = 200_000
+
+    # ---- job-description input bounds (phase-1-matching §11.1) -----------
+    # Trimmed length window enforced by the match request validator
+    # (Requirement 8.3 → 422 ``validation_error``).
+    jd_min_chars: int = 30
+    jd_max_chars: int = 50_000
+
+    # ---- scoring output bounds (phase-1-matching §6, §7) -----------------
+    # Caps on the analyzed keyword set (Requirement 6.1) and generated
+    # suggestions (Requirement 7.1).
+    match_max_keywords: int = 50
+    match_max_suggestions: int = 10
+
+    # ---- score weights (phase-1-matching §5) -----------------------------
+    # Fixed similarity/keyword-coverage blend weights. The
+    # ``_score_weights_sum_to_one`` validator below asserts they sum to
+    # 1.0 at startup (Requirement 5.3), failing fast like the JWT-secret
+    # length floor.
+    score_weight_similarity: float = 0.6
+    score_weight_keyword: float = 0.4
+
+    # ---- per-user rate limits & daily quotas (phase-1-matching §11) ------
+    # Per-minute sliding-window limits (Requirement 11.1, 11.2) and
+    # per-UTC-day quotas (Requirement 11.4, 11.5 → 429 ``quota_exceeded``).
+    resume_rate_limit_per_min: int = 10
+    match_rate_limit_per_min: int = 20
+    resume_daily_quota: int = 20
+    match_daily_quota: int = 50
+
     # ---- validators ------------------------------------------------------
 
     @field_validator("jwt_secret")
@@ -186,6 +239,32 @@ class Settings(BaseSettings):
                 return json.loads(stripped)
             return [item.strip() for item in stripped.split(",") if item.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _score_weights_sum_to_one(self) -> Settings:
+        """Reject score weights that do not sum to 1.0 at startup.
+
+        The final score is a convex blend of the similarity and
+        keyword-coverage components (Requirement 5.3); weights that do not
+        sum to exactly 1.0 would silently distort every score and break the
+        ``0..100`` guarantee. Failing fast here mirrors the JWT-secret
+        length floor: a misconfiguration raises ``ValidationError`` before
+        the app accepts traffic rather than producing wrong scores in
+        production.
+
+        ``math.isclose`` with a tight absolute tolerance accommodates IEEE
+        754 representation error (e.g. ``0.6 + 0.4`` is not bit-exactly
+        ``1.0``) without admitting weights that are meaningfully off.
+        """
+        total = self.score_weight_similarity + self.score_weight_keyword
+        if not math.isclose(total, 1.0, abs_tol=1e-9):
+            raise ValueError(
+                "MATCHLAYER_SCORE_WEIGHT_SIMILARITY + "
+                "MATCHLAYER_SCORE_WEIGHT_KEYWORD must sum to 1.0; "
+                f"received {self.score_weight_similarity} + "
+                f"{self.score_weight_keyword} = {total}"
+            )
+        return self
 
 
 @lru_cache(maxsize=1)

@@ -115,3 +115,80 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class Resume(Base):
+    """The ``resumes`` table.
+
+    One uploaded resume file owned by a ``users`` row. ``original_filename``
+    and ``extracted_text`` are Restricted PII (display/analysis only) and are
+    never logged or placed in audit payloads.
+
+    Design reference: Data Models (phase-1-matching); Requirements 14.2, 14.5.
+    """
+
+    __tablename__ = "resumes"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=_uuid7)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    original_filename: Mapped[str] = mapped_column(Text, nullable=False)
+    storage_key: Mapped[str] = mapped_column(Text, nullable=False)
+    content_type: Mapped[str] = mapped_column(Text, nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    extraction_status: Mapped[str] = mapped_column(Text, nullable=False)
+    extraction_char_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+
+
+class MatchResult(Base):
+    """The ``match_results`` table.
+
+    One scoring of one ``resumes`` row against one job description, owned by a
+    ``users`` row. ``job_description_text`` is Restricted PII and is never
+    logged or placed in audit payloads.
+
+    Design reference: Data Models (phase-1-matching); Requirements 14.2, 14.5.
+    """
+
+    __tablename__ = "match_results"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=_uuid7)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    resume_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("resumes.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    job_description_text: Mapped[str] = mapped_column(Text, nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    score_breakdown: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    matched_keywords: Mapped[list] = mapped_column(JSONB, nullable=False)
+    missing_keywords: Mapped[list] = mapped_column(JSONB, nullable=False)
+    suggestions: Mapped[list] = mapped_column(JSONB, nullable=False)
+    scorer_version: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )

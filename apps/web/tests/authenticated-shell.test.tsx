@@ -1,41 +1,46 @@
 /**
- * Component test for the (app) Authenticated_Shell layout.
+ * Component test for the (app) Authenticated_Shell layout + AppShellClient.
  *
- * Validates Requirement 12.4 (null session → redirect to /login?next=...) and
- * Requirement 12.5 (valid session → render children with the user's display
- * name and inject the access token into the client closure).
+ * Post-split-origin behavior (see `(app)/layout.tsx` and `shell-client.tsx`):
  *
- * The shell is an async Server Component that:
- *   - Calls verifySessionFromRefreshCookie({ headers, cookies }).
- *   - On null → calls redirect(`/login?next=${encodeURIComponent(url)}`).
- *   - On session → renders <AppShellClient accessToken={...} user={...}>{children}</AppShellClient>.
+ *   - The layout is an async Server Component that calls
+ *     `verifySessionFromRefreshCookie({ headers, cookies })` and ALWAYS renders
+ *     `<AppShellClient accessToken={...} user={...}>` — passing the
+ *     server-acquired token/user when verification succeeded (same-origin
+ *     production path), or `null`/`null` when it could not (split-origin local
+ *     dev, where the refresh cookie lives on the API origin and never reaches
+ *     the Next.js server). The layout no longer calls `redirect()` — gating on
+ *     the unverifiable case is delegated to the client.
  *
- * The AppShellClient injects the access token via useEffect(setAccessToken)
- * and renders the user's display name + sign-out button. We verify both the
- * server-side redirect logic (by mocking redirect + verifySessionFromRefreshCookie)
- * and the client-side render of AppShellClient directly.
+ *   - `AppShellClient`:
+ *       • server-verified (token non-null) → injects the token via
+ *         `setAccessToken` and renders the chrome + children immediately;
+ *       • not server-verified (token null) → attempts client recovery via
+ *         `useAuth().refresh()`; while pending it shows a loading state; if the
+ *         client is authenticated it renders the shell; otherwise it
+ *         `router.replace("/login?next=<path>")`.
  *
  * @vitest-environment jsdom
  */
 
 import * as React from "react";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-// Mock dependencies before importing the layout.
-const redirectMock = vi.fn((url: string) => {
-  // Next.js redirect throws to halt rendering.
-  throw new Error(`NEXT_REDIRECT:${url}`);
-});
-
+const setAccessTokenMock = vi.fn();
+const getAccessTokenMock = vi.fn<() => string | null>(() => null);
 const verifySessionMock = vi.fn();
 
-const setAccessTokenMock = vi.fn();
+// next/navigation: the client shell uses useRouter().replace and usePathname.
+const replaceMock = vi.fn();
+const pushMock = vi.fn();
+let pathnameValue = "/dashboard";
 
 vi.mock("next/navigation", () => ({
-  redirect: (url: string) => redirectMock(url),
+  useRouter: () => ({ replace: replaceMock, push: pushMock }),
+  usePathname: () => pathnameValue,
 }));
 
 vi.mock("next/headers", () => ({
@@ -51,28 +56,47 @@ vi.mock("next/headers", () => ({
   })),
 }));
 
-vi.mock("@/lib/auth", async () => {
-  const actual = await vi.importActual<Record<string, unknown>>("@/lib/auth");
-  return {
-    ...actual,
-    verifySessionFromRefreshCookie: (...args: unknown[]) =>
-      verifySessionMock(...args),
-    setAccessToken: (...args: unknown[]) => setAccessTokenMock(...args),
-  };
-});
+// useAuth is driven per-test via this mutable object so each test can simulate
+// "client has a session" vs "client is anonymous after recovery".
+interface MockAuth {
+  user: { id: string; email: string; display_name: string } | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  refresh: ReturnType<typeof vi.fn>;
+  signOut: ReturnType<typeof vi.fn>;
+}
+
+let mockAuth: MockAuth;
+
+vi.mock("@/lib/auth", () => ({
+  setAccessToken: (...args: unknown[]) => setAccessTokenMock(...args),
+  getAccessToken: () => getAccessTokenMock(),
+  useAuth: () => mockAuth,
+}));
+
+vi.mock("@/lib/auth-server", () => ({
+  verifySessionFromRefreshCookie: (...args: unknown[]) =>
+    verifySessionMock(...args),
+}));
 
 import AppLayout from "@/app/(app)/layout";
 import { AppShellClient } from "@/app/(app)/shell-client";
 
 afterEach(() => {
   cleanup();
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 beforeEach(() => {
-  redirectMock.mockClear();
-  verifySessionMock.mockClear();
-  setAccessTokenMock.mockClear();
+  pathnameValue = "/dashboard";
+  getAccessTokenMock.mockReturnValue(null);
+  mockAuth = {
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+    refresh: vi.fn(async () => {}),
+    signOut: vi.fn(async () => {}),
+  };
 });
 
 function makeWrapper(): React.FC<{ children: React.ReactNode }> {
@@ -89,138 +113,54 @@ function makeWrapper(): React.FC<{ children: React.ReactNode }> {
   };
 }
 
-describe("(app)/layout — Authenticated_Shell (Requirement 12.4)", () => {
-  it("redirects to /login?next=<url-encoded path> when verifySessionFromRefreshCookie returns null", async () => {
-    verifySessionMock.mockResolvedValue(null);
+const SERVER_USER = {
+  id: "01938f00-0000-7000-8000-000000000001",
+  email: "alice@example.com",
+  display_name: "alice",
+  created_at: "2025-01-01T00:00:00Z",
+  updated_at: "2025-01-01T00:00:00Z",
+};
 
-    // The layout calls redirect() which throws. We catch that to assert
-    // the URL the layout attempted to redirect to.
-    let redirectError: Error | null = null;
-    try {
-      await AppLayout({ children: <div>protected</div> });
-    } catch (err) {
-      redirectError = err as Error;
-    }
-
-    expect(redirectError).not.toBeNull();
-    expect(redirectMock).toHaveBeenCalledTimes(1);
-    const calledWith = redirectMock.mock.calls[0]![0]!;
-    expect(calledWith).toMatch(/^\/login\?next=/);
-    // The next param must be URL-encoded.
-    expect(calledWith).toContain(encodeURIComponent("/dashboard"));
-  });
-
-  it("renders the AppShellClient with children when verifySessionFromRefreshCookie returns a session", async () => {
+describe("(app)/layout — Authenticated_Shell (server verification path)", () => {
+  it("renders the shell with the server token + user when verification succeeds", async () => {
     verifySessionMock.mockResolvedValue({
       accessToken: "fresh.access.token",
-      user: {
-        id: "01938f00-0000-7000-8000-000000000001",
-        email: "alice@example.com",
-        display_name: "alice",
-        created_at: "2025-01-01T00:00:00Z",
-        updated_at: "2025-01-01T00:00:00Z",
-      },
+      user: SERVER_USER,
     });
 
     const tree = await AppLayout({
       children: <div data-testid="child-content">protected content</div>,
     });
 
-    expect(redirectMock).not.toHaveBeenCalled();
-
-    // The layout returns <AppShellClient>...</AppShellClient>. Render it
-    // through the client wrapper to assert children + display name.
     const Wrapper = makeWrapper();
     render(<Wrapper>{tree}</Wrapper>);
 
+    // Server-acquired token is injected; chrome + children render immediately.
+    expect(setAccessTokenMock).toHaveBeenCalledWith("fresh.access.token");
     expect(screen.getByTestId("child-content")).toBeInstanceOf(HTMLElement);
     expect(screen.getByText("alice")).toBeInstanceOf(HTMLElement);
+    // No client-side redirect when the server verified.
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it("does NOT redirect from the server even when verification returns null", async () => {
+    // Split-origin dev: server can't see the cookie. The layout must still
+    // render (delegating the gate to the client), never throw a redirect.
+    verifySessionMock.mockResolvedValue(null);
+
+    const tree = await AppLayout({ children: <div>protected</div> });
+    // The layout returned a tree rather than throwing NEXT_REDIRECT.
+    expect(tree).toBeDefined();
   });
 });
 
-/**
- * Option-B regression — public `/` vs gated `/dashboard`.
- *
- * The Authenticated_Shell layout wraps the `(app)` route group only. Per
- * design §13.1 / §13.5 (post-Option-B alignment, see tasks.md §15 deviation
- * note), `/` is the public marketing landing rendered by `app/page.tsx` —
- * which is *outside* `(app)/`, so this layout never runs for `/`. The gated
- * surface lives at `/dashboard` and any future `(app)/*` routes.
- *
- * These tests pin that contract: the redirect target encodes the original
- * `(app)/*` pathname so the user lands back where they came from after
- * sign-in.
- */
-describe("(app)/layout — Option B redirect contract for /dashboard", () => {
-  it("encodes /dashboard as %2Fdashboard in the next= query param", async () => {
-    verifySessionMock.mockResolvedValue(null);
-
-    try {
-      await AppLayout({ children: <div>protected</div> });
-    } catch {
-      /* redirect throws */
-    }
-
-    expect(redirectMock).toHaveBeenCalledTimes(1);
-    const calledWith = redirectMock.mock.calls[0]![0]!;
-    expect(calledWith).toBe(`/login?next=${encodeURIComponent("/dashboard")}`);
-    // Belt-and-suspenders: verify the literal encoded form.
-    expect(calledWith).toContain("next=%2Fdashboard");
-  });
-
-  it("encodes nested (app)/* paths in the next= query param", async () => {
-    verifySessionMock.mockResolvedValue(null);
-
-    // Override the headers mock for this case.
-    const { headers: headersMock } = await import("next/headers");
-    (headersMock as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
-      async () => ({
-        get: (name: string) => {
-          if (name === "x-url") return "/dashboard/settings";
-          return null;
-        },
-      }),
-    );
-
-    try {
-      await AppLayout({ children: <div>protected</div> });
-    } catch {
-      /* redirect throws */
-    }
-
-    expect(redirectMock).toHaveBeenCalledTimes(1);
-    const calledWith = redirectMock.mock.calls[0]![0]!;
-    expect(calledWith).toContain("next=%2Fdashboard%2Fsettings");
-  });
-});
-
-describe("AppShellClient (Requirement 12.5 — access-token injection)", () => {
-  it("injects the access token into the closure via setAccessToken on mount", () => {
+describe("AppShellClient — server-verified path (Requirement 12.5)", () => {
+  it("injects the access token and renders display name + children", () => {
     const Wrapper = makeWrapper();
     render(
       <Wrapper>
         <AppShellClient
           accessToken="injected.token.value"
-          user={{
-            id: "01938f00-0000-7000-8000-000000000001",
-            email: "alice@example.com",
-            display_name: "alice",
-          }}
-        >
-          <div>child</div>
-        </AppShellClient>
-      </Wrapper>,
-    );
-
-    expect(setAccessTokenMock).toHaveBeenCalledWith("injected.token.value");
-  });
-
-  it("renders the user's display name and the children", () => {
-    const Wrapper = makeWrapper();
-    render(
-      <Wrapper>
-        <AppShellClient
-          accessToken="t"
           user={{
             id: "01938f00-0000-7000-8000-000000000001",
             email: "alice@example.com",
@@ -232,7 +172,67 @@ describe("AppShellClient (Requirement 12.5 — access-token injection)", () => {
       </Wrapper>,
     );
 
+    expect(setAccessTokenMock).toHaveBeenCalledWith("injected.token.value");
     expect(screen.getByText("Alice Wonderland")).toBeInstanceOf(HTMLElement);
     expect(screen.getByTestId("dash-content")).toBeInstanceOf(HTMLElement);
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("AppShellClient — split-origin client recovery", () => {
+  it("renders the shell when the client already holds a token (post-login)", async () => {
+    // No server token, but the login form put a token in the closure and
+    // useAuth reports authenticated.
+    getAccessTokenMock.mockReturnValue("client.token");
+    mockAuth = {
+      user: { id: "u1", email: "a@b.co", display_name: "Bob" },
+      isAuthenticated: true,
+      isLoading: false,
+      refresh: vi.fn(async () => {}),
+      signOut: vi.fn(async () => {}),
+    };
+
+    const Wrapper = makeWrapper();
+    render(
+      <Wrapper>
+        <AppShellClient accessToken={null} user={null}>
+          <div data-testid="dash">Dashboard</div>
+        </AppShellClient>
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("dash")).toBeInstanceOf(HTMLElement);
+    });
+    expect(screen.getByText("Bob")).toBeInstanceOf(HTMLElement);
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it("redirects to /login?next=<path> when recovery finds no session", async () => {
+    pathnameValue = "/dashboard/settings";
+    // No server token, no client token, recovery refresh resolves anonymous.
+    getAccessTokenMock.mockReturnValue(null);
+    mockAuth = {
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      refresh: vi.fn(async () => {}),
+      signOut: vi.fn(async () => {}),
+    };
+
+    const Wrapper = makeWrapper();
+    render(
+      <Wrapper>
+        <AppShellClient accessToken={null} user={null}>
+          <div data-testid="dash">Dashboard</div>
+        </AppShellClient>
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(
+        `/login?next=${encodeURIComponent("/dashboard/settings")}`,
+      );
+    });
   });
 });

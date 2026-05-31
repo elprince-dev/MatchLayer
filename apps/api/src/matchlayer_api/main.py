@@ -83,12 +83,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from matchlayer_api.api.health import router as health_router
+from matchlayer_api.api.matches.router import router as matches_router
+from matchlayer_api.api.resumes.router import router as resumes_router
 from matchlayer_api.auth.router import router as auth_router
 from matchlayer_api.config import Settings, get_settings
 from matchlayer_api.core.db import verify_database_connection
 from matchlayer_api.core.errors import register_exception_handlers
 from matchlayer_api.core.logging import configure_logging
-from matchlayer_api.core.middleware import RequestIdMiddleware
+from matchlayer_api.core.middleware import ApiNoIndexMiddleware, RequestIdMiddleware
 
 # Module-level logger. The startup probe runs *before* any HTTP
 # request, so the contextvar fields the request-id middleware binds
@@ -203,6 +205,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(RequestIdMiddleware)
 
+    # ------------------------------------------------------------------
+    # ApiNoIndexMiddleware — stamps ``X-Robots-Tag: noindex, nofollow``
+    # on every ``/api/v1/*`` response (Requirement 15.3). Added LAST so
+    # it is the OUTERMOST user middleware, extending the stack to
+    #
+    #     inbound:  ApiNoIndexMiddleware → RequestIdMiddleware → CORS → routes
+    #     outbound: routes → CORS → RequestIdMiddleware → ApiNoIndexMiddleware
+    #
+    # The header must survive 4xx/5xx, but the RFC 7807 error envelopes
+    # are produced by the handlers registered in
+    # ``register_exception_handlers`` — and in Starlette those run inside
+    # the Exception/ServerErrorMiddleware, which sit at the OUTER part of
+    # the stack (outside the routes). Only a middleware that is at least
+    # as outer as that layer observes the *final* response, error
+    # envelopes included. RequestIdMiddleware already relies on exactly
+    # this property to stamp ``X-Request-Id`` on error responses; adding
+    # ApiNoIndexMiddleware after it gives the same guarantee — the
+    # outbound response (whatever its status) passes back out through
+    # this middleware last, so ``X-Robots-Tag`` lands on 2xx, 3xx, and
+    # handler-produced 4xx/5xx alike. Privacy control (defense in depth),
+    # not merely SEO (``seo.md``, ``security.md``, ADR 0006).
+    # ------------------------------------------------------------------
+    app.add_middleware(ApiNoIndexMiddleware)
+
     # Step 5 — RFC 7807 error envelope. Pass ``cfg`` explicitly so the
     # production-vs-development branch in the catch-all handler is
     # driven by the same Settings the caller supplied (rather than
@@ -215,6 +241,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Auth router — always mounted.
     app.include_router(auth_router)
+
+    # Resume and match routers — always mounted. Each APIRouter carries its
+    # own ``/api/v1/resumes`` / ``/api/v1/matches`` prefix, so no extra prefix
+    # is applied here (Requirements 2.1, 8.1).
+    app.include_router(resumes_router)
+    app.include_router(matches_router)
 
     # Dev router — only in development (Design §12.3, Requirement 13.4).
     if cfg.environment == "development":

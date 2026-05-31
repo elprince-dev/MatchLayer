@@ -30,10 +30,12 @@ function LoginPageInner(): React.JSX.Element {
   const justReset = searchParams.get("just-reset");
 
   // Validate next param: must start with / and not contain ://
+  // Defaults to /dashboard (the authenticated home) rather than the marketing
+  // landing, so a successful sign-in visibly lands the user inside the app.
   const safeNext =
     next && next.startsWith("/") && !decodeURIComponent(next).includes("://")
       ? next
-      : "/";
+      : "/dashboard";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
