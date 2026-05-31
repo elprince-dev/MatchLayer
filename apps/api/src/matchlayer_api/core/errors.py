@@ -122,6 +122,82 @@ class MatchLayerError(Exception):
             self.title = title
 
 
+# ---------------------------------------------------------------------------
+# Feature-defined subclasses (phase-1-matching).
+#
+# Each pins ``status_code`` / ``error_type`` / ``title`` so that raising the
+# class with only a ``detail`` string yields the right RFC 7807 envelope; no
+# new handler is needed because the registered :func:`matchlayer_error_handler`
+# already renders any :class:`MatchLayerError`. The ``error_type`` values are
+# the ``type`` strings from the design's error catalog (design.md §"Error
+# Handling"). Status codes use integer literals — mirroring the docstring
+# example above — to stay clear of Starlette's ongoing 4xx constant renames
+# (e.g., ``HTTP_413_REQUEST_ENTITY_TOO_LARGE`` →
+# ``HTTP_413_CONTENT_TOO_LARGE``, ``HTTP_422_UNPROCESSABLE_ENTITY`` →
+# ``HTTP_422_UNPROCESSABLE_CONTENT``), whose deprecation warnings our
+# ``filterwarnings = ["error"]`` pytest config would otherwise promote to
+# failures.
+# ---------------------------------------------------------------------------
+
+
+class NotFoundError(MatchLayerError):
+    """Resource missing, soft-deleted, or owned by another User_Account.
+
+    Returns the same ``not_found`` envelope whether the row truly does
+    not exist or belongs to a different user, so the existence of
+    another account's resource is not disclosed (Requirements 1.5, 1.6,
+    4.4, 8.4).
+    """
+
+    status_code = 404
+    error_type = "not_found"
+    title = "Not Found"
+
+
+class PayloadTooLargeError(MatchLayerError):
+    """Declared upload length exceeds ``MATCHLAYER_RESUME_MAX_BYTES`` (Req 2.2)."""
+
+    status_code = 413
+    error_type = "payload_too_large"
+    title = "Payload Too Large"
+
+
+class UnsupportedMediaTypeError(MatchLayerError):
+    """Magic-byte type is neither PDF nor DOCX (Requirement 2.3)."""
+
+    status_code = 415
+    error_type = "unsupported_media_type"
+    title = "Unsupported Media Type"
+
+
+class MalformedUploadError(MatchLayerError):
+    """DOCX zip-bomb: decompressed size or entry count over limits (Req 2.4)."""
+
+    status_code = 422
+    error_type = "malformed_upload"
+    title = "Malformed Upload"
+
+
+class ResumeNotExtractableError(MatchLayerError):
+    """Match references a Resume whose ``extraction_status != 'succeeded'`` (Req 8.5)."""
+
+    status_code = 422
+    error_type = "resume_not_extractable"
+    title = "Resume Not Extractable"
+
+
+class QuotaExceededError(MatchLayerError):
+    """Daily Upload_Quota or Scoring_Quota exceeded (Requirement 11.6).
+
+    The caller supplies a ``detail`` that states the daily limit and the
+    UTC time the quota resets; the router additionally sets ``Retry-After``.
+    """
+
+    status_code = 429
+    error_type = "quota_exceeded"
+    title = "Quota Exceeded"
+
+
 def _current_request_id() -> str | None:
     """Return the request_id bound by :class:`RequestIdMiddleware`, or ``None``.
 
@@ -344,6 +420,12 @@ def register_exception_handlers(
 
 
 __all__ = [
+    "MalformedUploadError",
     "MatchLayerError",
+    "NotFoundError",
+    "PayloadTooLargeError",
+    "QuotaExceededError",
+    "ResumeNotExtractableError",
+    "UnsupportedMediaTypeError",
     "register_exception_handlers",
 ]

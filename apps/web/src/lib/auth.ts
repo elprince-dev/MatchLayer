@@ -20,14 +20,12 @@
  *    `useQuery` for `GET /api/v1/auth/me`. Mutations for `signIn`, `signOut`,
  *    and `refresh` keep the closure and the query cache in lockstep.
  *
- * 3. The server-side helper `verifySessionFromRefreshCookie` consumed by the
- *    `(app)/layout.tsx` Server Component (Frontend Architecture §13.5). It
- *    forwards the inbound `Cookie` header (and `X-CSRF-Token` from the sibling
- *    `matchlayer_csrf` cookie, since the API double-submit check sees the
- *    refresh cookie present) to `POST /api/v1/auth/refresh`. On success it
- *    returns the fresh access token + user payload so the layout can hand them
- *    down. On 401/403/network-error it returns null so the layout redirects
- *    to `/login?next=...`.
+ * 3. The server-side helper `verifySessionFromRefreshCookie` (consumed by the
+ *    `(app)/layout.tsx` Server Component, Frontend Architecture §13.5) used to
+ *    live here too, but a `"use client"` directive tags every export as a
+ *    client reference — so a Server Component calling it threw. It now lives in
+ *    the sibling non-client module `./auth-server`; its `ServerSession` result
+ *    type is re-exported from here for backward compatibility.
  *
  * Why a module closure instead of a React Context
  * -----------------------------------------------
@@ -103,15 +101,13 @@ export interface UseAuth {
 }
 
 /**
- * Result of `verifySessionFromRefreshCookie`. The Authenticated_Shell layout
- * consumes both fields — the user for rendering, the access token for
- * hydrating the client closure on first paint so the leaf components don't
- * have to wait for a second `/refresh` round-trip.
+ * Re-exported from `./auth-server` for backward compatibility. The actual
+ * declaration and the `verifySessionFromRefreshCookie` helper that produces it
+ * now live in the non-`"use client"` `lib/auth-server.ts` so a Server Component
+ * can call them (a `"use client"` module tags every export as a client
+ * reference, which broke the server-side call site). See that module's header.
  */
-export interface ServerSession {
-  accessToken: string;
-  user: AuthUser;
-}
+export type { ServerSession } from "./auth-server";
 
 // ---------------------------------------------------------------------------
 // Module-level closure store (Requirement 12.6, Design §13.4)
@@ -512,131 +508,4 @@ export function useAuth(): UseAuth {
       await refreshMutation.mutateAsync();
     },
   };
-}
-
-// ---------------------------------------------------------------------------
-// Server-side: `verifySessionFromRefreshCookie` (Design §13.5)
-// ---------------------------------------------------------------------------
-
-/**
- * Minimal structural type for `next/headers`'s `headers()` return value.
- * Declared locally so this module never imports from `next/headers` and stays
- * safe to ship in the client bundle. The `(app)/layout.tsx` Server Component
- * imports `headers` from `next/headers` itself and passes the function in.
- */
-type HeadersFnLike = () =>
-  | { get(name: string): string | null }
-  | Promise<{ get(name: string): string | null }>;
-
-/**
- * Minimal structural type for `next/headers`'s `cookies()` return value. We
- * need exactly two operations: serialize as a `Cookie` request header
- * (`toString()`) and look up `matchlayer_csrf` for the double-submit echo.
- */
-type CookieStoreLike = {
-  toString(): string;
-  get(name: string): { value: string } | undefined;
-};
-
-type CookiesFnLike = () => CookieStoreLike | Promise<CookieStoreLike>;
-
-/**
- * Verify a session by replaying the inbound cookies against
- * `POST /api/v1/auth/refresh`. Used by `(app)/layout.tsx` (Design §13.5) to
- * decide whether to render the children or `redirect("/login?next=...")`.
- *
- * Behavior matrix:
- *   - No `matchlayer_refresh` cookie present → return `null` immediately.
- *     This avoids a guaranteed 401 round-trip and leaves the API audit log
- *     cleaner during anonymous renders.
- *   - `/refresh` returns 2xx → return `{ accessToken, user }` so the layout
- *     can hand the access token to the client tree.
- *   - `/refresh` returns 4xx/5xx, or the network call throws, or the body
- *     is not parseable → return `null`. The layout treats every non-success
- *     identically and redirects.
- *
- * The function takes `headers` and `cookies` as function references (matching
- * the design.md §13.5 call site) so this module never imports `next/headers`
- * directly. That matters for two reasons: (a) the file is a `'use client'`
- * module and `next/headers` is server-only, (b) the function is unit-testable
- * without spinning up a Next.js request context.
- */
-export async function verifySessionFromRefreshCookie(input: {
-  headers: HeadersFnLike;
-  cookies: CookiesFnLike;
-}): Promise<ServerSession | null> {
-  const [hdrs, cookieStore] = await Promise.all([
-    Promise.resolve(input.headers()),
-    Promise.resolve(input.cookies()),
-  ]);
-
-  const cookieHeader = cookieStore.toString();
-  // Fast path — no refresh cookie means we cannot recover a session and the
-  // refresh endpoint will return 401 anyway. Skipping the network call also
-  // keeps the audit log free of `missing_refresh_cookie` noise on anonymous
-  // top-of-funnel landings into the `(app)` route group.
-  if (cookieHeader === "" || !cookieHeader.includes("matchlayer_refresh=")) {
-    return null;
-  }
-
-  const csrfValue = cookieStore.get("matchlayer_csrf")?.value;
-  const userAgent = hdrs.get("user-agent");
-  const forwardedFor = hdrs.get("x-forwarded-for");
-
-  const requestHeaders: Record<string, string> = {
-    Cookie: cookieHeader,
-  };
-  if (csrfValue !== undefined) {
-    // Double-submit echo. Without this header the API returns 403
-    // `csrf_mismatch` whenever the refresh cookie is also present.
-    requestHeaders["X-CSRF-Token"] = csrfValue;
-  }
-  if (userAgent !== null) {
-    // Forward UA so the audit row's `user_agent` column reflects the real
-    // browser, not a Next.js server fingerprint.
-    requestHeaders["User-Agent"] = userAgent;
-  }
-  if (forwardedFor !== null) {
-    // Forward client IP for the same reason. The FastAPI request middleware
-    // unwraps `X-Forwarded-For` per the foundation contract.
-    requestHeaders["X-Forwarded-For"] = forwardedFor;
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(`${apiBaseUrl}/api/v1/auth/refresh`, {
-      method: "POST",
-      headers: requestHeaders,
-      // `cache: "no-store"` is mandatory — Next.js's default fetch cache is
-      // shared across requests and would happily serve stale token pairs.
-      cache: "no-store",
-    });
-  } catch {
-    return null;
-  }
-
-  if (!res.ok) {
-    return null;
-  }
-
-  let body: TokenPairResponse;
-  try {
-    body = (await res.json()) as TokenPairResponse;
-  } catch {
-    return null;
-  }
-
-  // Defensive shape check. The codegen pass will eventually replace this with
-  // a Zod parse against the curated `TokenPairResponseSchema`, but until then
-  // we validate the two fields the layout actually consumes.
-  if (
-    typeof body.access_token !== "string" ||
-    body.user === null ||
-    typeof body.user !== "object" ||
-    typeof body.user.id !== "string"
-  ) {
-    return null;
-  }
-
-  return { accessToken: body.access_token, user: body.user };
 }

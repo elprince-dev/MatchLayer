@@ -1,5 +1,8 @@
+import Link from "next/link";
+
 import { HeroText } from "@/components/hero-text";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 
 /**
  * Placeholder landing page (route: `/`).
@@ -10,15 +13,11 @@ import { ThemeToggle } from "@/components/theme-toggle";
  * `<ThemeToggle />`) are isolated as small client islands; this page itself
  * stays static and renders at build time.
  *
- * Layout:
- *   - Outer `<div>` is a full-viewport flex column with the design-system
- *     `bg-bg` / `text-text` tokens. The body in `layout.tsx` already paints
- *     these, but setting them here too keeps the page self-contained for any
- *     future parallel-route / template wrappers.
- *   - Top nav row hosts the theme toggle in the right corner (`flex
- *     justify-end p-6`).
- *   - The hero block fills the remaining viewport (`flex-1`) and centers the
- *     animated wordmark over the muted tagline.
+ * Navigation: the top nav and hero CTAs link to the auth surface
+ * (`/login`, `/register`). These are the only public entry points into the
+ * authenticated app in Phase 1 — without them a first-time visitor on `/`
+ * would have no way in. `next/link` keeps client-side navigation fast and the
+ * links are plain anchors (good for SEO + accessibility on this public page).
  *
  * Tokens only — no hex literals, and no shadcn defaults like `bg-background` /
  * `text-foreground` (those tokens don't exist in our `globals.css`).
@@ -36,8 +35,19 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export default function Home(): React.JSX.Element {
   return (
     <div className="flex min-h-screen flex-col bg-bg text-text">
-      <header className="flex justify-end p-6">
-        <ThemeToggle />
+      <header className="flex items-center justify-between p-6">
+        <span className="text-sm font-semibold tracking-tight text-text">
+          MatchLayer
+        </span>
+        <nav className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/login">Sign in</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/register">Get started</Link>
+          </Button>
+          <ThemeToggle />
+        </nav>
       </header>
 
       <main className="flex flex-1 flex-col items-center justify-center px-6 pb-24 text-center">
@@ -45,6 +55,14 @@ export default function Home(): React.JSX.Element {
         <p className="mt-6 text-lg text-text-muted sm:text-xl">
           AI-native ATS, transparent scoring.
         </p>
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+          <Button asChild size="lg">
+            <Link href="/register">Get started — it&apos;s free</Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link href="/login">Sign in</Link>
+          </Button>
+        </div>
       </main>
     </div>
   );

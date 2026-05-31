@@ -1,0 +1,19 @@
+{
+  "id": "clear_mismatch_pastry_chef",
+  "kind": "clear_mismatch",
+  "description": "An unrelated (pastry-chef) resume scored against the backend-engineer job description. It covers none of the JD's technical skills, so the score should be low and the JD skills should appear as missing.",
+  "jd_key_skills": [
+    "python",
+    "fastapi",
+    "postgresql",
+    "docker",
+    "aws",
+    "ci/cd",
+    "pytest",
+    "redis",
+    "kubernetes",
+    "rest"
+  ],
+  "job_description": "We are hiring a Senior Backend Engineer to design and build scalable REST APIs in Python using the FastAPI framework. You will model data in PostgreSQL, containerize services with Docker, and deploy to AWS. Strong experience with CI/CD pipelines and automated testing with pytest is required. Familiarity with Redis caching and Kubernetes is preferred.",
+  "resume": "Pastry Chef and bakery manager with twelve years of experience crafting artisan breads, laminated croissants, and wedding cakes. I manage kitchen inventory, train junior bakers, design seasonal dessert menus, and ensure food safety compliance across two retail locations. Skilled in chocolate tempering, sugar work, and high-volume catering for events."
+}

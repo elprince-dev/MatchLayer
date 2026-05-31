@@ -51,10 +51,13 @@ export default function RegisterPage(): React.JSX.Element {
         const data = await res.json();
         if (data.access_token) {
           setAccessToken(data.access_token);
-          router.push("/");
+          // Land the new user in the app on the core action (upload + match),
+          // so a successful sign-up has an obvious, useful next step rather
+          // than dropping back on the marketing landing with no feedback.
+          router.push("/upload");
         } else {
           // Enumeration defense path — same UX as success.
-          router.push("/");
+          router.push("/upload");
         }
       }
     } catch {

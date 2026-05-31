@@ -1,0 +1,19 @@
+{
+  "id": "keyword_stuffed_adversarial",
+  "kind": "keyword_stuffed",
+  "description": "An adversarial resume that just lists the JD's keywords twice with no real prose. Phase 1 is a deliberately naive TF-IDF + keyword scorer with no anti-stuffing defense, so the stuffed keywords DO count as matched and the resume DOES score higher than a clearly-unrelated one. This fixture documents that known, intended Phase 1 behavior rather than asserting a defense the scorer does not yet have.",
+  "jd_key_skills": [
+    "python",
+    "fastapi",
+    "postgresql",
+    "docker",
+    "aws",
+    "ci/cd",
+    "pytest",
+    "redis",
+    "kubernetes",
+    "rest"
+  ],
+  "job_description": "We are hiring a Senior Backend Engineer to design and build scalable REST APIs in Python using the FastAPI framework. You will model data in PostgreSQL, containerize services with Docker, and deploy to AWS. Strong experience with CI/CD pipelines and automated testing with pytest is required. Familiarity with Redis caching and Kubernetes is preferred.",
+  "resume": "Python FastAPI PostgreSQL Docker AWS REST CI/CD pytest Redis Kubernetes Python FastAPI PostgreSQL Docker AWS REST CI/CD pytest Redis Kubernetes"
+}

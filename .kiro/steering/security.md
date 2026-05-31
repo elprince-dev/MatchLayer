@@ -40,6 +40,8 @@ What we explicitly **don't** defend against (yet): nation-state actors, sophisti
 
 - **HTTPS everywhere.** Redirect HTTP → HTTPS. HSTS with `max-age=31536000; includeSubDomains; preload`.
 - **Security headers** on every HTML response (Next.js proxy, formerly the `middleware` file convention — renamed in Next.js 16): `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `X-Frame-Options: DENY`.
+- **Non-indexing of PII surfaces.** Every authenticated (`(app)` route group) HTML response and every `/api/v1/*` response sets `X-Robots-Tag: noindex, nofollow`. This is a privacy control, not just an SEO one: resume text, job descriptions, and match results must never be crawled or indexed. Full policy and route classification in `seo.md`; rationale in ADR 0006.
+- **Inline `<script>` is disallowed by CSP.** No `'unsafe-inline'` in `script-src`. The one sanctioned exception is structured-data JSON-LD on **public** pages, which must use a per-request **CSP nonce** (deferred until Phase 1's marketing pages warrant it). Never broaden CSP to accommodate inline script for SEO.
 - **CORS:** explicit allowlist of origins. Never `*` for authenticated endpoints. Document allowed origins per environment.
 
 ## Input validation & API safety
@@ -140,3 +142,4 @@ What we explicitly **don't** defend against (yet): nation-state actors, sophisti
 - Deploying with secrets baked into the container image.
 - Hand-parsing free-form LLM output.
 - Trusting `Content-Type` headers for upload validation.
+- Making any authenticated/PII page indexable (sitemap entry, canonical tag, missing `noindex`) for the sake of SEO.

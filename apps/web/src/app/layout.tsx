@@ -3,6 +3,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { Providers } from "@/components/providers";
 import { ThemeProvider } from "@/components/theme-provider";
 
 /**
@@ -21,6 +22,9 @@ import { ThemeProvider } from "@/components/theme-provider";
  *      `suppressHydrationWarning` prop on `<html>` is required because the
  *      provider mutates that class during hydration to apply the resolved
  *      theme — without the suppression React would warn about the mismatch.
+ *   4. The TanStack Query `Providers` (a `QueryClientProvider`), required by
+ *      `useAuth()` and any other server-state hook. Mounted at the root so
+ *      every route — public and authenticated — has a client available.
  *
  * The `<body>` uses only design-system tokens (`bg-bg`, `text-text`,
  * `font-sans`, `antialiased`); no hex literals leak into the markup.
@@ -55,7 +59,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
       <body className="bg-bg text-text font-sans antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <Providers>
+          <ThemeProvider>{children}</ThemeProvider>
+        </Providers>
       </body>
     </html>
   );

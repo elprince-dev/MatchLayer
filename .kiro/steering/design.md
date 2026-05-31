@@ -119,3 +119,12 @@ Framer Motion is the standard. Principles:
 - shadcn primitives are accessible by default — don't break them.
 - Motion respects `prefers-reduced-motion`.
 - Form errors announced via `aria-live`.
+
+## SEO & metadata (intersection with design)
+
+See `seo.md` for the full policy. The design-relevant parts:
+
+- **Semantic HTML is the shared currency of accessibility and SEO.** One `<h1>` per page, logical heading order, and landmark elements (`<header>`, `<nav>`, `<main>`, `<footer>`). The markup that helps screen readers is the same markup that helps crawlers.
+- **Public vs. app.** Marketing pages (`/`, `/pricing`, `/about`) carry full metadata (title, description, Open Graph, canonical) via the Next.js Metadata API. App-shell pages are `noindex` — never add SEO chrome to them.
+- **Images:** descriptive `alt` text on public pages; use `next/image` to protect Core Web Vitals (CLS/LCP).
+- **OG images** follow the brand: the signature violet→cyan gradient and Geist type, so shared links look like MatchLayer.

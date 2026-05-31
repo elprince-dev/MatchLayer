@@ -37,6 +37,7 @@
 - **Server vs client:** prefer Server Components; mark `'use client'` only when needed (state, effects, browser APIs).
 - **API client + types:** generated from FastAPI's OpenAPI schema via `openapi-typescript`. Generated types land in `packages/shared-types/`. No hand-written types for API request/response shapes.
 - **Forms:** React Hook Form + Zod resolver. Zod schemas auto-generated from OpenAPI via `openapi-zod-client` and re-exported from `packages/shared-types/`. Handwritten Zod schemas only for purely client-side state that has no API representation (e.g., a UI-only filter dropdown).
+- **SEO metadata:** the Next.js **Metadata API** (`metadata` / `generateMetadata` exports) is the only source of page metadata. No hand-placed `<head>`/`<meta>` tags in components. Shared SEO helpers live in `apps/web/src/lib/seo/`. Classify every new route Public or Authenticated per `seo.md`; authenticated routes export `robots: { index: false, follow: false }`.
 
 ## Shared schemas — single source of truth
 

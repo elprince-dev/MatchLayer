@@ -134,6 +134,59 @@ class RateLimitRejectedPayload(TypedDict):
     category: Literal["ip", "email"]
 
 
+class ResumeUploadedPayload(TypedDict):
+    """Payload for ``resume_uploaded`` (phase-1-matching Audit_Service
+    additions, Requirement 2.7).
+
+    Internal IDs only. The Resume's ``original_filename``, the file
+    bytes, and the extracted text are Restricted PII and must NEVER
+    appear here (``security.md`` "Logging" / Requirement 2.6, 3.6).
+    """
+
+    resume_id: str
+
+
+class ResumeDeletedPayload(TypedDict):
+    """Payload for ``resume_deleted`` (Requirement 4.5).
+
+    Emitted only on the first soft delete; the second delete inserts
+    no additional audit row (Requirement 4.6). Internal ID only.
+    """
+
+    resume_id: str
+
+
+class MatchCreatedPayload(TypedDict):
+    """Payload for ``match_created`` (Requirement 8.6).
+
+    Internal IDs only. The ``job_description_text`` is Restricted PII
+    and must NEVER appear here (Requirement 8.8).
+    """
+
+    resume_id: str
+    match_id: str
+
+
+class MatchDeletedPayload(TypedDict):
+    """Payload for ``match_deleted`` (Requirement 9.4).
+
+    Emitted only on the first soft delete (Requirement 9.5). Internal
+    ID only.
+    """
+
+    match_id: str
+
+
+class QuotaRejectedPayload(TypedDict):
+    """Payload for ``quota_rejected`` (Requirement 11.6).
+
+    Records which per-day cost-as-DoS quota rejected the request --
+    the Upload_Quota or the Scoring_Quota -- and nothing else.
+    """
+
+    quota: Literal["upload", "scoring"]
+
+
 # Convenience aliases for the literal sets so the overload list below
 # stays readable.
 _EmptyEvent = Literal[
@@ -251,6 +304,66 @@ class Audit_Service:  # noqa: N801 -- design uses the underscored class name.
         user_id: UUID | None = None,
         request: Request | None = None,
         payload: RateLimitRejectedPayload,
+    ) -> None: ...
+
+    # ---- resume_uploaded -----------------------------------------------------
+    @overload
+    async def emit(
+        self,
+        session: AsyncSession,
+        *,
+        event_type: Literal["resume_uploaded"],
+        user_id: UUID | None = None,
+        request: Request | None = None,
+        payload: ResumeUploadedPayload,
+    ) -> None: ...
+
+    # ---- resume_deleted ------------------------------------------------------
+    @overload
+    async def emit(
+        self,
+        session: AsyncSession,
+        *,
+        event_type: Literal["resume_deleted"],
+        user_id: UUID | None = None,
+        request: Request | None = None,
+        payload: ResumeDeletedPayload,
+    ) -> None: ...
+
+    # ---- match_created -------------------------------------------------------
+    @overload
+    async def emit(
+        self,
+        session: AsyncSession,
+        *,
+        event_type: Literal["match_created"],
+        user_id: UUID | None = None,
+        request: Request | None = None,
+        payload: MatchCreatedPayload,
+    ) -> None: ...
+
+    # ---- match_deleted -------------------------------------------------------
+    @overload
+    async def emit(
+        self,
+        session: AsyncSession,
+        *,
+        event_type: Literal["match_deleted"],
+        user_id: UUID | None = None,
+        request: Request | None = None,
+        payload: MatchDeletedPayload,
+    ) -> None: ...
+
+    # ---- quota_rejected ------------------------------------------------------
+    @overload
+    async def emit(
+        self,
+        session: AsyncSession,
+        *,
+        event_type: Literal["quota_rejected"],
+        user_id: UUID | None = None,
+        request: Request | None = None,
+        payload: QuotaRejectedPayload,
     ) -> None: ...
 
     # ---- runtime implementation ----------------------------------------------

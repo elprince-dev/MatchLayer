@@ -1,0 +1,27 @@
+# Root Prettier ignore list.
+#
+# These files are GENERATED artifacts whose canonical formatter is NOT
+# Prettier. Running Prettier over them produces a diff on every regeneration,
+# which fights the byte-identical drift checks that gate the build. Keep them
+# out of `prettier --check .` / `prettier --write .` (the root `pnpm format`
+# and `pnpm format:write` scripts).
+#
+# Note: CI does not run the root format script — the frontend and shared-types
+# jobs run package-scoped `pnpm --filter ... format`, and the pre-commit hook
+# carries its own matching `exclude` list. This file protects developers who
+# run `pnpm format:write` from the repo root.
+
+# Lockfile (machine-generated, anchor-heavy).
+pnpm-lock.yaml
+
+# OpenAPI codegen output (also pinned in packages/shared-types/.prettierignore,
+# which scopes the package-level format script).
+packages/shared-types/src/api-types.ts
+packages/shared-types/src/api-schemas.ts
+
+# Skill_Lexicon artifact (phase-1-matching, Requirement 10.3). Source of truth
+# is ml/lexicon/skill_lexicon.v1.json; the API copy must stay byte-identical to
+# it. Both are emitted by ml/pipelines/build_skill_lexicon.py with canonical
+# json.dumps formatting and enforced by tools/check_lexicon_drift.py.
+ml/lexicon/skill_lexicon.v1.json
+apps/api/src/matchlayer_api/scoring/data/skill_lexicon.v1.json

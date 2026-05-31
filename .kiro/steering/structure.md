@@ -66,8 +66,13 @@ Standard Next.js App Router layout:
 apps/web/
 ├── src/
 │   ├── app/                # Routes
+│   │   ├── sitemap.ts      # Public routes only — generated, never lists PII routes
+│   │   ├── robots.ts       # Disallows /api/ and the (app) authenticated routes
+│   │   ├── (marketing)/    # Public, indexable pages (full SEO metadata)
+│   │   └── (app)/          # Authenticated route group — layout sets robots: noindex,nofollow
 │   ├── components/         # Page-specific components
 │   ├── lib/                # API client, auth helpers, utils
+│   │   └── seo/            # Shared metadata builders, OG image helpers (Metadata API only)
 │   └── styles/
 ├── public/
 ├── package.json
@@ -85,8 +90,9 @@ apps/web/
 ## What goes where — quick rules
 
 - New API endpoint → `apps/api/src/matchlayer_api/api/<feature>/`
-- New page → `apps/web/src/app/<route>/`
+- New page → `apps/web/src/app/<route>/` (classify Public `(marketing)` or Authenticated `(app)` per `seo.md`)
 - Shared TS type → `packages/shared-types/` (or generated from OpenAPI)
+- SEO metadata / OG helpers → `apps/web/src/lib/seo/`
 - Training script → `ml/pipelines/`
 - Architectural decision → `docs/adr/NNNN-title.md`
 - Infra change → `infra/`

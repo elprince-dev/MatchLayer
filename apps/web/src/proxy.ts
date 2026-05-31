@@ -24,6 +24,14 @@ import { NextResponse, type NextRequest } from "next/server";
  * cutover, where we'll inject a per-request nonce here and thread it
  * through Next's `next/script` and inline-style hooks.
  *
+ * `'unsafe-eval'` is added to `script-src` **only in development**. Next.js
+ * dev mode (React's dev build, the Fast Refresh runtime, and the error
+ * overlay) uses `eval()` for debugging features like reconstructing
+ * callstacks; without it the dev server throws "eval() is not supported in
+ * this environment". React never uses `eval()` in production, so the
+ * production CSP omits `'unsafe-eval'` and stays strict — the dev-only
+ * allowance never ships.
+ *
  * `Strict-Transport-Security` is only emitted on HTTPS requests. Browsers
  * ignore HSTS sent over plain HTTP, but emitting it there is still poor
  * form (and confusing in dev where we run on http://localhost:3000). In
@@ -33,10 +41,24 @@ import { NextResponse, type NextRequest } from "next/server";
 export function proxy(request: NextRequest): NextResponse {
   const response = NextResponse.next();
 
-  // §7.7 — Content Security Policy (verbatim from design).
+  // `'unsafe-eval'` is needed only by the Next.js dev runtime (see docstring);
+  // production stays strict and never receives it.
+  const scriptSrc =
+    process.env.NODE_ENV === "development"
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+      : "script-src 'self' 'unsafe-inline'";
+
+  // §7.7 — Content Security Policy.
   response.headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' http://localhost:8000",
+    [
+      "default-src 'self'",
+      "img-src 'self' data:",
+      "style-src 'self' 'unsafe-inline'",
+      scriptSrc,
+      "font-src 'self' data:",
+      "connect-src 'self' http://localhost:8000",
+    ].join("; "),
   );
 
   response.headers.set("X-Content-Type-Options", "nosniff");

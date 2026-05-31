@@ -27,11 +27,14 @@ Requirements: 6.2, 6.4, 9.3, 9.4, 10.5, 10.7.
 
 from __future__ import annotations
 
+import json
 import secrets
-from collections.abc import Callable, Coroutine
-from typing import Annotated, Any, Literal
+from collections.abc import AsyncIterator, Callable, Coroutine
+from dataclasses import dataclass
+from typing import Annotated, Any, Final, Literal
 from uuid import UUID
 
+import redis.asyncio as aioredis
 import structlog
 from fastapi import Depends, Request, Response
 from sqlalchemy import insert, select
@@ -423,12 +426,270 @@ async def _emit_rate_limit_rejected(
         _log.error("rate_limit_audit_emit_failed", endpoint=endpoint, category=category)
 
 
+# ---------------------------------------------------------------------------
+# user_rate_limit — per-user sliding-window dependency (phase-1-matching)
+#
+# The auth surface keys its limits on IP/email (pre-authentication). The
+# resume/match surface is always Bearer-authenticated, so it keys on the
+# resolved ``User_Account.id`` instead. This factory mirrors ``rate_limit``
+# above but composes ``Depends(get_current_user)`` to obtain the principal
+# and reuses the existing :class:`RateLimiter`, :class:`RateLimitDecision`,
+# :class:`RateLimited`, and :class:`RateLimiterUnavailableError` — no new
+# limiter or error type is introduced (Requirements 11.1, 11.2, 11.3, 11.7).
+# ---------------------------------------------------------------------------
+
+
+_UserRateLimitEndpoint = Literal["resume", "match"]
+
+# Per-user limits use a fixed 60-second window (Requirement 11.1/11.2 "per
+# 1-minute window"); only the request budget is configurable per endpoint.
+_USER_RATE_LIMIT_WINDOW_SECONDS: Final[int] = 60
+
+# Closures over ``Settings`` keep the limit lookup declarative and avoid the
+# ``getattr(settings, dynamic_name)`` shape that defeats mypy ``--strict``,
+# matching the ``_IP_POLICY`` / ``_EMAIL_POLICY`` tables above.
+_USER_RATE_LIMIT_LIMIT: dict[_UserRateLimitEndpoint, Callable[[Settings], int]] = {
+    "resume": lambda s: s.resume_rate_limit_per_min,
+    "match": lambda s: s.match_rate_limit_per_min,
+}
+
+# Annotated alias for the authenticated principal. Defined here (after
+# ``get_current_user``) so the nested dependency can compose it without a
+# function-default ``Depends`` call (ruff B008).
+_CurrentUserDep = Annotated[User, Depends(get_current_user)]
+
+
+def user_rate_limit(
+    endpoint: _UserRateLimitEndpoint,
+) -> Callable[..., Coroutine[Any, Any, None]]:
+    """Build a FastAPI dependency enforcing a per-user, per-minute limit.
+
+    Parameters
+    ----------
+    endpoint:
+        ``"resume"`` (``POST /api/v1/resumes``) or ``"match"``
+        (``POST /api/v1/matches``). Selects the per-minute budget from
+        :class:`Settings` (``resume_rate_limit_per_min`` /
+        ``match_rate_limit_per_min``) and forms the Redis key category.
+
+    The returned dependency:
+
+    * Resolves the caller via :func:`get_current_user` (so an
+      unauthenticated request is rejected with the 401
+      ``unauthenticated`` envelope before any rate-limit work).
+    * Calls :meth:`RateLimiter.check` once with the key
+      ``rl:{endpoint}:user:{user_id}``, a 60-second window, and the
+      configured per-minute limit (Requirements 11.1, 11.2).
+    * On a Redis-unavailable decision raises
+      :class:`RateLimiterUnavailableError` after setting ``Retry-After``;
+      the foundation handler maps it to HTTP 503
+      ``rate_limiter_unavailable`` (Requirement 11.7, fail-closed).
+    * On a normal rejection sets ``Retry-After`` and raises
+      :class:`RateLimited`; the foundation handler maps it to HTTP 429
+      ``rate_limited`` (Requirement 11.3).
+    * On allow returns ``None`` so the request proceeds.
+
+    Unlike the auth ``rate_limit`` factory this writes no audit row: the
+    matching spec's audit surface is ``quota_rejected`` (emitted by the
+    service layer on a daily-quota breach, Requirement 11.6), not the
+    per-minute rate-limit decision.
+    """
+
+    async def _dependency(
+        response: Response,
+        settings: _SettingsDep,
+        rl: _RateLimiterDep,
+        user: _CurrentUserDep,
+    ) -> None:
+        limit = _USER_RATE_LIMIT_LIMIT[endpoint](settings)
+        redis_key = f"rl:{endpoint}:user:{user.id}"
+
+        decision: RateLimitDecision = await rl.check(
+            redis_key, limit=limit, window_seconds=_USER_RATE_LIMIT_WINDOW_SECONDS
+        )
+
+        if decision.allowed:
+            return
+
+        # Both the 429 and the fail-closed 503 carry ``Retry-After``
+        # (Requirement 11.3 / 11.7), mirroring the auth dependency.
+        response.headers["Retry-After"] = str(decision.retry_after_seconds)
+
+        if decision.redis_unavailable:
+            raise RateLimiterUnavailableError(retry_after_seconds=decision.retry_after_seconds)
+
+        raise RateLimited(
+            endpoint=endpoint,
+            category="user",
+            retry_after_seconds=decision.retry_after_seconds,
+        )
+
+    return _dependency
+
+
+# ---------------------------------------------------------------------------
+# Idempotency for mutating POSTs (phase-1-matching) — Requirements 2.8, 8.9
+#
+# Mutating uploads/match-creations accept an ``Idempotency-Key`` header.
+# The first successful request stores the created resource id and the
+# serialized 201 response in Redis under ``idem:{user_id}:{route}:{key}``
+# with a 24h TTL; a replay within that window returns the stored response
+# without a second object write or row insert. Redis-backed (rather than a
+# third table) keeps the migration to the two tables Requirement 14.2
+# enumerates. The ``user_rate_limit`` dependency runs first on these routes,
+# so the rate limiter's fail-closed 503 already gates the Redis-down case
+# before any idempotency lookup executes (Design §"Per-user rate limiting
+# and idempotency").
+# ---------------------------------------------------------------------------
+
+
+# 24 hours, per ``security.md`` ("Persist keys for 24h") and the design.
+_IDEMPOTENCY_TTL_SECONDS: Final[int] = 24 * 60 * 60
+
+
+@dataclass(frozen=True, slots=True)
+class IdempotencyRecord:
+    """A stored idempotent outcome for a single ``Idempotency-Key``.
+
+    Holds the created resource's id and the serialized 201 response so a
+    replay can be answered without re-running the mutation.
+
+    Attributes
+    ----------
+    resource_id:
+        The created Resume / MatchResult ``id`` as a string.
+    status_code:
+        The HTTP status of the stored response (always ``201`` for the
+        create endpoints; retained explicitly so the router can replay it
+        without hard-coding the value).
+    body:
+        The JSON-serializable response body (the Pydantic response model
+        dumped with ``mode="json"``).
+    """
+
+    resource_id: str
+    status_code: int
+    body: dict[str, Any]
+
+
+def _build_idempotency_key(*, user_id: UUID, route: str, key: str) -> str:
+    """Return the Redis key for an idempotent outcome (Design §idempotency).
+
+    Scoped by ``user_id`` so one account's key can never replay another's
+    stored response, and by ``route`` so the same client-supplied key on a
+    different endpoint is treated independently.
+    """
+    return f"idem:{user_id}:{route}:{key}"
+
+
+class IdempotencyStore:
+    """Redis-backed store for idempotent mutation outcomes.
+
+    Constructed with an injected ``redis.asyncio.Redis`` client; the public
+    :func:`get_idempotency_store` factory builds the per-request client the
+    dependency layer wires through ``Depends`` (mirroring
+    :func:`get_rate_limiter`). Lookups and writes fail soft: a Redis error
+    on :meth:`get` is treated as a miss (the caller performs the mutation),
+    and a Redis error on :meth:`put` is logged but never turns an
+    already-successful creation into a request failure. The preceding
+    ``user_rate_limit`` dependency has already fail-closed on a Redis
+    outage, so these soft paths only cover a mid-request blip.
+    """
+
+    def __init__(self, redis_client: aioredis.Redis) -> None:
+        self._redis = redis_client
+
+    async def get(self, *, user_id: UUID, route: str, key: str) -> IdempotencyRecord | None:
+        """Return the stored outcome for ``key`` if one exists, else ``None``."""
+        redis_key = _build_idempotency_key(user_id=user_id, route=route, key=key)
+        try:
+            raw = await self._redis.get(redis_key)
+        except Exception:
+            # Treat a lookup failure as a miss: the caller will perform the
+            # mutation. Never log the client-supplied key value.
+            _log.warning("idempotency_lookup_failed", route=route)
+            return None
+
+        if raw is None:
+            return None
+
+        try:
+            data = json.loads(raw)
+            return IdempotencyRecord(
+                resource_id=str(data["resource_id"]),
+                status_code=int(data["status_code"]),
+                body=dict(data["body"]),
+            )
+        except (ValueError, TypeError, KeyError):
+            # A corrupt / unexpected payload is treated as a miss rather
+            # than failing the request.
+            _log.warning("idempotency_record_corrupt", route=route)
+            return None
+
+    async def put(self, *, user_id: UUID, route: str, key: str, record: IdempotencyRecord) -> None:
+        """Store ``record`` under ``key`` with a 24h TTL (first writer wins).
+
+        Uses ``SET ... NX EX 86400`` so a concurrent replay never clobbers
+        the originally stored response; the first writer's outcome is the
+        one every later replay sees (Requirements 2.8, 8.9).
+        """
+        redis_key = _build_idempotency_key(user_id=user_id, route=route, key=key)
+        payload = json.dumps(
+            {
+                "resource_id": record.resource_id,
+                "status_code": record.status_code,
+                "body": record.body,
+            }
+        )
+        try:
+            await self._redis.set(redis_key, payload, ex=_IDEMPOTENCY_TTL_SECONDS, nx=True)
+        except Exception:
+            # The resource was already created; a failure to memoize the
+            # outcome must not surface as a 5xx. Log for operator visibility.
+            _log.warning("idempotency_store_failed", route=route)
+
+
+async def get_idempotency_store() -> AsyncIterator[IdempotencyStore]:
+    """Yield a per-request :class:`IdempotencyStore`; close it on teardown.
+
+    Built per request for the same reason as :func:`get_rate_limiter`: the
+    underlying ``redis.asyncio.Redis`` client's asyncio resources must not
+    outlive the event loop that allocates them (pytest-asyncio creates one
+    loop per test). redis-py pools connections lazily, so a request that
+    carries no ``Idempotency-Key`` (and therefore never touches the store)
+    opens no TCP connection. The teardown drains the pool to avoid the
+    ``ResourceWarning`` the API test suite's ``filterwarnings = ["error"]``
+    would otherwise escalate to a failure.
+    """
+    settings = get_settings()
+    client = aioredis.from_url(str(settings.redis_url), decode_responses=False)  # type: ignore[no-untyped-call]
+    try:
+        yield IdempotencyStore(client)
+    finally:
+        try:
+            await client.aclose(close_connection_pool=True)
+            await client.connection_pool.disconnect()
+        except Exception:  # pragma: no cover - defensive
+            _log.warning("idempotency_client_close_failed")
+
+
+# Annotated alias for routers wiring the store via ``Depends`` (parallel to
+# ``_RateLimiterDep`` above). Exported so the resumes/matches routers can
+# inject it without re-declaring the ``Depends(...)`` call.
+IdempotencyStoreDep = Annotated[IdempotencyStore, Depends(get_idempotency_store)]
+
+
 __all__ = [
     "CsrfMismatchError",
+    "IdempotencyRecord",
+    "IdempotencyStore",
+    "IdempotencyStoreDep",
     "RateLimited",
     "RateLimiterUnavailableError",
     "UnauthenticatedError",
     "csrf_required",
     "get_current_user",
+    "get_idempotency_store",
     "rate_limit",
+    "user_rate_limit",
 ]

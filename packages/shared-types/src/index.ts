@@ -94,3 +94,42 @@ export const MePatchRequestSchema = schemas.MePatchRequest;
 // ---------------------------------------------------------------------------
 
 export const UserResponseSchema = schemas.UserResponse;
+
+// ---------------------------------------------------------------------------
+// Resumes — upload / get (safe field set: no extracted_text or storage_key)
+// ---------------------------------------------------------------------------
+
+export type ResumeResponse =
+  paths["/api/v1/resumes"]["post"]["responses"]["201"]["content"]["application/json"];
+
+export const ResumeResponseSchema = schemas.ResumeResponse;
+
+// ---------------------------------------------------------------------------
+// Resumes — list (cursor-paginated)
+// ---------------------------------------------------------------------------
+
+export type ResumeListResponse =
+  paths["/api/v1/resumes"]["get"]["responses"]["200"]["content"]["application/json"];
+
+export const ResumeListResponseSchema = schemas.ResumeListResponse;
+
+// ---------------------------------------------------------------------------
+// Matches — create
+// ---------------------------------------------------------------------------
+
+export type CreateMatchRequest =
+  paths["/api/v1/matches"]["post"]["requestBody"]["content"]["application/json"];
+export type MatchResponse =
+  paths["/api/v1/matches"]["post"]["responses"]["201"]["content"]["application/json"];
+
+export const CreateMatchRequestSchema = schemas.CreateMatchRequest;
+export const MatchResponseSchema = schemas.MatchResponse;
+
+// ---------------------------------------------------------------------------
+// Matches — list (items omit job_description_text)
+// ---------------------------------------------------------------------------
+
+export type MatchListResponse =
+  paths["/api/v1/matches"]["get"]["responses"]["200"]["content"]["application/json"];
+
+export const MatchListResponseSchema = schemas.MatchListResponse;

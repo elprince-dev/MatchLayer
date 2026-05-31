@@ -31,6 +31,7 @@ Validates: Requirements 7.1, 1.10.
 from __future__ import annotations
 
 import ast
+import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -223,4 +224,228 @@ def test_protected_set_cookie_calls_only_in_cookies_module() -> None:
             f"{file}@{','.join(str(line) for line, _ in calls)}"
             for file, calls in offenders.items()
         )
+    )
+
+
+# ===========================================================================
+# phase-1-matching, task 5.2 — scoring import boundary, repo-root ml/ guard,
+# and the static "adapter does no scoring arithmetic" check.
+#
+# These checks extend the phase-1-auth boundaries above with the rules locked
+# down by the phase-1-matching design ("Components and Interfaces" import-
+# boundary rule) and Requirement 10:
+#
+#   * 10.1 / 5.8 — every module under ``matchlayer_api/scoring/`` imports ONLY
+#     scikit-learn (top-level ``sklearn``), the Python standard library, and its
+#     sibling ``matchlayer_api.scoring`` modules. It never imports FastAPI,
+#     SQLAlchemy, ``matchlayer_api.config``, redis, boto3, or any other web /
+#     storage / config module — so the scoring logic is unit-testable in
+#     isolation.
+#   * 10.3 — the regeneration script lives under the repo-root ``ml/pipelines``
+#     tree and is NEVER imported by the API at runtime. No module anywhere under
+#     ``matchlayer_api`` may import the repo-root ``ml`` package (distinct from
+#     the in-package ``matchlayer_api.ml`` adapter).
+#   * 10.2 — the ``ml/scorer_adapter`` performs NO scoring arithmetic of its own
+#     (the static half: it imports no sklearn and contains no arithmetic
+#     operators). The runtime delegation behavior is asserted in
+#     ``test_scorer_adapter_delegation.py``.
+#
+# Like the checks above, these walk the AST rather than grepping text, so prose
+# in a docstring that merely *names* a forbidden module (this file, and the
+# scoring package docstrings, list ``fastapi``/``sqlalchemy``/``config`` by name)
+# cannot produce a false positive.
+#
+# Design reference: design.md "Components and Interfaces" (import-boundary rule).
+# Validates: Requirements 5.8, 10.1, 10.2, 10.3.
+# ===========================================================================
+
+# The scoring subpackage, relative to the package root, POSIX-style.
+_SCORING_SUBDIR = "scoring"
+
+# The single permitted third-party top-level module inside scoring/ (scikit-learn
+# imports under the ``sklearn`` name). Requirement 5.8 / 10.1.
+_SKLEARN_TOP_LEVEL = "sklearn"
+
+# First-party roots. Inside scoring/, the ONLY first-party imports allowed are
+# the sibling ``matchlayer_api.scoring`` modules — never ``matchlayer_api.config``
+# or any other matchlayer_api subpackage.
+_FIRST_PARTY_TOP_LEVEL = "matchlayer_api"
+_SCORING_PACKAGE = "matchlayer_api.scoring"
+
+# The repo-root training tree. ``import ml`` / ``from ml.pipelines import ...``
+# reach the top-level ``ml/`` package that holds ``ml/pipelines`` (Requirement
+# 10.3). This is NOT ``matchlayer_api.ml`` (the in-package adapter), which is a
+# different, permitted module — the AST checks below distinguish them.
+_REPO_ROOT_ML_TOP_LEVEL = "ml"
+
+# The adapter module that must contain no scoring arithmetic (Requirement 10.2).
+_SCORER_ADAPTER = "ml/scorer_adapter.py"
+
+# Arithmetic binary operators. Their presence in the adapter would mean it is
+# doing scoring math rather than pure marshalling.
+_ARITHMETIC_BINOPS = (
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.FloorDiv,
+    ast.Mod,
+    ast.Pow,
+    ast.MatMult,
+)
+
+
+def _iter_scoring_sources() -> list[Path]:
+    """Return every ``.py`` file under ``matchlayer_api/scoring/`` (sorted)."""
+    scoring_root = _PACKAGE_ROOT / _SCORING_SUBDIR
+    return sorted(path for path in scoring_root.rglob("*.py") if "__pycache__" not in path.parts)
+
+
+def _imported_modules(tree: ast.Module) -> list[tuple[str | None, int]]:
+    """Return ``(module, level)`` for every import in ``tree``.
+
+    * ``import a.b.c [as x]`` contributes ``("a.b.c", 0)`` per alias.
+    * ``from a.b import c`` contributes ``("a.b", 0)``.
+    * ``from . import c`` / ``from .sib import c`` contribute ``(module, level)``
+      with ``level > 0``; ``module`` may be ``None`` for a bare ``from . import``.
+
+    The ``level`` is preserved so a relative import (which can only ever reach a
+    sibling within the same package) is recognized as in-package and allowed.
+    """
+    refs: list[tuple[str | None, int]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            refs.extend((alias.name, 0) for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            refs.append((node.module, node.level))
+    return refs
+
+
+def _scoring_import_is_violation(module: str | None, level: int) -> bool:
+    """True if an import ``(module, level)`` breaks the scoring import boundary.
+
+    Allowed: relative (in-package) imports, ``matchlayer_api.scoring[.*]``,
+    top-level ``sklearn[.*]``, and any standard-library module
+    (``sys.stdlib_module_names``, which includes ``__future__``). Everything
+    else — notably ``matchlayer_api.config`` and any other ``matchlayer_api``
+    subpackage, ``fastapi``, ``sqlalchemy``, ``redis``, ``boto3`` — is a
+    violation (Requirements 5.8, 10.1).
+    """
+    # Relative imports stay inside the scoring package (a sibling module).
+    if level > 0:
+        return False
+    # ``from __future__`` etc. always carry a module at level 0; a None module
+    # at level 0 cannot occur, but treat it as benign rather than crash.
+    if module is None:
+        return False
+    # First-party: only the scoring subpackage itself is permitted.
+    if module == _FIRST_PARTY_TOP_LEVEL or module.startswith(f"{_FIRST_PARTY_TOP_LEVEL}."):
+        return not (module == _SCORING_PACKAGE or module.startswith(f"{_SCORING_PACKAGE}."))
+    top_level = module.split(".", 1)[0]
+    if top_level == _SKLEARN_TOP_LEVEL:
+        return False
+    return top_level not in sys.stdlib_module_names
+
+
+def test_scoring_package_imports_only_sklearn_stdlib_and_siblings() -> None:
+    """Every ``scoring/`` module imports only sklearn, stdlib, and scoring siblings.
+
+    The scoring core is the framework-free heart of Phase 1: it must never reach
+    for FastAPI, SQLAlchemy, ``matchlayer_api.config``, redis, boto3, or any
+    other web/storage/config module, so it stays unit-testable in isolation
+    (design "Components and Interfaces"; Requirements 5.8, 10.1).
+
+    Validates: Requirements 5.8, 10.1.
+    """
+    scoring_sources = _iter_scoring_sources()
+    assert scoring_sources, (
+        f"No .py files found under {_PACKAGE_ROOT / _SCORING_SUBDIR}; the scoring "
+        f"import-boundary check has nothing to scan."
+    )
+
+    offenders: dict[str, list[str]] = {}
+    for path in scoring_sources:
+        tree = _parse(path)
+        bad = sorted(
+            {
+                module
+                for module, level in _imported_modules(tree)
+                if _scoring_import_is_violation(module, level) and module is not None
+            }
+        )
+        if bad:
+            offenders[_relpath(path)] = bad
+
+    assert not offenders, (
+        "matchlayer_api.scoring.* may import ONLY scikit-learn (sklearn), the "
+        "Python standard library, and sibling matchlayer_api.scoring modules "
+        "(Requirements 5.8, 10.1); found forbidden imports: "
+        + "; ".join(f"{file}: {modules}" for file, modules in offenders.items())
+    )
+
+
+def test_api_never_imports_repo_root_ml_tree() -> None:
+    """No ``matchlayer_api`` module imports the repo-root ``ml`` package.
+
+    The repo-root ``ml/`` tree (``ml/pipelines``, ``ml/lexicon``, ``ml/evals``)
+    is training / build / exploration code that must never be imported by the
+    running API (Requirement 10.3, ``structure.md``). A bare ``import ml`` or
+    ``from ml.pipelines import ...`` reaches that tree; the in-package
+    ``matchlayer_api.ml`` adapter is a different module and is NOT flagged by
+    :func:`_imports_module` (its module string is ``matchlayer_api.ml...``,
+    which neither equals ``ml`` nor starts with ``ml.``).
+
+    Validates: Requirement 10.3.
+    """
+    offenders: list[str] = []
+    for path in _iter_package_sources():
+        tree = _parse(path)
+        if _imports_module(tree, _REPO_ROOT_ML_TOP_LEVEL):
+            offenders.append(_relpath(path))
+    assert not offenders, (
+        "The API must never import the repo-root ml/ tree (which holds "
+        "ml/pipelines); found imports of the top-level `ml` package in: "
+        f"{offenders}"
+    )
+
+
+def test_scorer_adapter_contains_no_scoring_arithmetic() -> None:
+    """The ``ml/scorer_adapter`` does pure marshalling — no scoring math.
+
+    Requirement 10.2: the adapter "performs no scoring arithmetic of its own
+    beyond marshalling inputs and outputs." This is the static half of that
+    guarantee:
+
+    * the adapter imports no scikit-learn (all TF-IDF / cosine work lives in
+      ``scoring/``), and
+    * the adapter's module body contains no arithmetic binary operators
+      (``+``, ``-``, ``*``, ``/``, ``//``, ``%``, ``**``, ``@``).
+
+    The runtime delegation behavior (``score`` forwards to the cached
+    ``Match_Scorer`` and returns its result unchanged) is asserted in
+    ``test_scorer_adapter_delegation.py``.
+
+    Validates: Requirement 10.2.
+    """
+    adapter_path = _PACKAGE_ROOT / _SCORER_ADAPTER
+    assert adapter_path.is_file(), f"expected the scorer adapter at {adapter_path}"
+    tree = _parse(adapter_path)
+
+    # No scikit-learn import: the adapter never vectorizes or computes
+    # similarity; it only constructs and calls the scorer.
+    assert not _imports_module(tree, _SKLEARN_TOP_LEVEL), (
+        f"{_SCORER_ADAPTER} must not import scikit-learn; all scoring math lives "
+        f"in matchlayer_api.scoring (Requirement 10.2)."
+    )
+
+    # No arithmetic operators anywhere in the module body.
+    arithmetic_sites = sorted(
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, _ARITHMETIC_BINOPS)
+    )
+    assert not arithmetic_sites, (
+        f"{_SCORER_ADAPTER} must perform no scoring arithmetic of its own "
+        f"(Requirement 10.2); found arithmetic operator(s) at line(s): "
+        f"{arithmetic_sites}"
     )

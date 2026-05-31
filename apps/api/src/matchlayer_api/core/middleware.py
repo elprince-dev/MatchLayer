@@ -1,9 +1,10 @@
-"""Request-id ASGI middleware with structured access logging.
+"""Cross-cutting ASGI middleware: request-id logging and API non-indexing.
 
-Implements :class:`RequestIdMiddleware`, a pure-ASGI middleware (not
+Both classes here are pure-ASGI middleware (not
 ``starlette.middleware.base.BaseHTTPMiddleware``, which has known
-performance and cancellation-handling issues with streaming responses)
-that:
+performance and cancellation-handling issues with streaming responses).
+
+:class:`RequestIdMiddleware`:
 
 * Reuses an inbound ``X-Request-Id`` header when it matches the format
   ``^[A-Za-z0-9_-]{8,128}$``, otherwise generates a fresh UUIDv7
@@ -17,8 +18,18 @@ that:
 * Emits one structured access-log line per request with ``status`` and
   ``latency_ms`` once the response has been fully sent.
 
-Design reference: §6.4.
-Requirements covered: 4.4, 4.5, 4.6.
+:class:`ApiNoIndexMiddleware`:
+
+* Sets ``X-Robots-Tag: noindex, nofollow`` on every response whose path
+  starts with ``/api/v1/``, for all status codes including the RFC 7807
+  error envelopes produced by the exception handlers (Requirement 15.3).
+  This is a privacy control (defense in depth), not only SEO — resume
+  text, job descriptions, and match results must never be crawled or
+  indexed (``seo.md``, ``security.md``, ADR 0006).
+
+Design reference: §6.4, "Cross-cutting middleware addition (Requirement
+15.3)".
+Requirements covered: 4.4, 4.5, 4.6, 15.3.
 """
 
 from __future__ import annotations
@@ -41,6 +52,18 @@ _REQUEST_ID_HEADER_NAME: Final[bytes] = b"x-request-id"
 # trace IDs, W3C trace-context request ids) while rejecting obvious
 # garbage that could log-poison structured output.
 _VALID_REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
+
+# Header name and value for the API non-indexing control (Requirement
+# 15.3). ASGI carries header names/values as lowercase-normalised byte
+# strings; the value is a fixed ASCII token list.
+_X_ROBOTS_TAG_HEADER_NAME: Final[bytes] = b"x-robots-tag"
+_X_ROBOTS_TAG_VALUE: Final[bytes] = b"noindex, nofollow"
+
+# Path prefix whose responses must be marked non-indexable. Matched
+# against the raw ``scope["path"]`` exactly (no normalisation), so only
+# the versioned API surface — never the marketing/static surface — is
+# affected.
+_API_PATH_PREFIX: Final[str] = "/api/v1/"
 
 _access_log = structlog.get_logger("matchlayer_api.access")
 
@@ -211,3 +234,66 @@ class RequestIdMiddleware:
             )
 
         structlog.contextvars.clear_contextvars()
+
+
+def _with_noindex_header(
+    existing: list[tuple[bytes, bytes]],
+) -> list[tuple[bytes, bytes]]:
+    """Return *existing* headers with a single ``X-Robots-Tag`` set.
+
+    Any pre-existing ``X-Robots-Tag`` header is stripped first so the
+    middleware's ``noindex, nofollow`` value is authoritative and never
+    duplicated, regardless of what the downstream app or an exception
+    handler emitted.
+    """
+    filtered = [
+        (name, value) for name, value in existing if name.lower() != _X_ROBOTS_TAG_HEADER_NAME
+    ]
+    filtered.append((_X_ROBOTS_TAG_HEADER_NAME, _X_ROBOTS_TAG_VALUE))
+    return filtered
+
+
+class ApiNoIndexMiddleware:
+    """Pure-ASGI middleware that marks every API response non-indexable.
+
+    Sets ``X-Robots-Tag: noindex, nofollow`` on the outbound response of
+    every request whose path starts with ``/api/v1/`` (Requirement
+    15.3). The header is injected on the ``http.response.start`` message,
+    so it lands on **every** response — 2xx, 3xx, and the 4xx/5xx RFC
+    7807 error envelopes alike — provided this middleware is registered
+    so it wraps (outlives) the exception-handling layer. That wiring is
+    owned by the application factory (a separate task); this class only
+    guarantees the header is applied on the way out regardless of status
+    code.
+
+    This is a privacy control, not merely SEO: the API surface returns
+    Restricted PII (resume text, job descriptions, match results) that
+    must never be crawled or indexed (``seo.md``, ``security.md``, ADR
+    0006). It is intentionally defense in depth alongside the frontend
+    ``robots`` metadata and ``robots.txt`` disallow rules.
+
+    Non-``/api/v1/`` paths and non-HTTP scopes (``"lifespan"``,
+    ``"websocket"``) pass through untouched.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        # Only HTTP requests under the versioned API prefix are marked.
+        # Everything else (lifespan, websockets, marketing/static paths)
+        # passes straight through with no added header.
+        if scope["type"] != "http" or not scope.get("path", "").startswith(_API_PATH_PREFIX):
+            await self._app(scope, receive, send)
+            return
+
+        async def send_with_noindex(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers: list[tuple[bytes, bytes]] = list(message.get("headers", ()))
+                message = {
+                    **message,
+                    "headers": _with_noindex_header(headers),
+                }
+            await send(message)
+
+        await self._app(scope, receive, send_with_noindex)

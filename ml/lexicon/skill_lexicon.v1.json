@@ -1,0 +1,725 @@
+{
+  "description": "MatchLayer Phase 1 Skill_Lexicon. Canonical skills, alias rules, per-term weights and metadata for the deterministic non-LLM Match_Scorer. Source of truth: ml/lexicon/skill_lexicon.v1.json; regenerate with ml/pipelines/build_skill_lexicon.py.",
+  "lexicon_version": "1.0.0",
+  "schema_version": 1,
+  "skill_count": 80,
+  "skills": [
+    {
+      "aliases": [
+        "asp.net",
+        "aspnet",
+        "dot net",
+        "dotnet"
+      ],
+      "canonical": ".net",
+      "category": "framework",
+      "display": ".NET",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "kanban",
+        "scrum"
+      ],
+      "canonical": "agile",
+      "category": "practice",
+      "display": "Agile",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "apache airflow"
+      ],
+      "canonical": "airflow",
+      "category": "data",
+      "display": "Apache Airflow",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "angularjs"
+      ],
+      "canonical": "angular",
+      "category": "framework",
+      "display": "Angular",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "amazon web services"
+      ],
+      "canonical": "aws",
+      "category": "cloud",
+      "display": "AWS",
+      "weight": 0.95
+    },
+    {
+      "aliases": [
+        "cdk"
+      ],
+      "canonical": "aws cdk",
+      "category": "devops",
+      "display": "AWS CDK",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "microsoft azure"
+      ],
+      "canonical": "azure",
+      "category": "cloud",
+      "display": "Azure",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "sh",
+        "shell",
+        "shell scripting"
+      ],
+      "canonical": "bash",
+      "category": "language",
+      "display": "Bash",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "c sharp",
+        "csharp",
+        "dotnet c#"
+      ],
+      "canonical": "c#",
+      "category": "language",
+      "display": "C#",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "c plus plus",
+        "cplusplus",
+        "cpp"
+      ],
+      "canonical": "c++",
+      "category": "language",
+      "display": "C++",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "ci cd",
+        "cicd",
+        "continuous delivery",
+        "continuous integration"
+      ],
+      "canonical": "ci/cd",
+      "category": "devops",
+      "display": "CI/CD",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "team player",
+        "teamwork"
+      ],
+      "canonical": "collaboration",
+      "category": "soft_skill",
+      "display": "Collaboration",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "communication skills"
+      ],
+      "canonical": "communication",
+      "category": "soft_skill",
+      "display": "Communication",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "django",
+      "category": "framework",
+      "display": "Django",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "containerization"
+      ],
+      "canonical": "docker",
+      "category": "devops",
+      "display": "Docker",
+      "weight": 0.9
+    },
+    {
+      "aliases": [
+        "dynamo"
+      ],
+      "canonical": "dynamodb",
+      "category": "database",
+      "display": "DynamoDB",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "amazon ecs",
+        "fargate"
+      ],
+      "canonical": "ecs",
+      "category": "cloud",
+      "display": "Amazon ECS",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "elastic search",
+        "es"
+      ],
+      "canonical": "elasticsearch",
+      "category": "database",
+      "display": "Elasticsearch",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "express.js",
+        "expressjs"
+      ],
+      "canonical": "express",
+      "category": "framework",
+      "display": "Express",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "fast api"
+      ],
+      "canonical": "fastapi",
+      "category": "framework",
+      "display": "FastAPI",
+      "weight": 0.9
+    },
+    {
+      "aliases": [],
+      "canonical": "flask",
+      "category": "framework",
+      "display": "Flask",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "google cloud",
+        "google cloud platform"
+      ],
+      "canonical": "gcp",
+      "category": "cloud",
+      "display": "Google Cloud",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "version control"
+      ],
+      "canonical": "git",
+      "category": "tool",
+      "display": "Git",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "gha"
+      ],
+      "canonical": "github actions",
+      "category": "devops",
+      "display": "GitHub Actions",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "golang"
+      ],
+      "canonical": "go",
+      "category": "language",
+      "display": "Go",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "graph ql"
+      ],
+      "canonical": "graphql",
+      "category": "tool",
+      "display": "GraphQL",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "grpc",
+      "category": "tool",
+      "display": "gRPC",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "java",
+      "category": "language",
+      "display": "Java",
+      "weight": 0.9
+    },
+    {
+      "aliases": [
+        "ecmascript",
+        "js"
+      ],
+      "canonical": "javascript",
+      "category": "language",
+      "display": "JavaScript",
+      "weight": 1.0
+    },
+    {
+      "aliases": [],
+      "canonical": "jenkins",
+      "category": "devops",
+      "display": "Jenkins",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "jest",
+      "category": "testing",
+      "display": "Jest",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "apache kafka"
+      ],
+      "canonical": "kafka",
+      "category": "tool",
+      "display": "Apache Kafka",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "kotlin",
+      "category": "language",
+      "display": "Kotlin",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "k8s"
+      ],
+      "canonical": "kubernetes",
+      "category": "devops",
+      "display": "Kubernetes",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "aws lambda"
+      ],
+      "canonical": "lambda",
+      "category": "cloud",
+      "display": "AWS Lambda",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "team lead",
+        "tech lead"
+      ],
+      "canonical": "leadership",
+      "category": "soft_skill",
+      "display": "Leadership",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "unix"
+      ],
+      "canonical": "linux",
+      "category": "devops",
+      "display": "Linux",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "ml"
+      ],
+      "canonical": "machine learning",
+      "category": "data",
+      "display": "Machine Learning",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "micro services",
+        "microservice"
+      ],
+      "canonical": "microservices",
+      "category": "practice",
+      "display": "Microservices",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "mongo"
+      ],
+      "canonical": "mongodb",
+      "category": "database",
+      "display": "MongoDB",
+      "weight": 0.8
+    },
+    {
+      "aliases": [],
+      "canonical": "mysql",
+      "category": "database",
+      "display": "MySQL",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "next js",
+        "nextjs"
+      ],
+      "canonical": "next.js",
+      "category": "framework",
+      "display": "Next.js",
+      "weight": 0.85
+    },
+    {
+      "aliases": [],
+      "canonical": "nginx",
+      "category": "devops",
+      "display": "Nginx",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "natural language processing"
+      ],
+      "canonical": "nlp",
+      "category": "data",
+      "display": "NLP",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "node",
+        "node js",
+        "nodejs"
+      ],
+      "canonical": "node.js",
+      "category": "framework",
+      "display": "Node.js",
+      "weight": 0.9
+    },
+    {
+      "aliases": [
+        "np"
+      ],
+      "canonical": "numpy",
+      "category": "data",
+      "display": "NumPy",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "swagger"
+      ],
+      "canonical": "openapi",
+      "category": "tool",
+      "display": "OpenAPI",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "pandas",
+      "category": "data",
+      "display": "pandas",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "pg vector"
+      ],
+      "canonical": "pgvector",
+      "category": "database",
+      "display": "pgvector",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "php",
+      "category": "language",
+      "display": "PHP",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "playwright",
+      "category": "testing",
+      "display": "Playwright",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "postgre",
+        "postgres",
+        "psql"
+      ],
+      "canonical": "postgresql",
+      "category": "database",
+      "display": "PostgreSQL",
+      "weight": 0.9
+    },
+    {
+      "aliases": [
+        "problem-solving"
+      ],
+      "canonical": "problem solving",
+      "category": "soft_skill",
+      "display": "Problem Solving",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "pytest",
+      "category": "testing",
+      "display": "pytest",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "cpython",
+        "py",
+        "python3"
+      ],
+      "canonical": "python",
+      "category": "language",
+      "display": "Python",
+      "weight": 1.0
+    },
+    {
+      "aliases": [
+        "torch"
+      ],
+      "canonical": "pytorch",
+      "category": "data",
+      "display": "PyTorch",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "rabbit mq"
+      ],
+      "canonical": "rabbitmq",
+      "category": "tool",
+      "display": "RabbitMQ",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "ror",
+        "ruby on rails"
+      ],
+      "canonical": "rails",
+      "category": "framework",
+      "display": "Ruby on Rails",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "react.js",
+        "reactjs"
+      ],
+      "canonical": "react",
+      "category": "framework",
+      "display": "React",
+      "weight": 0.95
+    },
+    {
+      "aliases": [],
+      "canonical": "redis",
+      "category": "database",
+      "display": "Redis",
+      "weight": 0.8
+    },
+    {
+      "aliases": [],
+      "canonical": "redux",
+      "category": "library",
+      "display": "Redux",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "rest api",
+        "restful",
+        "restful api"
+      ],
+      "canonical": "rest",
+      "category": "tool",
+      "display": "REST",
+      "weight": 0.85
+    },
+    {
+      "aliases": [],
+      "canonical": "ruby",
+      "category": "language",
+      "display": "Ruby",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "rust",
+      "category": "language",
+      "display": "Rust",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "amazon s3"
+      ],
+      "canonical": "s3",
+      "category": "cloud",
+      "display": "Amazon S3",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "scala",
+      "category": "language",
+      "display": "Scala",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "scikit learn",
+        "sklearn"
+      ],
+      "canonical": "scikit-learn",
+      "category": "data",
+      "display": "scikit-learn",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "apache spark",
+        "pyspark"
+      ],
+      "canonical": "spark",
+      "category": "data",
+      "display": "Apache Spark",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "spring boot",
+        "springboot"
+      ],
+      "canonical": "spring",
+      "category": "framework",
+      "display": "Spring",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "structured query language"
+      ],
+      "canonical": "sql",
+      "category": "language",
+      "display": "SQL",
+      "weight": 0.95
+    },
+    {
+      "aliases": [],
+      "canonical": "sqlite",
+      "category": "database",
+      "display": "SQLite",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "sveltekit"
+      ],
+      "canonical": "svelte",
+      "category": "framework",
+      "display": "Svelte",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "swift",
+      "category": "language",
+      "display": "Swift",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "tailwind css",
+        "tailwindcss"
+      ],
+      "canonical": "tailwind",
+      "category": "framework",
+      "display": "Tailwind CSS",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "test driven development",
+        "test-driven development"
+      ],
+      "canonical": "tdd",
+      "category": "practice",
+      "display": "Test-Driven Development",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "tf"
+      ],
+      "canonical": "tensorflow",
+      "category": "data",
+      "display": "TensorFlow",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "terraform",
+      "category": "devops",
+      "display": "Terraform",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "ts"
+      ],
+      "canonical": "typescript",
+      "category": "language",
+      "display": "TypeScript",
+      "weight": 0.95
+    },
+    {
+      "aliases": [
+        "unit tests"
+      ],
+      "canonical": "unit testing",
+      "category": "testing",
+      "display": "Unit Testing",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "vue.js",
+        "vuejs"
+      ],
+      "canonical": "vue",
+      "category": "framework",
+      "display": "Vue",
+      "weight": 0.75
+    }
+  ],
+  "source": "ml/pipelines/build_skill_lexicon.py"
+}

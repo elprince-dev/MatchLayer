@@ -102,21 +102,37 @@ After the prerequisites are installed:
 
    Brings up Postgres, Redis, and MinIO and blocks until each service's healthcheck passes.
 
-6. **Apply the Alembic baseline.**
+6. **Create the resume bucket in MinIO.**
+
+   The resume-upload surface writes objects to the S3 bucket named by `MATCHLAYER_S3_BUCKET` (default `matchlayer-dev`). `phase-1-foundation` deferred provisioning it, so create it once per fresh MinIO data volume. There is no auto-bootstrap — this runbook step is how the bucket gets created for local dev.
+
+   Use the [MinIO Client (`mc`)](https://min.io/docs/minio/linux/reference/minio-mc.html) installed on your host (the `minio/minio` server image doesn't bundle `mc`). Point it at the local MinIO using the dev-only root credentials from `docker-compose.yml`, then make the bucket:
+
+   ```bash
+   # Alias the local MinIO (S3 API on :9000) using the dev-only root credentials
+   mc alias set matchlayer-local http://localhost:9000 matchlayer dev_only_password
+
+   # Create the bucket named by MATCHLAYER_S3_BUCKET — idempotent, safe to re-run
+   mc mb --ignore-existing matchlayer-local/matchlayer-dev
+   ```
+
+   `--ignore-existing` makes this a no-op if the bucket is already there, so it's safe to skip when re-running the setup. If you renamed `MATCHLAYER_S3_BUCKET` in `.env`, use that name instead of `matchlayer-dev`. The bucket stays private (no public-read) — matching the Phase 1 security posture. Prefer a GUI? The MinIO console at [http://localhost:9001](http://localhost:9001) (same credentials) can create the bucket too.
+
+7. **Apply the Alembic baseline.**
 
    ```bash
    uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
    ```
 
-   `alembic.ini` lives inside `apps/api/`, so the explicit `-c` flag is required when running from the repo root — without it Alembic can't find `script_location`. Phase 1 ships migration `0001_users_and_auth` which creates `users`, `refresh_tokens`, `password_reset_tokens`, and the append-only `audit_events` table (with role-scoped grants — see [Audit log notes](#audit-log) below).
+   `alembic.ini` lives inside `apps/api/`, so the explicit `-c` flag is required when running from the repo root — without it Alembic can't find `script_location`. Phase 1 ships migration `0001_users_and_auth` which creates `users`, `refresh_tokens`, `password_reset_tokens`, and the append-only `audit_events` table (with role-scoped grants — see [Audit log notes](#audit-log) below). `phase-1-matching` adds `0002_resumes_and_matches`, which creates the `resumes` and `match_results` tables; `upgrade head` applies both.
 
-7. **Install pre-commit hooks.**
+8. **Install pre-commit hooks.**
 
    ```bash
    pre-commit install
    ```
 
-8. **Start the apps** (in two terminals):
+9. **Start the apps** (in two terminals):
 
    ```bash
    # API — http://localhost:8000
@@ -175,6 +191,68 @@ Run it on a quiet developer laptop. Expects ≤ 25ms median delta between the un
 ### Skip-if-no-infra tests
 
 Integration tests under `apps/api/tests/integration/` and infra-dependent property tests under `apps/api/tests/property/` skip when Postgres or Redis isn't reachable. Bring up `docker compose up -d --wait` to run them locally; CI runs them automatically.
+
+## Phase 1 matching — upload and match a resume
+
+The `phase-1-matching` surface adds resume upload (PDF/DOCX → MinIO), bounded server-side text extraction, a deterministic TF-IDF-plus-keyword score against a pasted job description, and the results UI. The endpoints are authenticated with the access token from `phase-1-auth`, rate-limited, and quota-bounded.
+
+### End-to-end upload-and-match walkthrough
+
+Prerequisite: the stack is up (`docker compose up -d --wait`), the resume bucket exists (setup step 6), migrations are applied (step 7), and both apps are running (step 9).
+
+**Via the web UI:**
+
+1. Register or log in at [http://localhost:3000/register](http://localhost:3000/register) (or `/login`) — see the auth runbook above.
+2. Go to the Upload_Page at [http://localhost:3000/upload](http://localhost:3000/upload), choose a `.pdf` or `.docx` resume, and paste a job description into the textarea.
+3. Submit. The page uploads the resume, creates the match, and navigates you to the Results_Page at `/matches/{id}` (the score reveal with the matched/missing keyword breakdown).
+
+**Via the API** (replace `$TOKEN` with the `access_token` returned by login/register):
+
+```bash
+# 1. Log in and capture the access token (jq optional — the body is {access_token, user})
+TOKEN=$(curl -s http://localhost:8000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"your-password-12+chars"}' \
+  | jq -r .access_token)
+
+# 2. Upload a resume (multipart field name is `file`); capture the returned resume id
+RESUME_ID=$(curl -s http://localhost:8000/api/v1/resumes \
+  -H "Authorization: Bearer $TOKEN" \
+  -F 'file=@/path/to/resume.pdf' \
+  | jq -r .id)
+
+# 3. Create a match against a pasted job description
+MATCH_ID=$(curl -s http://localhost:8000/api/v1/matches \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d "{\"resume_id\":\"$RESUME_ID\",\"job_description\":\"Senior Python engineer with FastAPI and Postgres experience...\"}" \
+  | jq -r .id)
+
+# 4. View the result (score, breakdown, matched/missing keywords, suggestions)
+curl -s http://localhost:8000/api/v1/matches/$MATCH_ID -H "Authorization: Bearer $TOKEN"
+```
+
+The same match is viewable in the browser at `http://localhost:3000/matches/$MATCH_ID`, and your resumes and recent matches are listed at [http://localhost:3000/library](http://localhost:3000/library).
+
+### Adjust the per-user daily quotas
+
+Uploads and matches are bounded per user per UTC calendar day as a cost-as-DoS control. The counts are kept in Postgres, so the quotas hold even during a Redis outage. Exceeding either cap returns HTTP 429 with the RFC 7807 `quota_exceeded` envelope (the `detail` states the daily limit and the UTC reset time); the upload or scoring is not performed.
+
+Tune them by editing `.env` (defaults shown) and restarting the API:
+
+| Variable                        | Default | Caps                                            |
+| ------------------------------- | ------- | ----------------------------------------------- |
+| `MATCHLAYER_RESUME_DAILY_QUOTA` | `20`    | Successful resume uploads per user per UTC day  |
+| `MATCHLAYER_MATCH_DAILY_QUOTA`  | `50`    | Successful match creations per user per UTC day |
+
+The tighter per-minute sliding-window rate limits (Redis-backed) are tunable in the same way:
+
+| Variable                               | Default | Caps                                |
+| -------------------------------------- | ------- | ----------------------------------- |
+| `MATCHLAYER_RESUME_RATE_LIMIT_PER_MIN` | `10`    | Resume uploads per user per minute  |
+| `MATCHLAYER_MATCH_RATE_LIMIT_PER_MIN`  | `20`    | Match creations per user per minute |
+
+Raise them when developing locally so test loops don't trip the 429; keep production values conservative.
 
 ## Branch & PR conventions
 

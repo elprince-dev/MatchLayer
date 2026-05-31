@@ -193,8 +193,9 @@ describe("Login form (Requirement 12.7, 12.8 — Auth Pages Design §14.3)", () 
     });
   });
 
-  it("falls back to '/' when ?next= is missing or unsafe (§13.7)", async () => {
-    // Unsafe next (contains ://) should be rejected and replaced with /
+  it("falls back to '/dashboard' when ?next= is missing or unsafe (§13.7)", async () => {
+    // Unsafe next (contains ://) should be rejected and replaced with the
+    // authenticated home (/dashboard), not the public landing.
     searchParamsMock.set("next", "https://evil.com/phish");
     stubFetch({
       status: 200,
@@ -214,7 +215,7 @@ describe("Login form (Requirement 12.7, 12.8 — Auth Pages Design §14.3)", () 
     fillAndSubmit();
 
     await waitFor(() => {
-      expect(pushMock).toHaveBeenCalledWith("/");
+      expect(pushMock).toHaveBeenCalledWith("/dashboard");
     });
   });
 });
