@@ -1,0 +1,3 @@
+# Playwright visual/layout acceptance gates (design Section 9) live here.
+# Harness configured in apps/web/playwright.config.ts (task 1.1).
+# Screen specs and baseline __screenshots__/ land in task 4.4 / per-screen gates.

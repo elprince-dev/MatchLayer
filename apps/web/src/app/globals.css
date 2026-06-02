@@ -3,15 +3,18 @@
  *
  * Tokens are defined as space-separated `R G B` triplets on `:root` (light) and
  * `.dark` (dark). Tailwind v4's `@theme inline` block re-exports each token as
- * `rgb(var(--color-*) / <alpha-value>)` so utilities like `bg-bg/65` and
- * `text-brand/80` work uniformly.
+ * `rgb(var(--color-*))` so the color utilities (`bg-bg`, `text-brand`, …)
+ * resolve. Opacity modifiers like `bg-bg/65` and `text-brand/80` are handled by
+ * Tailwind v4 via `color-mix(...)`, so no `<alpha-value>` placeholder is needed
+ * (that was the v3 convention and is left unsubstituted under v4, producing
+ * invalid `rgb(... / <alpha-value>)` declarations the browser drops).
  *
  * `bg-glass` is intentionally stored as a plain RGB triplet (matching `bg`/
  * `bg-elevated`) instead of the `rgba(...)` form quoted in the steering design
  * doc. The frosted-nav effect is then composed via opacity utilities, e.g.
  * `bg-bg-glass/65 backdrop-blur`. Keeping every color in the same shape lets
- * Tailwind's `<alpha-value>` template work for glass too, and matches the
- * design intent ("frosted surface over bg") without baking a fixed alpha.
+ * Tailwind v4's `color-mix` opacity modifier work for glass too, and matches
+ * the design intent ("frosted surface over bg") without baking a fixed alpha.
  *
  * Dark mode is class-based — activated when `<html class="dark">`. The
  * next-themes provider wired in `layout.tsx` (task 4.4) toggles that class.
@@ -48,6 +51,29 @@
   --color-success: 16 185 129;
   --color-warning: 245 158 11;
   --color-danger: 239 68 68;
+
+  /*
+   * Radius / shadow / motion are theme-invariant: they live only on `:root`
+   * (design Section 4.6–4.9) and are intentionally NOT redeclared in `.dark`,
+   * which inherits them unchanged.
+   */
+
+  /* Radius (design 4.6) */
+  --radius-card: 0.75rem; /* 12px — cards, buttons, inputs, dialogs */
+  --radius-hero: 1rem; /* 16px — hero/feature/score cards, auth card */
+  --radius-pill: 9999px; /* keyword tags, badges */
+
+  /* Shadows — layered, multi-stop only (design 4.7) */
+  --shadow-resting:
+    0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-elevated:
+    0 2px 4px rgba(0, 0, 0, 0.06), 0 16px 48px rgba(0, 0, 0, 0.16);
+
+  /* Motion (design 4.8) */
+  --motion-micro: 200ms; /* hover, press, toggle, nav bg swap */
+  --motion-layout: 400ms; /* layout transitions, card stagger */
+  --motion-hero: 600ms; /* score reveal, hero entrance */
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1); /* default easing */
 }
 
 .dark {
@@ -73,12 +99,31 @@
   --color-success: 52 211 153;
   --color-warning: 251 191 36;
   --color-danger: 248 113 113;
+
+  /* Radius / shadow / motion inherit from `:root` (theme-invariant). */
 }
 
 /*
- * Re-export every token as a Tailwind theme color. The `<alpha-value>`
- * placeholder is substituted by Tailwind when utilities like `bg-bg/50` are
- * used, defaulting to `1` otherwise.
+ * Reduced-motion override (Req 1.9, design 4.8). Re-point the duration tokens to
+ * `0ms` so token-consuming components animate instantly. `--motion-ease` is left
+ * intact (easing of a 0ms transition is a no-op). Loading/progress indicators and
+ * focus-ring transitions are exempt and must not read these tokens for suppression.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-micro: 0ms;
+    --motion-layout: 0ms;
+    --motion-hero: 0ms;
+  }
+}
+
+/*
+ * Re-export every token as a Tailwind theme color as `rgb(var(--color-*))`.
+ * Opacity modifiers (`bg-bg/50`, `text-brand/80`, …) are resolved by Tailwind
+ * v4 through `color-mix(...)`, so no `<alpha-value>` placeholder is used — under
+ * v4 that v3-era placeholder is passed through verbatim, yielding an invalid
+ * `rgb(... / <alpha-value>)` value that the browser discards (leaving the
+ * element with no painted color).
  *
  * Fonts are bound to the next/font CSS variables exposed by `layout.tsx`
  * (task 4.4) — once the layout sets `--font-geist-sans` / `--font-geist-mono`
@@ -86,27 +131,40 @@
  */
 @theme inline {
   /* Surfaces */
-  --color-bg: rgb(var(--color-bg) / <alpha-value>);
-  --color-bg-elevated: rgb(var(--color-bg-elevated) / <alpha-value>);
-  --color-bg-glass: rgb(var(--color-bg-glass) / <alpha-value>);
+  --color-bg: rgb(var(--color-bg));
+  --color-bg-elevated: rgb(var(--color-bg-elevated));
+  --color-bg-glass: rgb(var(--color-bg-glass));
 
   /* Borders */
-  --color-border: rgb(var(--color-border) / <alpha-value>);
-  --color-border-strong: rgb(var(--color-border-strong) / <alpha-value>);
+  --color-border: rgb(var(--color-border));
+  --color-border-strong: rgb(var(--color-border-strong));
 
   /* Text */
-  --color-text: rgb(var(--color-text) / <alpha-value>);
-  --color-text-muted: rgb(var(--color-text-muted) / <alpha-value>);
-  --color-text-subtle: rgb(var(--color-text-subtle) / <alpha-value>);
+  --color-text: rgb(var(--color-text));
+  --color-text-muted: rgb(var(--color-text-muted));
+  --color-text-subtle: rgb(var(--color-text-subtle));
 
   /* Brand + accents */
-  --color-brand: rgb(var(--color-brand) / <alpha-value>);
-  --color-brand-2: rgb(var(--color-brand-2) / <alpha-value>);
+  --color-brand: rgb(var(--color-brand));
+  --color-brand-2: rgb(var(--color-brand-2));
 
   /* Status */
-  --color-success: rgb(var(--color-success) / <alpha-value>);
-  --color-warning: rgb(var(--color-warning) / <alpha-value>);
-  --color-danger: rgb(var(--color-danger) / <alpha-value>);
+  --color-success: rgb(var(--color-success));
+  --color-warning: rgb(var(--color-warning));
+  --color-danger: rgb(var(--color-danger));
+
+  /*
+   * Radius + shadow re-exported so Tailwind resolves `rounded-card/-hero/-pill`
+   * and `shadow-resting/-elevated` utilities (design 4.6, 4.7, 4.9). These are
+   * theme-invariant `:root` values, passed through unchanged. Motion tokens are
+   * consumed directly as `var(--motion-*)` in transitions, so they are not
+   * re-exported here.
+   */
+  --radius-card: var(--radius-card);
+  --radius-hero: var(--radius-hero);
+  --radius-pill: var(--radius-pill);
+  --shadow-resting: var(--shadow-resting);
+  --shadow-elevated: var(--shadow-elevated);
 
   /* Fonts (next/font variables wired in layout.tsx — task 4.4) */
   --font-sans: var(--font-geist-sans);
