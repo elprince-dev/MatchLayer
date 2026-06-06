@@ -13,7 +13,7 @@ The library lives at `docs/learning/` and is multi-phase by construction. Phase 
 5. The compliance-validation approach: a static Markdown-walking script that checks structural invariants (filenames, heading sequences, link targets, code-snippet equality, knowledge-presuming phrases) and reports violations.
 6. The maintenance discipline that keeps Topic_Docs in sync with the Phase 1 codebase.
 
-The Phase 1 implementation source of truth being explained is `.kiro/specs/phase-1-foundation/`. Every Topic_Doc's "MatchLayer Phase 1 usage" section anchors to a real file path inside that implementation, and the validator enforces that those paths resolve.
+The Phase 1 implementation source of truth being explained is the set of three sequential implementation specs that together deliver Phase 1: `.kiro/specs/phase-1-foundation/` (the monorepo, the FastAPI and Next.js scaffold, Docker and Compose, CI, and the OpenAPI codegen pipeline), `.kiro/specs/phase-1-auth/` (the authentication and account surface), and `.kiro/specs/phase-1-matching/` (resume upload plus the deterministic TF-IDF and keyword scoring surface). No single one of them covers Phase 1 alone. Every Topic_Doc's "MatchLayer Phase 1 usage" section anchors to a real file path inside one of those three implementations, and the validator enforces that those paths resolve.
 
 The design intentionally treats the library as data: a Topic_Doc is a structured Markdown document with a fixed schema (an ordered list of H2 sections), and the Phase_1_Index is a generated-shape document that mirrors a single source-of-truth coverage table. That framing makes the structural rules testable as universal properties, and most of the correctness work shifts from prose review into a deterministic validator.
 
@@ -67,6 +67,10 @@ docs/
         ├── README.md              # Phase_1_Index
         ├── monorepo-layout.md     # foundation & tooling
         ├── pnpm-and-workspaces.md
+        ├── jwt-and-pyjwt.md       # authentication & accounts
+        ├── tf-idf-and-cosine-similarity.md   # matching & scoring
+        ├── uuidv7-identifiers.md   # api & data conventions
+        ├── pytest-and-httpx-backend-testing.md   # testing & quality
         ├── …                      # one Topic_Doc per coverage entry
         └── aws-migration-path-preservation.md   # hosting & deploy
 ```
@@ -203,14 +207,18 @@ The validator flags every match for human review. `just` has a high false-positi
 The Phase 1 landing page. Required structure:
 
 1. **Title** (H1) — `# MatchLayer Phase 1 — Learning Docs`.
-2. **Introduction** (H2) — 40–150 words, names `.kiro/specs/phase-1-foundation/` explicitly as the implementation source of truth (Req 2.3).
-3. **Topic coverage table** (H2 named `Topic coverage`) — rows: coverage-list entry text, assigned Topic_Doc filename. One row per entry from Req 4.2–4.9. Used by the validator and by the Reader to confirm completeness (Req 4.10–4.12).
+2. **Introduction** (H2) — 40–200 words, names all three Phase_1_Implementation_Specs explicitly by their paths `.kiro/specs/phase-1-foundation/`, `.kiro/specs/phase-1-auth/`, and `.kiro/specs/phase-1-matching/` and identifies them collectively as the implementation source of truth for Phase 1 (Req 2.3).
+3. **Topic coverage table** (H2 named `Topic coverage`) — rows: coverage-list entry text, assigned Topic_Doc filename. One row per entry from Req 4.2–4.13. Used by the validator and by the Reader to confirm completeness (Req 4.14–4.16).
 4. **Thematic sections** (H2 each, in this exact order, per Req 2.4):
    - `Foundation and tooling`
    - `Frontend`
    - `Backend`
+   - `API and data conventions`
    - `Security`
+   - `Authentication and accounts`
    - `Database and storage`
+   - `Matching and scoring`
+   - `Testing and quality`
    - `Containerization`
    - `Contracts and codegen`
    - `Hosting and deploy`
@@ -220,7 +228,7 @@ The Phase 1 landing page. Required structure:
 
 #### Topic_Doc presence rule
 
-If a row in the coverage table names a filename that does not exist in `docs/learning/phase-1/`, the validator flags it (Req 4.12). If a Topic_Doc file exists in `docs/learning/phase-1/` but is not referenced by exactly one row, the validator also flags it (Req 2.5, 2.10). The Phase_1_Index omits rather than renders broken links to missing Topic_Docs (Req 2.10).
+If a row in the coverage table names a filename that does not exist in `docs/learning/phase-1/`, the validator flags it (Req 4.16). If a Topic_Doc file exists in `docs/learning/phase-1/` but is not referenced by exactly one row, the validator also flags it (Req 2.5, 2.10). The Phase_1_Index omits rather than renders broken links to missing Topic_Docs (Req 2.10).
 
 ### 4. Topic_Doc
 
@@ -256,8 +264,8 @@ A Python script (placed under the existing `tools/` directory next to `check_env
 | `LDC013` | Req 5.3                      | Every acronym (run of ≥2 capital letters surrounded by word boundaries) is preceded on first use by `Expanded Form (` and followed by `)`. (Heuristic; reviewer confirms.)                                                                             |
 | `LDC014` | Req 5.5                      | No banned phrase appears outside fenced code blocks.                                                                                                                                                                                                   |
 | `LDC015` | Req 5.6                      | Introduction contains a hyperlinked prerequisite list (or an explicit "no prerequisites" sentence).                                                                                                                                                    |
-| `LDC016` | Req 4.1, 4.10, 4.12          | Every coverage-list entry has at least one Topic_Doc filename in the Phase_1_Index `Topic coverage` table; every named Topic_Doc filename exists in `docs/learning/phase-1/`.                                                                          |
-| `LDC017` | Req 2.5, 2.10                | Every Topic_Doc in `docs/learning/phase-1/` is listed in exactly one thematic section of the Phase_1_Index.                                                                                                                                            |
+| `LDC016` | Req 4.1, 4.14, 4.16          | Every coverage entry from Req 4.2–4.13 has at least one Topic_Doc filename in the Phase_1_Index `Topic coverage` table; every named Topic_Doc filename exists in `docs/learning/phase-1/`.                                                             |
+| `LDC017` | Req 2.5, 2.10                | Every Topic_Doc in `docs/learning/phase-1/` is listed in exactly one of the twelve thematic sections of the Phase_1_Index.                                                                                                                             |
 | `LDC018` | Req 1.4                      | Library_Index `Phase Sub-Libraries` section lists every present `phase-<N>/` directory.                                                                                                                                                                |
 | `LDC019` | Req 1.7, 10.3                | Library_Index `External Sources` and `Non-goals` reference every existing `apps/*/README.md`.                                                                                                                                                          |
 | `LDC020` | Req 10.7                     | Every relative link in Library_Index `Non-goals` and `External Sources` resolves.                                                                                                                                                                      |
@@ -278,72 +286,112 @@ The validator never makes network requests. External-link integrity beyond schem
 
 ### 6. Phase_1_Topic_Coverage_List → Topic_Doc mapping
 
-The following table is the canonical mapping from each entry in Req 4.2–4.9 to a Topic_Doc filename. The Phase_1_Index reproduces this table in its `Topic coverage` section. Topic consolidation (Req 4.11) is permitted; this baseline mapping is one Topic_Doc per entry except where a single underlying concept binds two entries together. The mapping is:
+The following table is the canonical mapping from each entry in Req 4.2–4.13 to a Topic_Doc filename. The Phase_1_Index reproduces this table in its `Topic coverage` section. Topic consolidation (Req 4.15) is permitted; this baseline mapping is one Topic_Doc per entry except where a single underlying concept binds two entries together. The mapping is:
 
-| Coverage-list entry (Req §)                               | Topic_Doc filename                           |
-| --------------------------------------------------------- | -------------------------------------------- |
-| Monorepo concept and apps-vs-packages split (4.2)         | `monorepo-layout.md`                         |
-| pnpm and pnpm workspaces (4.2)                            | `pnpm-and-workspaces.md`                     |
-| uv as a Python package manager (4.2)                      | `uv-python-package-manager.md`               |
-| Node.js + Python version pinning (4.2)                    | `language-version-pinning.md`                |
-| Root `package.json` and `tsconfig.base.json` (4.2)        | `root-package-and-tsconfig.md`               |
-| `.editorconfig` (4.2)                                     | `editorconfig.md`                            |
-| Lockfiles and frozen-lockfile installs (4.2)              | `lockfiles-and-frozen-installs.md`           |
-| `.env`, `.env.example`, env-drift script (4.2)            | `env-files-and-drift-detection.md`           |
-| Pre-commit hooks (4.2)                                    | `pre-commit-hooks.md`                        |
-| Next.js App Router + Server vs Client Components (4.3)    | `nextjs-app-router-and-rsc.md`               |
-| TypeScript strict mode + repo compiler options (4.3)      | `typescript-strict-mode.md`                  |
-| Tailwind v4 + `@theme inline` token strategy (4.3)        | `tailwind-v4-and-theme-tokens.md`            |
-| shadcn/ui as a copy-in primitive library (4.3)            | `shadcn-ui-as-copy-in-primitives.md`         |
-| Geist Sans + Geist Mono via `next/font` (4.3)             | `geist-fonts-via-next-font.md`               |
-| Framer Motion + reduced-motion pattern (4.3)              | `framer-motion-and-reduced-motion.md`        |
-| `next-themes` + system-default theme (4.3)                | `next-themes-and-system-default.md`          |
-| Security-headers proxy (Next.js 16 `proxy.ts`) (4.3)      | `nextjs-proxy-security-headers.md`           |
-| WCAG AA color contrast (4.3)                              | `wcag-aa-color-contrast.md`                  |
-| FastAPI as async ASGI + application-factory pattern (4.4) | `fastapi-application-factory.md`             |
-| Pydantic v2 + `pydantic-settings` (4.4)                   | `pydantic-and-pydantic-settings.md`          |
-| Async Python and the asyncio model (4.4)                  | `async-python-and-asyncio.md`                |
-| SQLAlchemy 2.x async + per-request session (4.4)          | `sqlalchemy-async-and-session-dependency.md` |
-| Connection pooling + `pool_pre_ping` (4.4)                | `connection-pooling-and-pre-ping.md`         |
-| Alembic migrations + empty baseline (4.4)                 | `alembic-migrations-and-empty-baseline.md`   |
-| `structlog` and structured JSON logging (4.4)             | `structlog-and-json-logging.md`              |
-| Request-id ASGI middleware + `X-Request-Id` (4.4)         | `request-id-middleware.md`                   |
-| RFC 7807 error envelope (4.4)                             | `rfc-7807-error-envelope.md`                 |
-| OpenAPI dump CLI (4.4)                                    | `openapi-dump-cli.md`                        |
-| Security headers (CSP, HSTS, etc.) (4.5)                  | `security-headers-explained.md`              |
-| CORS allowlists (4.5)                                     | `cors-allowlists.md`                         |
-| Structured logging as PII defense + redaction (4.5)       | `structured-logging-as-pii-defense.md`       |
-| Secrets management, gitleaks, .env discipline (4.5)       | `secrets-management.md`                      |
-| Dependency + supply-chain scanning (4.5)                  | `dependency-and-supply-chain-scanning.md`    |
-| Threat-model categories (4.5)                             | `threat-model-categories.md`                 |
-| PostgreSQL 16 fundamentals (4.6)                          | `postgresql-fundamentals.md`                 |
-| Postgres vs MinIO and why Phase 1 uses both (4.6)         | `postgres-vs-minio.md`                       |
-| Redis fundamentals + Phase 1 standby (4.6)                | `redis-fundamentals.md`                      |
-| Named Docker volumes + persistence (4.6)                  | `named-docker-volumes.md`                    |
-| Future addition of pgvector in Phase 2 (4.6)              | `pgvector-and-the-phase-2-boundary.md`       |
-| Containers vs virtual machines (4.7)                      | `containers-vs-vms.md`                       |
-| Docker images, layers, build cache (4.7)                  | `docker-images-layers-and-cache.md`          |
-| Dockerfiles + multi-stage builds (4.7)                    | `dockerfiles-and-multi-stage-builds.md`      |
-| `docker compose` + healthchecks + `--wait` (4.7)          | `docker-compose-and-healthchecks.md`         |
-| Production Dockerfiles in `infra/docker/` (4.7)           | `production-dockerfiles.md`                  |
-| Distroless + non-root + read-only runtime (4.7)           | `distroless-and-runtime-hardening.md`        |
-| Image digest pinning (4.7)                                | `image-digest-pinning.md`                    |
-| OpenAPI generation by FastAPI (4.8)                       | `openapi-from-fastapi.md`                    |
-| Codegen orchestrator + `execa` (4.8)                      | `codegen-orchestrator-and-execa.md`          |
-| `openapi-typescript` (4.8)                                | `openapi-typescript-codegen.md`              |
-| `openapi-zod-client` (4.8)                                | `openapi-zod-client-codegen.md`              |
-| Curated `index.ts` re-export pattern (4.8)                | `shared-types-curated-reexports.md`          |
-| OpenAPI drift check in CI (4.8)                           | `openapi-drift-check.md`                     |
-| GitHub Actions workflow structure (4.9)                   | `github-actions-workflow-structure.md`       |
-| The five Phase 1 CI jobs (4.9)                            | `phase-1-ci-jobs.md`                         |
-| Dependabot configuration (4.9)                            | `dependabot-configuration.md`                |
-| Branch protection + required-checks aggregator (4.9)      | `branch-protection-and-required-checks.md`   |
-| Vercel hobby tier as Phase 1 frontend host (4.9)          | `vercel-hobby-tier-hosting.md`               |
-| Fly.io as Phase 1 backend host (4.9)                      | `flyio-backend-hosting.md`                   |
-| AWS S3 as Phase 1 file-storage backend (4.9)              | `aws-s3-in-phase-1.md`                       |
-| Phase 6 AWS migration-path preservation (4.9)             | `aws-migration-path-preservation.md`         |
+| Coverage-list entry (Req §)                                                | Topic_Doc filename                           |
+| -------------------------------------------------------------------------- | -------------------------------------------- |
+| Monorepo concept and apps-vs-packages split (4.2)                          | `monorepo-layout.md`                         |
+| pnpm and pnpm workspaces (4.2)                                             | `pnpm-and-workspaces.md`                     |
+| uv as a Python package manager (4.2)                                       | `uv-python-package-manager.md`               |
+| Node.js + Python version pinning (4.2)                                     | `language-version-pinning.md`                |
+| Root `package.json` and `tsconfig.base.json` (4.2)                         | `root-package-and-tsconfig.md`               |
+| `.editorconfig` (4.2)                                                      | `editorconfig.md`                            |
+| Lockfiles and frozen-lockfile installs (4.2)                               | `lockfiles-and-frozen-installs.md`           |
+| `.env`, `.env.example`, env-drift script (4.2)                             | `env-files-and-drift-detection.md`           |
+| Pre-commit hooks (4.2)                                                     | `pre-commit-hooks.md`                        |
+| corepack pin activating the root `packageManager` pnpm version (4.2)       | `corepack-and-packagemanager-pin.md`         |
+| Next.js `output: "standalone"` build mode (4.2)                            | `nextjs-standalone-build.md`                 |
+| Next.js App Router + Server vs Client Components (4.3)                     | `nextjs-app-router-and-rsc.md`               |
+| TypeScript strict mode + repo compiler options (4.3)                       | `typescript-strict-mode.md`                  |
+| Tailwind v4 + `@theme inline` token strategy (4.3)                         | `tailwind-v4-and-theme-tokens.md`            |
+| shadcn/ui as a copy-in primitive library (4.3)                             | `shadcn-ui-as-copy-in-primitives.md`         |
+| Geist Sans + Geist Mono via `next/font` (4.3)                              | `geist-fonts-via-next-font.md`               |
+| Framer Motion + reduced-motion pattern (4.3)                               | `framer-motion-and-reduced-motion.md`        |
+| `next-themes` + system-default theme (4.3)                                 | `next-themes-and-system-default.md`          |
+| Security-headers proxy (Next.js 16 `proxy.ts`) (4.3)                       | `nextjs-proxy-security-headers.md`           |
+| WCAG AA color contrast (4.3)                                               | `wcag-aa-color-contrast.md`                  |
+| FastAPI as async ASGI + application-factory pattern (4.4)                  | `fastapi-application-factory.md`             |
+| Pydantic v2 + `pydantic-settings` (4.4)                                    | `pydantic-and-pydantic-settings.md`          |
+| Async Python and the asyncio model (4.4)                                   | `async-python-and-asyncio.md`                |
+| SQLAlchemy 2.x async + per-request session (4.4)                           | `sqlalchemy-async-and-session-dependency.md` |
+| Connection pooling + `pool_pre_ping` (4.4)                                 | `connection-pooling-and-pre-ping.md`         |
+| Alembic migrations + empty baseline (4.4)                                  | `alembic-migrations-and-empty-baseline.md`   |
+| `structlog` and structured JSON logging (4.4)                              | `structlog-and-json-logging.md`              |
+| Request-id ASGI middleware + `X-Request-Id` (4.4)                          | `request-id-middleware.md`                   |
+| RFC 7807 error envelope (4.4)                                              | `rfc-7807-error-envelope.md`                 |
+| OpenAPI dump CLI (4.4)                                                     | `openapi-dump-cli.md`                        |
+| Security headers (CSP, HSTS, etc.) (4.5)                                   | `security-headers-explained.md`              |
+| CORS allowlists (4.5)                                                      | `cors-allowlists.md`                         |
+| Structured logging as PII defense + redaction (4.5)                        | `structured-logging-as-pii-defense.md`       |
+| Secrets management, gitleaks, .env discipline (4.5)                        | `secrets-management.md`                      |
+| Dependency + supply-chain scanning (4.5)                                   | `dependency-and-supply-chain-scanning.md`    |
+| Threat-model categories (4.5)                                              | `threat-model-categories.md`                 |
+| Non-indexing of PII surfaces as a privacy control (4.5)                    | `pii-non-indexing.md`                        |
+| JWT and PyJWT; access vs refresh tokens; HS256 allowlist (4.6)             | `jwt-and-pyjwt.md`                           |
+| Argon2id password hashing + common-password blocklist (4.6)                | `password-hashing-argon2id.md`               |
+| Refresh-token rotation + family reuse detection (4.6)                      | `refresh-token-rotation.md`                  |
+| Double-submit-cookie CSRF + HttpOnly/Secure/SameSite (4.6)                 | `csrf-and-secure-cookies.md`                 |
+| Redis sliding-window rate limiting + account lockout (4.6)                 | `rate-limiting-and-account-lockout.md`       |
+| Append-only audit log (4.6)                                                | `append-only-audit-log.md`                   |
+| Password-reset tokens + dev-only reset surface (4.6)                       | `password-reset-tokens.md`                   |
+| TanStack Query + `useAuth` server-state hook (4.6)                         | `tanstack-query-and-useauth.md`              |
+| Authenticated route-group shell `(app)` + redirect (4.6)                   | `authenticated-route-group-shell.md`         |
+| No-account-enumeration via dummy-hash timing + generic error (4.6)         | `no-account-enumeration.md`                  |
+| PostgreSQL 16 fundamentals (4.7)                                           | `postgresql-fundamentals.md`                 |
+| Postgres vs MinIO and why Phase 1 uses both (4.7)                          | `postgres-vs-minio.md`                       |
+| Redis fundamentals + Phase 1 standby (4.7)                                 | `redis-fundamentals.md`                      |
+| Named Docker volumes + persistence (4.7)                                   | `named-docker-volumes.md`                    |
+| Future addition of pgvector in Phase 2 (4.7)                               | `pgvector-and-the-phase-2-boundary.md`       |
+| ATS match score in Phase 1 + deterministic non-LLM approach (4.8)          | `ats-scoring-overview.md`                    |
+| TF-IDF + cosine similarity via scikit-learn (4.8)                          | `tf-idf-and-cosine-similarity.md`            |
+| Keyword/skill overlap + committed Skill_Lexicon (4.8)                      | `skill-lexicon-and-keyword-overlap.md`       |
+| Rule-based suggestion generation (4.8)                                     | `rule-based-suggestions.md`                  |
+| File-upload safety (magic-byte MIME, size, UUID keys) (4.8)                | `file-upload-safety.md`                      |
+| Bounded PDF/DOCX text extraction (4.8)                                     | `pdf-docx-text-extraction.md`                |
+| S3/MinIO storage abstraction (4.8)                                         | `s3-minio-storage-abstraction.md`            |
+| Per-user daily upload/scoring quotas (cost-as-DoS) (4.8)                   | `usage-quotas-cost-as-dos.md`                |
+| `ml/` vs `apps/api` separation + Scorer_Version (4.8)                      | `ml-vs-api-separation-and-scorer-version.md` |
+| Zod runtime validation generated from OpenAPI (4.8)                        | `zod-runtime-validation.md`                  |
+| Skill-lexicon build pipeline (`ml/pipelines/build_skill_lexicon.py`) (4.8) | `skill-lexicon-build-pipeline.md`            |
+| Lexicon drift check (`tools/check_lexicon_drift.py`) (4.8)                 | `lexicon-drift-check.md`                     |
+| Zip-bomb / decompression-bomb defense (4.8)                                | `zip-bomb-defense.md`                        |
+| Containers vs virtual machines (4.9)                                       | `containers-vs-vms.md`                       |
+| Docker images, layers, build cache (4.9)                                   | `docker-images-layers-and-cache.md`          |
+| Dockerfiles + multi-stage builds (4.9)                                     | `dockerfiles-and-multi-stage-builds.md`      |
+| `docker compose` + healthchecks + `--wait` (4.9)                           | `docker-compose-and-healthchecks.md`         |
+| Production Dockerfiles in `infra/docker/` (4.9)                            | `production-dockerfiles.md`                  |
+| Distroless + non-root + read-only runtime (4.9)                            | `distroless-and-runtime-hardening.md`        |
+| Image digest pinning (4.9)                                                 | `image-digest-pinning.md`                    |
+| OpenAPI generation by FastAPI (4.10)                                       | `openapi-from-fastapi.md`                    |
+| Codegen orchestrator + `execa` (4.10)                                      | `codegen-orchestrator-and-execa.md`          |
+| `openapi-typescript` (4.10)                                                | `openapi-typescript-codegen.md`              |
+| `openapi-zod-client` (4.10)                                                | `openapi-zod-client-codegen.md`              |
+| Curated `index.ts` re-export pattern (4.10)                                | `shared-types-curated-reexports.md`          |
+| OpenAPI drift check in CI (4.10)                                           | `openapi-drift-check.md`                     |
+| GitHub Actions workflow structure (4.11)                                   | `github-actions-workflow-structure.md`       |
+| The five Phase 1 CI jobs (4.11)                                            | `phase-1-ci-jobs.md`                         |
+| Dependabot configuration (4.11)                                            | `dependabot-configuration.md`                |
+| Branch protection + required-checks aggregator (4.11)                      | `branch-protection-and-required-checks.md`   |
+| Vercel hobby tier as Phase 1 frontend host (4.11)                          | `vercel-hobby-tier-hosting.md`               |
+| Fly.io as Phase 1 backend host (4.11)                                      | `flyio-backend-hosting.md`                   |
+| AWS S3 as Phase 1 file-storage backend (4.11)                              | `aws-s3-in-phase-1.md`                       |
+| Phase 6 AWS migration-path preservation (4.11)                             | `aws-migration-path-preservation.md`         |
+| UUIDv7 time-ordered opaque identifiers (4.12)                              | `uuidv7-identifiers.md`                      |
+| Soft-delete via `deleted_at` timestamp (4.12)                              | `soft-delete-and-deleted-at.md`              |
+| Cursor-based pagination (`?limit=&cursor=`) (4.12)                         | `cursor-pagination.md`                       |
+| Idempotency keys via `Idempotency-Key` header (4.12)                       | `idempotency-keys.md`                        |
+| `/api/v1` versioning, plural resources, ISO 8601 UTC timestamps (4.12)     | `api-versioning-and-resource-naming.md`      |
+| pytest, pytest-asyncio, httpx backend testing (4.13)                       | `pytest-and-httpx-backend-testing.md`        |
+| Integration testing against real Postgres in Docker (4.13)                 | `integration-testing-with-real-postgres.md`  |
+| Vitest + Testing Library frontend component tests (4.13)                   | `vitest-and-testing-library.md`              |
+| Playwright end-to-end (E2E) tests (4.13)                                   | `playwright-e2e-testing.md`                  |
+| Hypothesis property-based testing for the Reader (4.13)                    | `property-based-testing-with-hypothesis.md`  |
+| Test taxonomy of layers across Phase 1 (4.13)                              | `test-taxonomy-and-layers.md`                |
+| axe-core accessibility tests (4.13)                                        | `axe-core-accessibility-testing.md`          |
+| Import-boundary tests enforcing apps/packages/ml separation (4.13)         | `import-boundary-tests.md`                   |
+| Timing-category tests for no-account-enumeration equalization (4.13)       | `timing-equalization-tests.md`               |
 
-This mapping is the design-time baseline. The Phase_1_Index `Topic coverage` table is the runtime source of truth; if implementation chooses to consolidate (e.g., merge `connection-pooling-and-pre-ping.md` into `sqlalchemy-async-and-session-dependency.md`), the table reflects that and the Topic_Doc's introduction names every consolidated entry (Req 4.11). The validator enforces the runtime table, not this design-time baseline.
+This mapping is the design-time baseline. The Phase_1_Index `Topic coverage` table is the runtime source of truth; if implementation chooses to consolidate (e.g., merge `connection-pooling-and-pre-ping.md` into `sqlalchemy-async-and-session-dependency.md`), the table reflects that and the Topic_Doc's introduction names every consolidated entry (Req 4.15). The validator enforces the runtime table, not this design-time baseline.
 
 ## Data Models
 
@@ -399,7 +447,7 @@ class CoverageRow:
     entry_text: str                 # verbatim from the Phase_1_Topic_Coverage_List
     requirement_clause: str         # e.g. '4.4'
     topic_doc_filename: str         # the Topic_Doc that covers it
-    thematic_section: str           # one of the 8 thematic sections
+    thematic_section: str           # one of the 12 thematic sections
 ```
 
 ### Finding
@@ -509,21 +557,21 @@ _For any_ Topic_Doc and any contiguous 50-word window of its prose body, that wi
 
 **Validates: Requirements 1.8**
 
-### Property 5: Phase_1_Index introduction word count and reference
+### Property 5: Phase_1_Index introduction word count and references
 
-_For any_ state of the Phase_1_Index, its `Introduction` section SHALL contain between 40 and 150 words inclusive, and SHALL contain the literal substring `.kiro/specs/phase-1-foundation/`.
+_For any_ state of the Phase_1_Index, its `Introduction` section SHALL contain between 40 and 200 words inclusive, and SHALL contain all three literal substrings `.kiro/specs/phase-1-foundation/`, `.kiro/specs/phase-1-auth/`, and `.kiro/specs/phase-1-matching/`.
 
 **Validates: Requirements 2.3**
 
 ### Property 6: Phase_1_Index thematic-section sequence equality
 
-_For any_ state of the Phase_1_Index, the sequence of H2 headings whose text appears in the canonical thematic-section set `{"Foundation and tooling", "Frontend", "Backend", "Security", "Database and storage", "Containerization", "Contracts and codegen", "Hosting and deploy"}` SHALL equal the canonical sequence `("Foundation and tooling", "Frontend", "Backend", "Security", "Database and storage", "Containerization", "Contracts and codegen", "Hosting and deploy")` in that exact order.
+_For any_ state of the Phase_1_Index, the sequence of H2 headings whose text appears in the canonical thematic-section set `{"Foundation and tooling", "Frontend", "Backend", "API and data conventions", "Security", "Authentication and accounts", "Database and storage", "Matching and scoring", "Testing and quality", "Containerization", "Contracts and codegen", "Hosting and deploy"}` SHALL equal the canonical sequence `("Foundation and tooling", "Frontend", "Backend", "API and data conventions", "Security", "Authentication and accounts", "Database and storage", "Matching and scoring", "Testing and quality", "Containerization", "Contracts and codegen", "Hosting and deploy")` in that exact order.
 
 **Validates: Requirements 2.4**
 
 ### Property 7: Every Topic_Doc listed exactly once across thematic sections
 
-_For any_ Topic_Doc `T` present in `docs/learning/phase-1/`, the count of Markdown hyperlinks across the eight thematic sections of the Phase_1_Index whose target equals `T`'s filename SHALL equal exactly 1.
+_For any_ Topic_Doc `T` present in `docs/learning/phase-1/`, the count of Markdown hyperlinks across the twelve thematic sections of the Phase_1_Index whose target equals `T`'s filename SHALL equal exactly 1.
 
 **Validates: Requirements 2.5**
 
@@ -603,13 +651,13 @@ _For any_ Topic_Doc, the count of Markdown hyperlinks inside its `External readi
 
 _For any_ row of the Phase_1_Index `Topic coverage` table, the row SHALL name a non-empty Topic_Doc filename, AND that filename SHALL exist as a file directly under `docs/learning/phase-1/`.
 
-**Validates: Requirements 4.1, 4.10, 4.12**
+**Validates: Requirements 4.1, 4.14, 4.16**
 
 ### Property 21: Consolidated Topic_Docs name every consolidated entry
 
 _For any_ Topic_Doc `T` whose filename is recorded in the Phase_1_Index `Topic coverage` table for two or more distinct coverage entries, the body of `T`'s `Introduction` section SHALL contain a verbatim mention of every coverage-entry text recorded against `T`.
 
-**Validates: Requirements 4.11**
+**Validates: Requirements 4.15**
 
 ### Property 22: Domain-specific term defined on first use
 
@@ -762,7 +810,7 @@ A handful of acceptance criteria do not reduce to a structural predicate over pa
 
 - Req 3.3 (Problem it solves names ≥1 problem and ≥1 prior approach)
 - Req 3.9 (Hands-on checkpoint inclusion against the rubric)
-- Req 4.2–4.9 (each named coverage entry appears in the table)
+- Req 4.2–4.13 (each named coverage entry appears in the table)
 - Req 5.1, 9.5 (Conventions_Doc states the Reader definition; names the maintainer)
 - Req 10.2, 10.4, 10.5 (specific Non-goals bullets and their links)
 

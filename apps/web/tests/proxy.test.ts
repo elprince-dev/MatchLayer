@@ -213,9 +213,11 @@ describe("proxy() CSP by NODE_ENV (no server required)", () => {
 
   function cspForNodeEnv(nodeEnv: string): string {
     vi.stubEnv("NODE_ENV", nodeEnv);
-    // Minimal NextRequest stub: proxy() only touches nextUrl.protocol.
+    // Minimal NextRequest stub: proxy() touches nextUrl.protocol (HSTS branch)
+    // and nextUrl.pathname (X-Robots-Tag branch). "/" is the landing page, an
+    // indexable route, so the noindex header is not set on this request.
     const req = {
-      nextUrl: { protocol: "http:" },
+      nextUrl: { protocol: "http:", pathname: "/" },
     } as unknown as NextRequest;
     const res = proxy(req);
     return res.headers.get("content-security-policy") ?? "";
@@ -232,5 +234,54 @@ describe("proxy() CSP by NODE_ENV (no server required)", () => {
   it("development: script-src includes the dev-only 'unsafe-eval'", () => {
     const csp = cspForNodeEnv("development");
     expect(csp).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval'");
+  });
+});
+
+/**
+ * Server-independent coverage of the `proxy()` `X-Robots-Tag` behavior
+ * (Req 8.7, 8.8; `seo.md` route classification; ADR 0006).
+ *
+ * The proxy stamps `X-Robots-Tag: noindex, nofollow` on the non-indexable
+ * route classes only — the `(auth)` pages (`/login`, `/register`), the
+ * authenticated `(app)` paths, and the `/api/` JSON surface — while the public
+ * landing page (`/`) and other public routes are left indexable (Req 8.10).
+ *
+ * `proxy()` reads only `request.nextUrl.pathname` (for this branch) and
+ * `process.env.NODE_ENV`, so a minimal `NextRequest`-shaped stub suffices.
+ */
+describe("proxy() X-Robots-Tag by path (no server required)", () => {
+  function robotsTagForPath(pathname: string): string | null {
+    const req = {
+      nextUrl: { protocol: "http:", pathname },
+    } as unknown as NextRequest;
+    return proxy(req).headers.get("x-robots-tag");
+  }
+
+  it.each([
+    "/login",
+    "/register",
+    "/upload",
+    "/matches",
+    "/matches/abc-123",
+    "/library",
+    "/dashboard",
+    "/settings",
+    "/api/v1/matches/abc",
+  ])("stamps noindex, nofollow on the non-indexable path %s", (path) => {
+    expect(robotsTagForPath(path)).toBe("noindex, nofollow");
+  });
+
+  it.each(["/", "/about", "/pricing", "/privacy", "/terms"])(
+    "leaves the indexable public path %s without an X-Robots-Tag header",
+    (path) => {
+      expect(robotsTagForPath(path)).toBeNull();
+    },
+  );
+
+  it("does not match a public path that merely shares a noindex prefix substring", () => {
+    // `/uploads-guide` is a public page that starts with the same letters as
+    // `/upload` but is not the authenticated route — the prefix check is
+    // segment-aware (`/upload` or `/upload/...`), so it must NOT be flagged.
+    expect(robotsTagForPath("/uploads-guide")).toBeNull();
   });
 });

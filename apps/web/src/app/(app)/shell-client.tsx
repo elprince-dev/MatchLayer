@@ -173,9 +173,33 @@ export function AppShellClient({
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
+      {/*
+       * Main content landmark + skip-link target (Req 19.5, 19.8; design
+       * Section 10.3, 10.4). `id="main"` matches the `<SkipNav>` href rendered
+       * by `(app)/layout.tsx`; `tabIndex={-1}` makes it a programmatic focus
+       * target for the skip link without adding it to the tab sequence.
+       * `outline-none` is paired with the focus ring on the skip link itself,
+       * so no focus indicator is removed without a replacement.
+       */}
+      <main
+        id="main"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-7xl flex-1 px-6 py-8 outline-none"
+      >
         {children}
       </main>
+      {/*
+       * Footer landmark (Req 19.5; design Section 10.4). The authenticated app
+       * shell stays "Linear/Notion calm" (design.md) — a single muted brand
+       * line, no navigation chrome. Kept link-free here because the MVP scope
+       * is exactly four screens (no standalone privacy/terms routes exist yet),
+       * so a real `<nav>`/footer links would point at non-existent pages.
+       */}
+      <footer className="border-t border-border px-6 py-6">
+        <p className="mx-auto max-w-7xl text-sm text-text-subtle">
+          MatchLayer — ATS simulation and resume-match analysis.
+        </p>
+      </footer>
     </div>
   );
 }

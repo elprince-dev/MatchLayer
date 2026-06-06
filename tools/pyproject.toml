@@ -1,0 +1,148 @@
+# MatchLayer — repo-root developer tooling (tools/)
+#
+# Anchors:
+#   - .kiro/specs/phase-1-learning-docs/tasks.md   →  Task 2.1 (validator dev-deps)
+#   - .kiro/specs/phase-1-learning-docs/design.md  →  §5 "Compliance Validator"
+#   - .kiro/steering/tech.md                       →  "uv for Python dependency
+#     management", "ruff for format+lint", "mypy --strict".
+#
+# Scope
+# -----
+# This project exists so the Phase 1 learning-docs compliance validator
+# (tools/learning_docs_check.py, authored in tasks 2.2+) and its tests can be
+# developed, linted, type-checked, and tested with the SAME rules the rest of
+# the repo uses (mirrors apps/api/pyproject.toml).
+#
+# Runtime constraint: the validator is Python 3.13 stdlib-only at runtime
+# (pathlib, re, json, dataclasses, argparse). It therefore declares NO runtime
+# dependencies. `pytest` + `hypothesis` (+ ruff/mypy to lint and type-check)
+# are dev-only — they never ship with, and are never imported by, the runtime
+# validator.
+#
+# This is a non-packaged project (`[tool.uv] package = false`): there is no
+# wheel to build, uv just materializes the dev dependency group into a local
+# `.venv`. Install/sync from this directory:
+#
+#     uv sync            # installs the `dev` group
+#     uv run pytest      # runs tools/tests
+#     uv run ruff check .
+#     uv run mypy .
+
+[project]
+name = "matchlayer-tools"
+version = "0.0.0"
+description = "MatchLayer repo-root developer tooling: stdlib-only check scripts and the Phase 1 learning-docs compliance validator."
+requires-python = ">=3.13"
+license = { text = "MIT" }
+# Stdlib-only at runtime — see module header above. Do NOT add runtime deps.
+dependencies = []
+
+[project.optional-dependencies]
+# Kept in sync with [dependency-groups].dev so both `uv sync` (which reads the
+# dependency group) and `pip install .[dev]` resolve the same set. Pinned by
+# major to match apps/api/pyproject.toml and steering/security.md
+# ("Pinned major versions for all dependencies").
+dev = [
+    "ruff>=0.7,<1.0",
+    "mypy>=1.13,<2.0",
+    "pytest>=8.3,<9.0",
+    "hypothesis>=6.100,<7.0",
+]
+
+[dependency-groups]
+# uv's preferred location for dev-only deps; mirrors the optional-deps block.
+dev = [
+    "ruff>=0.7,<1.0",
+    "mypy>=1.13,<2.0",
+    "pytest>=8.3,<9.0",
+    "hypothesis>=6.100,<7.0",
+]
+
+[tool.uv]
+# Non-packaged: there is nothing to build/install for `matchlayer-tools`
+# itself; the scripts are run directly (e.g. `python3 tools/...py`).
+package = false
+
+# ---------------------------------------------------------------------------
+# Ruff — formatter + linter. Mirrors apps/api/pyproject.toml so the same rules
+# apply to tools/ Python (the pre-commit ruff hook discovers this config as the
+# nearest pyproject.toml when linting files under tools/).
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = [".", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "UP",    # pyupgrade
+    "N",     # pep8-naming
+    "SIM",   # flake8-simplify
+    "RUF",   # ruff-specific
+    "ASYNC", # flake8-async
+    "S",     # flake8-bandit (basic security)
+    "TID",   # tidy imports
+]
+ignore = [
+    # Allow asserts; bandit S101 is too noisy for a typed codebase.
+    "S101",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests freely use fixtures and asserts.
+"tests/*" = ["S", "N802", "N803"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# ---------------------------------------------------------------------------
+# Mypy — `mypy --strict` on the validator, per tech.md + conventions.md
+# ("Types: mypy --strict"). Mirrors apps/api: the strict flags are spelled out
+# in a per-module override because mypy does not honor a bare `strict = true`
+# inside per-module overrides. Looser project-wide defaults apply to everything
+# else (e.g. the existing stdlib check scripts).
+#
+# Intended invocation (matches CI's `uv run mypy src` pattern in apps/api):
+#     uv run mypy learning_docs_check.py tests
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.13"
+namespace_packages = true
+explicit_package_bases = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+no_implicit_optional = true
+check_untyped_defs = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+# The learning-docs compliance validator (tools/learning_docs_check.py, module
+# name `learning_docs_check`) is held to the full strict bar.
+module = ["learning_docs_check"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_subclassing_any = true
+disallow_any_generics = true
+warn_return_any = true
+strict_equality = true
+extra_checks = true
+no_implicit_reexport = true
+
+# ---------------------------------------------------------------------------
+# Pytest — tests live under tools/tests/.
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = ["-ra"]

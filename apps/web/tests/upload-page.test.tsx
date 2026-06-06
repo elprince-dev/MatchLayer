@@ -1,28 +1,43 @@
 /**
- * Component test for the Upload_Page — `(app)/upload` (Task 14.2).
+ * Component test for the Upload_Page — `(app)/upload` (Task 6.5; Req 9.9, 9.10,
+ * 9.12; design Section 8.4, Testing Strategy).
  *
- * Validates the client-facing slice of Requirement 12 (Upload_Page) the design
- * pins to this surface:
+ * Task 6.4 rebuilt this page: the resume upload moved OUT of the page and INTO
+ * `@/components/upload/upload-widget` (`UploadWidget`). The page no longer owns
+ * a resume file input and no longer calls `POST /api/v1/resumes` itself — it
+ * composes the widget (via `onResumeReady`/`onResumeCleared`), owns the
+ * job-description `Textarea` + live count, gates the **"Analyze Match"** submit
+ * button, and on submit posts **only** `POST /api/v1/matches` then navigates to
+ * `/matches/{id}`. This file targets that page-level contract; the widget's own
+ * validation / `extraction_status` / remove behavior is covered by
+ * `src/components/upload/upload-widget.test.tsx`, and `formatBytes` edges by
+ * `src/lib/utils.test.ts`.
  *
- *   - 12.2 — the file input advertises `accept=".pdf,.docx"` and both controls
- *     (resume file, job description) are reachable by their labels (label
- *     `htmlFor`/`id` association works for screen readers and `getByLabelText`).
- *   - 12.4 — client pre-validation blocks an oversized file and a wrong-type
- *     file *before* any network request is issued (no `apiFetch` call).
- *   - 12.3 / 12.5 — when the two-step upload→match contract returns an
- *     RFC 7807 problem envelope (413 / 415 / 422 / 429), the page renders the
- *     server-supplied `detail` string inside the `aria-live="polite"` region
- *     (the shared `FormError` live region), so assistive tech announces it.
+ * Covered here:
+ *   - **Submit gating across resume status × JD bounds (Req 9.9):** "Analyze
+ *     Match" is disabled until BOTH a `succeeded` resume is ready AND the
+ *     trimmed JD is within 30..50,000 chars. Asserted disabled with no resume,
+ *     disabled with a ready resume but a too-short JD, disabled with a valid JD
+ *     but a non-ready (pending) resume, and enabled only once both hold.
+ *   - **Remove re-disables submit (Req 9.10):** removing the ready resume (via
+ *     the widget's `onResumeCleared`) disables the button again even though the
+ *     JD is still valid.
+ *   - **Success navigation (Req 9.12):** with a ready resume + valid JD,
+ *     clicking "Analyze Match" posts `POST /api/v1/matches` and navigates to
+ *     `/matches/{returned id}`.
  *
- * The page drives a two-step flow — `POST /api/v1/resumes` (multipart) then
- * `POST /api/v1/matches` (JSON) then `router.push('/matches/{id}')` — both
- * calls going through `apiFetch` from `@/lib/api`. We mock `apiFetch`
- * directly (rather than stubbing global `fetch`) so we can assert the call
- * sequence and craft a per-call `Response`. `next/navigation`'s `useRouter`
- * is mocked because the page navigates imperatively on success.
+ * The page reaches a `succeeded` resume only through the real `UploadWidget`,
+ * which posts `POST /api/v1/resumes` through `apiFetch`; we therefore mock
+ * `apiFetch` and branch on the path so the resumes call returns a `succeeded`
+ * `ResumeResponse` and the matches call returns a schema-valid `MatchResponse`.
+ * `next/navigation` is mocked because the page navigates imperatively on
+ * success. The match body is parsed with `MatchResponseSchema` to guard against
+ * contract drift (mirroring `results-page.test.tsx`).
  *
- * Privacy (`security.md`): all fixtures here are synthetic — generic filenames
- * and a fabricated job-description string. Nothing logs PII.
+ * Conventions mirror the rest of `apps/web/tests`: `@testing-library/react`
+ * render/screen/waitFor/fireEvent/cleanup, `vi.mock`, `afterEach(cleanup)`,
+ * `toBeInstanceOf`, and **no** jest-dom matchers. Privacy (`security.md`): all
+ * fixtures are synthetic — generic filenames and a fabricated JD string.
  *
  * @vitest-environment jsdom
  */
@@ -35,9 +50,10 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { MatchResponseSchema } from "@matchlayer/shared-types";
 
 // Mock next/navigation before importing the page: the page reads
 // `useRouter().push` to navigate to the Results_Page on success.
@@ -47,14 +63,20 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-// Mock the API client. The page imports only `apiFetch` from `@/lib/api`;
-// replacing it lets us assert the two-step call sequence and return crafted
-// Response objects per call without touching the real network stack.
+// Mock the API client. Both the composed UploadWidget (`POST /api/v1/resumes`)
+// and the page (`POST /api/v1/matches`) go through `apiFetch`; branching on the
+// path lets us drive a ready resume and a created match independently.
 const apiFetchMock = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   apiFetch: (...args: unknown[]) => apiFetchMock(...args),
 }));
+
+import {
+  matchStrong,
+  resumePending,
+  resumeSucceeded,
+} from "@/components/results/__fixtures__/match-fixtures";
 
 import UploadPage from "@/app/(app)/upload/page";
 
@@ -72,37 +94,64 @@ beforeEach(() => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** The client-side resume size ceiling mirrored by the page (5 MiB). */
-const RESUME_MAX_BYTES = 5_242_880;
-
 /**
- * A synthetic job description comfortably above the schema's trimmed floor
- * (the generated `CreateMatchRequestSchema.shape.job_description` field only
- * requires a non-empty string, but the design's window is 30..50000 chars).
- * 70+ characters, no PII.
+ * A synthetic job description comfortably inside the trimmed 30..50,000 window
+ * (70+ characters, no PII).
  */
 const VALID_JD =
   "We are hiring a backend software engineer to build and maintain " +
   "scalable services and APIs for our platform team.";
 
-/** Build a JSON `Response` with an RFC-7807-friendly content type. */
-function jsonResponse(status: number, body: unknown): Response {
+/** A trimmed-length value below the 30-char floor (Req 9.8). */
+const TOO_SHORT_JD = "too short";
+
+/**
+ * A schema-valid created `MatchResponse`. Parsing the fixture with the
+ * generated schema guards against contract drift — if the contract changes,
+ * this fails loudly here rather than producing a misleading navigation
+ * assertion.
+ */
+const MATCH = MatchResponseSchema.parse(matchStrong);
+
+/** Build a JSON `Response` with the given status and (optional) body. */
+function jsonResponse(status: number, body?: unknown): Response {
   return new Response(body !== undefined ? JSON.stringify(body) : null, {
     status,
     headers: { "Content-Type": "application/json" },
   });
 }
 
-/** A valid, small PDF `File` that passes client pre-validation. */
+/**
+ * Branch `apiFetch` by path: the widget's `POST /api/v1/resumes` resolves to
+ * `resume` (defaults to the `succeeded` fixture) and the page's
+ * `POST /api/v1/matches` resolves to a created `MatchResponse`.
+ */
+function mockApi(options: { resume?: unknown; match?: unknown } = {}): void {
+  const resumeBody = options.resume ?? resumeSucceeded;
+  const matchBody = options.match ?? MATCH;
+  apiFetchMock.mockImplementation(async (path: string): Promise<Response> => {
+    if (path === "/api/v1/resumes") {
+      return jsonResponse(201, resumeBody);
+    }
+    if (path === "/api/v1/matches") {
+      return jsonResponse(201, matchBody);
+    }
+    throw new Error(`unexpected apiFetch path: ${path}`);
+  });
+}
+
+/** A valid, small PDF `File` that passes the widget's client pre-validation. */
 function validResumeFile(): File {
   return new File(["%PDF-1.7 synthetic"], "resume.pdf", {
     type: "application/pdf",
   });
 }
 
-/** Select a file on the resume input via a change event. */
-function selectFile(file: File): void {
-  const input = screen.getByLabelText(/resume file/i) as HTMLInputElement;
+/** Select a file on the widget's (sr-only) file input via a change event. */
+function selectResumeFile(file: File = validResumeFile()): void {
+  const input = screen.getByLabelText(
+    /upload a pdf or docx resume/i,
+  ) as HTMLInputElement;
   fireEvent.change(input, { target: { files: [file] } });
 }
 
@@ -114,129 +163,195 @@ function fillJobDescription(text: string): void {
   fireEvent.change(textarea, { target: { value: text } });
 }
 
-/** Submit the form by clicking the submit button. */
-function submitForm(): void {
-  fireEvent.click(screen.getByRole("button", { name: /score match/i }));
+/** The "Analyze Match" submit button (idle label). */
+function submitButton(): HTMLButtonElement {
+  return screen.getByRole("button", {
+    name: /analyze match/i,
+  }) as HTMLButtonElement;
+}
+
+/** Select a valid resume and wait until the widget reports it ready. */
+async function makeResumeReady(): Promise<void> {
+  selectResumeFile();
+  await waitFor(() => {
+    expect(screen.getByText("Resume ready to analyze.")).toBeInstanceOf(
+      HTMLElement,
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
-// 12.2 — accept attribute + label association
+// 9.9 — submit gating across resume status × JD bounds
 // ---------------------------------------------------------------------------
 
-describe("Upload_Page accessibility wiring (Requirement 12.2)", () => {
-  it("advertises accept='.pdf,.docx' on the resume file input", () => {
+describe("Upload_Page submit gating (Req 9.9)", () => {
+  it("disables 'Analyze Match' on first render (no resume, no job description)", () => {
+    mockApi();
     render(<UploadPage />);
 
-    const input = screen.getByLabelText(/resume file/i);
-    expect(input).toBeInstanceOf(HTMLInputElement);
-    expect(input.getAttribute("type")).toBe("file");
-    expect(input.getAttribute("accept")).toBe(".pdf,.docx");
+    expect(submitButton().disabled).toBe(true);
   });
 
-  it("associates labels with both the file input and the job-description textarea", () => {
+  it("keeps submit disabled with a ready resume but a too-short job description", async () => {
+    mockApi();
     render(<UploadPage />);
 
-    // getByLabelText only resolves when the htmlFor/id association is correct.
-    const fileInput = screen.getByLabelText(/resume file/i);
-    const jdTextarea = screen.getByLabelText(/job description/i);
+    await makeResumeReady();
+    fillJobDescription(TOO_SHORT_JD);
 
-    expect(fileInput.tagName).toBe("INPUT");
-    expect(jdTextarea.tagName).toBe("TEXTAREA");
+    // Resume is ready, but the trimmed JD is below the 30-char floor.
+    expect(submitButton().disabled).toBe(true);
   });
-});
 
-// ---------------------------------------------------------------------------
-// 12.4 — client pre-validation blocks bad files before any request
-// ---------------------------------------------------------------------------
+  it("keeps submit disabled with a valid job description but a non-ready (pending) resume", async () => {
+    mockApi({ resume: resumePending });
+    const { container } = render(<UploadPage />);
 
-describe("Upload_Page client pre-validation (Requirement 12.4)", () => {
-  it("blocks an oversized file with a friendly error and issues no upload request", async () => {
-    render(<UploadPage />);
-
-    const file = validResumeFile();
-    // Can't allocate megabytes in a test — stub the reported size past the cap.
-    Object.defineProperty(file, "size", { value: RESUME_MAX_BYTES + 1 });
-
-    selectFile(file);
-    fillJobDescription(VALID_JD);
-    submitForm();
-
+    selectResumeFile();
+    // The widget reflects "pending" (processing) and never reports the resume
+    // ready, so the page never tracks a resume to gate on.
     await waitFor(() => {
-      expect(screen.getByText(/too large/i)).toBeInstanceOf(HTMLElement);
-    });
-    // The oversize guard must short-circuit before the two-step API flow.
-    expect(apiFetchMock).not.toHaveBeenCalled();
-  });
-
-  it("blocks a wrong-type (.txt) file with an unsupported-type error and issues no upload request", async () => {
-    render(<UploadPage />);
-
-    const file = new File(["plain text"], "resume.txt", {
-      type: "text/plain",
-    });
-
-    selectFile(file);
-    fillJobDescription(VALID_JD);
-    submitForm();
-
-    await waitFor(() => {
-      expect(screen.getByText(/isn't supported/i)).toBeInstanceOf(HTMLElement);
-    });
-    expect(apiFetchMock).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 12.3 / 12.5 — RFC 7807 `detail` rendered in the aria-live region
-// ---------------------------------------------------------------------------
-
-describe("Upload_Page error rendering (Requirements 12.3, 12.5)", () => {
-  // Synthetic, display-safe `detail` strings — one per status the design
-  // enumerates for this surface. No PII.
-  const cases: ReadonlyArray<{ status: number; detail: string }> = [
-    { status: 413, detail: "That resume is larger than the 5 MB limit." },
-    { status: 415, detail: "Only PDF and DOCX resumes are supported." },
-    { status: 422, detail: "The job description is too short to score." },
-    { status: 429, detail: "Too many uploads. Please try again shortly." },
-  ];
-
-  it.each(cases)(
-    "renders the RFC 7807 detail inside the aria-live region on a $status response",
-    async ({ status, detail }) => {
-      // First (and only) call — the resume upload — returns the problem
-      // envelope, so the page short-circuits and renders `detail`.
-      apiFetchMock.mockResolvedValueOnce(
-        jsonResponse(status, {
-          type: "validation_error",
-          title: "Upload rejected",
-          detail,
-          status,
-        }),
+      expect(screen.getByText("Processing your resume…")).toBeInstanceOf(
+        HTMLElement,
       );
+    });
+    fillJobDescription(VALID_JD);
 
-      const { container } = render(<UploadPage />);
+    expect(screen.queryByText("Resume ready to analyze.")).toBeNull();
+    expect(submitButton().disabled).toBe(true);
+    // Sanity: a pending resume still shows its preview but no ready affirmation.
+    expect(
+      container.querySelector('[data-slot="file-preview-card"]'),
+    ).toBeInstanceOf(HTMLElement);
+  });
 
-      selectFile(validResumeFile());
-      fillJobDescription(VALID_JD);
-      submitForm();
+  it("enables submit only once BOTH a ready resume and a valid job description are present", async () => {
+    mockApi();
+    render(<UploadPage />);
 
-      // The detail text becomes visible...
-      await waitFor(() => {
-        expect(screen.getByText(detail)).toBeInstanceOf(HTMLElement);
-      });
+    // JD alone is not enough.
+    fillJobDescription(VALID_JD);
+    expect(submitButton().disabled).toBe(true);
 
-      // ...and it lives inside the polite live region (the FormError node),
-      // so assistive tech announces it (Requirement 12.3).
-      const liveRegion = container.querySelector('[aria-live="polite"]');
-      expect(liveRegion).not.toBeNull();
-      expect(
-        within(liveRegion as HTMLElement).getByText(detail),
-      ).toBeInstanceOf(HTMLElement);
+    // With the resume also ready, the button enables.
+    await makeResumeReady();
+    await waitFor(() => {
+      expect(submitButton().disabled).toBe(false);
+    });
+  });
+});
 
-      // The upload was attempted exactly once; the match step never ran.
-      expect(apiFetchMock).toHaveBeenCalledTimes(1);
-      expect(apiFetchMock.mock.calls[0]?.[0]).toBe("/api/v1/resumes");
-      expect(pushMock).not.toHaveBeenCalled();
-    },
-  );
+// ---------------------------------------------------------------------------
+// 9.10 — removing the resume re-disables submit
+// ---------------------------------------------------------------------------
+
+describe("Upload_Page remove re-disables submit (Req 9.10)", () => {
+  it("disables 'Analyze Match' again after the ready resume is removed, even with a valid JD", async () => {
+    mockApi();
+    render(<UploadPage />);
+
+    fillJobDescription(VALID_JD);
+    await makeResumeReady();
+    await waitFor(() => {
+      expect(submitButton().disabled).toBe(false);
+    });
+
+    // Remove the resume via the FilePreviewCard's remove button.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: new RegExp(`remove ${resumeSucceeded.original_filename}`, "i"),
+      }),
+    );
+
+    // The JD is still valid, but with no ready resume the button re-disables.
+    await waitFor(() => {
+      expect(submitButton().disabled).toBe(true);
+    });
+    expect(
+      (screen.getByLabelText(/job description/i) as HTMLTextAreaElement).value,
+    ).toBe(VALID_JD);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9.12 — success posts POST /api/v1/matches and navigates to /matches/{id}
+// ---------------------------------------------------------------------------
+
+describe("Upload_Page success navigation (Req 9.12)", () => {
+  it("posts the match request and navigates to /matches/{returned id}", async () => {
+    mockApi();
+    render(<UploadPage />);
+
+    fillJobDescription(VALID_JD);
+    await makeResumeReady();
+    await waitFor(() => {
+      expect(submitButton().disabled).toBe(false);
+    });
+
+    fireEvent.click(submitButton());
+
+    // Navigation happens with the created match's id (Req 9.12).
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith(`/matches/${MATCH.id}`);
+    });
+
+    // The match POST carried the ready resume id + the trimmed job description.
+    const matchCall = apiFetchMock.mock.calls.find(
+      (call) => call[0] === "/api/v1/matches",
+    );
+    expect(matchCall).toBeDefined();
+    const init = matchCall?.[1] as { method?: string; body?: string };
+    expect(init.method).toBe("POST");
+    const sent = JSON.parse(init.body ?? "{}") as {
+      resume_id: string;
+      job_description: string;
+    };
+    expect(sent.resume_id).toBe(resumeSucceeded.id);
+    expect(sent.job_description).toBe(VALID_JD);
+
+    // While the successful navigation settles, the button shows the loading
+    // copy and stays disabled (Req 9.11).
+    expect(screen.getByText("Analyzing your resume…")).toBeInstanceOf(
+      HTMLElement,
+    );
+  });
+
+  it("does not navigate and surfaces the RFC 7807 detail when the match POST fails", async () => {
+    const detail = "The job description is too short to score.";
+    apiFetchMock.mockImplementation(async (path: string): Promise<Response> => {
+      if (path === "/api/v1/resumes") {
+        return jsonResponse(201, resumeSucceeded);
+      }
+      if (path === "/api/v1/matches") {
+        return jsonResponse(422, {
+          type: "validation_error",
+          title: "Unprocessable",
+          detail,
+          status: 422,
+        });
+      }
+      throw new Error(`unexpected apiFetch path: ${path}`);
+    });
+
+    const { container } = render(<UploadPage />);
+
+    fillJobDescription(VALID_JD);
+    await makeResumeReady();
+    await waitFor(() => {
+      expect(submitButton().disabled).toBe(false);
+    });
+
+    fireEvent.click(submitButton());
+
+    // The server-supplied detail is announced via the page's aria-live region.
+    await waitFor(() => {
+      expect(screen.getByText(detail)).toBeInstanceOf(HTMLElement);
+    });
+    const liveRegion = container.querySelector('[aria-live="polite"]');
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion?.textContent).toContain(detail);
+
+    // No navigation on failure.
+    expect(pushMock).not.toHaveBeenCalled();
+  });
 });

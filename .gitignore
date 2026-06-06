@@ -50,6 +50,12 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Playwright ephemeral output (the committed visual baselines live in
+# apps/web/tests/visual/__screenshots__/ and are intentionally NOT ignored)
+test-results/
+playwright-report/
+.playwright/
+
 # Eval datasets — private only
 ml/evals/datasets/private/
 

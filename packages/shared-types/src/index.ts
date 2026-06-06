@@ -126,6 +126,31 @@ export const CreateMatchRequestSchema = schemas.CreateMatchRequest;
 export const MatchResponseSchema = schemas.MatchResponse;
 
 // ---------------------------------------------------------------------------
+// Matches — nested value objects (curated names for the generated *Out shapes)
+// ---------------------------------------------------------------------------
+//
+// The OpenAPI generator names these `ScoreBreakdownOut`, `KeywordOut`, and
+// `SuggestionOut`. The frontend design (Data Models, §"Key interface
+// boundaries") and the component tasks consume them under the curated names
+// `ScoreBreakdown`, `Keyword`, and `Suggestion`. The types are derived from
+// `MatchResponse` so they stay in lockstep with the generated contract and can
+// never drift from the fields the API actually returns (Req 20.1, 20.7,
+// 21.11). The Zod schemas alias the generated `schemas.*Out` objects.
+//
+// Contract guarantees surfaced through these names: `Suggestion` carries only
+// `{ keyword, text }` — no `title`, no `priority`; `ScoreBreakdown` carries
+// exactly the two components + their weights + `final_score` — no third score
+// dimension.
+
+export type ScoreBreakdown = MatchResponse["score_breakdown"];
+export type Keyword = MatchResponse["matched_keywords"][number];
+export type Suggestion = MatchResponse["suggestions"][number];
+
+export const ScoreBreakdownSchema = schemas.ScoreBreakdownOut;
+export const KeywordSchema = schemas.KeywordOut;
+export const SuggestionSchema = schemas.SuggestionOut;
+
+// ---------------------------------------------------------------------------
 // Matches — list (items omit job_description_text)
 // ---------------------------------------------------------------------------
 
