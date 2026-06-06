@@ -398,7 +398,9 @@ describe("ResultsView — fixture A: strong match 85 (Requirements 11.1–11.5, 
     // The scorer_version attribution footnote is shown (Req 11.8).
     expect(
       screen.getByText(
-        new RegExp(matchStrong.scorer_version.replace(/[.+]/g, "\\$&")),
+        new RegExp(
+          matchStrong.scorer_version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        ),
       ),
     ).toBeInstanceOf(HTMLElement);
 

@@ -43,8 +43,9 @@ beforeAll(() => {
  * requires.
  */
 function declaresToken(name: string): boolean {
-  // Escape the leading dashes for the regex; match `--name` then a colon.
-  const escaped = name.replace(/[-]/g, "\\-");
+  // Escape regex metacharacters (incl. backslash) so the token name is matched
+  // literally; then match `--name` followed by a colon.
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`${escaped}\\s*:`).test(css);
 }
 
@@ -106,7 +107,7 @@ describe("globals.css reduced-motion override (Req 1.9; design §4.8)", () => {
       "--motion-layout",
       "--motion-hero",
     ]) {
-      const escaped = token.replace(/[-]/g, "\\-");
+      const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       expect(new RegExp(`${escaped}\\s*:\\s*0ms`).test(block)).toBe(true);
     }
   });
