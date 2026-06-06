@@ -1,60 +1,105 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
-import { FormError } from "@/components/auth/form-error";
+import { FieldError, FormError } from "@/components/auth/form-error";
 import { RetryAfterMessage } from "@/components/auth/retry-after-message";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { apiBaseUrl } from "@/lib/api";
 import { setAccessToken } from "@/lib/auth";
+import { cn } from "@/lib/utils";
+
+/**
+ * Client-side validation schema for the login form (Req 8.4, design §8.3).
+ *
+ * Only the two checks the acceptance criteria name for the login view:
+ *   - email: present + RFC-ish format (`z.string().email()`),
+ *   - password: minimum length of 12 characters.
+ *
+ * The server (FastAPI + Pydantic) remains authoritative — this is purely the
+ * "early-failure" UX layer (`conventions.md`: client Zod is for UX, not
+ * security). Messages are written for a screen reader: each is a complete,
+ * plain-language sentence so the `aria-live` field announcement reads cleanly.
+ */
+const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required.")
+    .email("Enter a valid email address."),
+  password: z.string().min(12, "Password must be at least 12 characters."),
+});
+
+type LoginValues = z.infer<typeof loginSchema>;
 
 /**
  * Inner client component that consumes `useSearchParams()`.
  *
  * Next.js 16 (App Router, Turbopack) requires every component that calls
  * `useSearchParams()` to live inside a `<Suspense>` boundary at the page
- * level — without one, `next build` fails the page's static generation
- * with `missing-suspense-with-csr-bailout`. We isolate the search-param
- * consumer here so the page-level export can wrap exactly the part that
- * needs CSR fallback, while the surrounding chrome (heading, links) can
- * still be rendered in the SSR pass.
+ * level — without one, `next build` fails the page's static generation with
+ * `missing-suspense-with-csr-bailout`. We isolate the search-param consumer
+ * here so the page-level export can wrap exactly the part that needs CSR
+ * fallback, while the surrounding chrome can still render in the SSR pass.
  */
 function LoginPageInner(): React.JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [error, setError] = React.useState<string | null>(null);
+
+  // Banner shown above the form. Holds the non-enumerable invalid-credentials
+  // message, the locked-account message, or a generic server/network error —
+  // never anything that distinguishes "user not found" from "wrong password"
+  // (Req 8.11; security.md "no account enumeration").
+  const [bannerError, setBannerError] = React.useState<string | null>(null);
   const [retryAfter, setRetryAfter] = React.useState<number | null>(null);
-  const [loading, setLoading] = React.useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
 
   const next = searchParams.get("next");
   const justReset = searchParams.get("just-reset");
 
-  // Validate next param: must start with / and not contain ://
-  // Defaults to /dashboard (the authenticated home) rather than the marketing
-  // landing, so a successful sign-in visibly lands the user inside the app.
+  // Post-auth destination (Req 8.12): default to the Upload_Page — the first
+  // screen of the core authenticated flow — rather than the marketing landing.
+  // A `next` param is honoured ONLY when it is a safe, same-origin, in-app
+  // path: it must start with a single "/" (rejecting protocol-relative
+  // "//evil.com") and contain no "://" (rejecting absolute URLs), so an
+  // attacker can't use it as an open-redirect. Anything else falls back to
+  // `/upload`. (`/dashboard`/library etc. are out of MVP scope but, being
+  // legitimate same-origin paths, are still safe to honour if explicitly
+  // requested.)
   const safeNext =
-    next && next.startsWith("/") && !decodeURIComponent(next).includes("://")
+    next &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !decodeURIComponent(next).includes("://")
       ? next
-      : "/dashboard";
+      : "/upload";
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
+  async function onValid(values: LoginValues): Promise<void> {
+    setBannerError(null);
     setRetryAfter(null);
-    setLoading(true);
-
-    const form = new FormData(e.currentTarget);
-    const body = {
-      email: form.get("email") as string,
-      password: form.get("password") as string,
-    };
 
     try {
       const res = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          email: values.email,
+          password: values.password,
+        }),
       });
 
       if (res.status === 429) {
@@ -63,13 +108,16 @@ function LoginPageInner(): React.JSX.Element {
         return;
       }
 
-      if (res.status === 401) {
-        setError("Email or password is incorrect.");
+      if (res.status === 423) {
+        setBannerError("Account is temporarily locked. Try again later.");
         return;
       }
 
-      if (res.status === 423) {
-        setError("Account is temporarily locked. Try again later.");
+      if (res.status === 401) {
+        // Identical wording for "user not found" and "wrong password"
+        // (Req 8.11). The entered email stays in the field because the
+        // uncontrolled RHF inputs are never reset on this path.
+        setBannerError("Email or password is incorrect.");
         return;
       }
 
@@ -77,25 +125,42 @@ function LoginPageInner(): React.JSX.Element {
         const data = await res.json();
         setAccessToken(data.access_token);
         router.push(safeNext);
+        return;
       }
+
+      // Any other non-OK status (including 5xx server errors): a generic,
+      // non-enumerable message above the form (Req 8.11).
+      setBannerError("Something went wrong. Please try again.");
     } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+      setBannerError("Network error. Please try again.");
     }
   }
 
+  // The single banner node: the rate-limit countdown takes precedence (it is
+  // the most actionable), otherwise the text error. Kept as one value so the
+  // always-mounted `<FormError>` live region announces content changes without
+  // remounting (a freshly-mounted live region's first content is often missed).
+  const banner: React.ReactNode =
+    retryAfter !== null ? (
+      <RetryAfterMessage seconds={retryAfter} />
+    ) : (
+      bannerError
+    );
+  const hasBanner = retryAfter !== null || bannerError !== null;
+
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="text-xl font-semibold text-text">Sign in</h1>
+      <header className="text-center">
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          Sign in
+        </h1>
         <p className="mt-1 text-sm text-text-muted">
           Don&apos;t have an account?{" "}
           <a href="/register" className="text-brand hover:underline">
             Create one
           </a>
         </p>
-      </div>
+      </header>
 
       {justReset === "1" && (
         <p className="rounded-xl bg-success/10 px-3 py-2 text-center text-sm text-success">
@@ -103,69 +168,80 @@ function LoginPageInner(): React.JSX.Element {
         </p>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {/*
+       * Non-enumerable error banner ABOVE the form (Req 8.11, design §8.3).
+       * `FormError` is always mounted (empty when there is no error) so its
+       * `aria-live="polite"` region announces a later error as a mutation of
+       * an existing region. Box chrome is applied only when populated so an
+       * empty region is visually absent.
+       */}
+      <FormError
+        className={cn(
+          hasBanner
+            ? "rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-center"
+            : undefined,
+        )}
+      >
+        {banner}
+      </FormError>
+
+      <form onSubmit={handleSubmit(onValid)} noValidate className="space-y-4">
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-text"
-          >
-            Email
-          </label>
-          <input
+          <Label htmlFor="email">Email</Label>
+          <Input
             id="email"
-            name="email"
             type="email"
-            required
             autoComplete="email"
-            className="mt-1 block w-full rounded-xl border border-border-strong bg-bg px-3 py-2 text-text placeholder:text-text-subtle focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            {...register("email")}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? "email-error" : undefined}
+            className="mt-1"
           />
+          <FieldError id="email-error">{errors.email?.message}</FieldError>
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-text"
-          >
-            Password
-          </label>
-          <input
+          <Label htmlFor="password">Password</Label>
+          <Input
             id="password"
-            name="password"
             type="password"
-            required
             autoComplete="current-password"
-            className="mt-1 block w-full rounded-xl border border-border-strong bg-bg px-3 py-2 text-text placeholder:text-text-subtle focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            {...register("password")}
+            aria-invalid={errors.password ? true : undefined}
+            aria-describedby={errors.password ? "password-error" : undefined}
+            className="mt-1"
           />
+          <FieldError id="password-error">
+            {errors.password?.message}
+          </FieldError>
         </div>
 
-        <div className="text-right">
-          <a
-            href="/forgot-password"
-            className="text-sm text-brand hover:underline"
-          >
-            Forgot password?
-          </a>
-        </div>
-
-        {error && <FormError>{error}</FormError>}
-        {retryAfter && <RetryAfterMessage seconds={retryAfter} />}
-
-        <button
+        <Button
           type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-brand px-4 py-2 font-medium text-white transition-colors hover:bg-brand/90 disabled:opacity-50"
+          disabled={isSubmitting}
+          className="h-11 w-full text-base"
         >
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
+          {isSubmitting ? "Signing in…" : "Sign in"}
+        </Button>
       </form>
+
+      {/* Trust links below the form (Req 8.2). */}
+      <p className="text-center text-xs text-text-muted">
+        <a href="/privacy" className="hover:text-text hover:underline">
+          Privacy policy
+        </a>
+        {" · "}
+        <a href="/terms" className="hover:text-text hover:underline">
+          Terms of service
+        </a>
+      </p>
     </div>
   );
 }
 
 export default function LoginPage(): React.JSX.Element {
-  // Suspense boundary required by Next.js 16 around any client component
-  // that reads `useSearchParams()`. Fallback is the same form skeleton
-  // (without the just-reset banner and `next`-aware redirect) so the
+  // Suspense boundary required by Next.js 16 around any client component that
+  // reads `useSearchParams()`. The fallback mirrors the static heading so the
   // initial paint matches the hydrated render closely.
   return (
     <React.Suspense fallback={<LoginPageFallback />}>
@@ -177,15 +253,17 @@ export default function LoginPage(): React.JSX.Element {
 function LoginPageFallback(): React.JSX.Element {
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="text-xl font-semibold text-text">Sign in</h1>
+      <header className="text-center">
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          Sign in
+        </h1>
         <p className="mt-1 text-sm text-text-muted">
           Don&apos;t have an account?{" "}
           <a href="/register" className="text-brand hover:underline">
             Create one
           </a>
         </p>
-      </div>
+      </header>
     </div>
   );
 }

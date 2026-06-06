@@ -61,7 +61,14 @@ export default defineConfig({
   // Fail the CI build if a `test.only` is committed by accident.
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // The managed `webServer` is a SINGLE Next.js standalone server (one Node
+  // process). Every worker drives full-page screenshots through it, so too many
+  // concurrent workers saturate that one server and trip the per-test timeout
+  // (observed once the suite grew past the flagship results gates to include
+  // the Upload/Auth/Landing gates). CI already pins 1 worker for determinism;
+  // locally we cap at 2 — enough to overlap I/O without overwhelming the single
+  // server — instead of Playwright's CPU-count default.
+  workers: process.env.CI ? 1 : 2,
   reporter: process.env.CI ? "github" : "list",
 
   // Commit baseline screenshots per (screen × viewport × theme) under

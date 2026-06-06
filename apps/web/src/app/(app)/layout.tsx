@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import * as React from "react";
 
+import { SkipNav } from "@/components/skip-nav";
 import { verifySessionFromRefreshCookie } from "@/lib/auth-server";
 
 import { AppShellClient } from "./shell-client";
@@ -69,11 +70,24 @@ export default async function AppLayout({
   });
 
   return (
-    <AppShellClient
-      accessToken={session?.accessToken ?? null}
-      user={session?.user ?? null}
-    >
-      {children}
-    </AppShellClient>
+    <>
+      {/*
+       * Skip-navigation link (Req 19.8; design Section 10.3): the first
+       * focusable element in the authenticated surface, rendered ahead of the
+       * `AppShellClient` chrome (the `<header>` brand bar and sign-out
+       * control) so keyboard users reach it before any repeated chrome. It
+       * targets the `<main id="main">` landmark rendered inside
+       * `AppShellClient`. Kept here in the layout (rather than the client
+       * shell) so it precedes every interactive element and stays a static,
+       * server-rendered anchor — it has no client-side behavior of its own.
+       */}
+      <SkipNav />
+      <AppShellClient
+        accessToken={session?.accessToken ?? null}
+        user={session?.user ?? null}
+      >
+        {children}
+      </AppShellClient>
+    </>
   );
 }

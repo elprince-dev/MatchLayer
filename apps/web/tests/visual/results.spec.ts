@@ -140,19 +140,38 @@ async function hasNoHorizontalScroll(page: Page): Promise<boolean> {
  * `--color-bg` token (design 9.3 #6). The `<body>` uses the `bg-bg` utility,
  * which resolves to `rgb(var(--color-bg))`; this pins that the theme's surface
  * token is actually painted (dark `rgb(10, 10, 11)` / light `rgb(255,255,255)`).
+ *
+ * Wrapped in `expect(...).toPass()` so the comparison is retried until the
+ * stylesheet has actually been applied. Reading `getComputedStyle` once can
+ * race the standalone server's first paint — observed transiently on a cold
+ * worker as `--color-bg` resolving empty and `<body>` still painting the
+ * UA-default transparent `rgba(0, 0, 0, 0)`. Polling waits for the token to
+ * resolve to a full RGB triplet AND the body to match it, so the assertion
+ * stays strict (exact per-theme token match) without flaking on paint timing.
  */
 async function assertBodyBackgroundMatchesToken(page: Page): Promise<void> {
-  const { bodyBg, expected } = await page.evaluate(() => {
-    const triplet = getComputedStyle(document.documentElement)
-      .getPropertyValue("--color-bg")
-      .trim();
-    const [r, g, b] = triplet.split(/\s+/).map(Number);
-    return {
-      bodyBg: getComputedStyle(document.body).backgroundColor,
-      expected: `rgb(${r}, ${g}, ${b})`,
-    };
-  });
-  expect(bodyBg).toBe(expected);
+  await expect(async () => {
+    const { bodyBg, expected, tokenResolved } = await page.evaluate(() => {
+      const triplet = getComputedStyle(document.documentElement)
+        .getPropertyValue("--color-bg")
+        .trim();
+      const parts = triplet.split(/\s+/).map(Number);
+      const tokenResolved =
+        parts.length === 3 && parts.every((n) => Number.isFinite(n));
+      const [r, g, b] = parts;
+      return {
+        bodyBg: getComputedStyle(document.body).backgroundColor,
+        expected: `rgb(${r}, ${g}, ${b})`,
+        tokenResolved,
+      };
+    });
+    // Guard against comparing a half-applied stylesheet: require the token to
+    // have resolved to three finite channels before trusting `expected`.
+    expect(tokenResolved, "--color-bg must resolve to an RGB triplet").toBe(
+      true,
+    );
+    expect(bodyBg).toBe(expected);
+  }).toPass({ timeout: 5_000 });
 }
 
 /** Scan the rendered text + markup for placeholder/debug/raw-field-name leaks

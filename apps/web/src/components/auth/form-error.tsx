@@ -69,3 +69,63 @@ export function FormError({
     </div>
   );
 }
+
+/**
+ * Inline, per-field error display for Auth_Page form rows (Req 8.4, 19.4).
+ *
+ * Where {@link FormError} is the single form-level banner that surfaces
+ * submit-time/server errors above the form, `FieldError` is the **field-level**
+ * variant the redesign adds: it renders **adjacent to** an individual input and
+ * announces client-side validation failures (email format, password length,
+ * confirm-password match) via `aria-live="polite"` (Req 8.4: "display the error
+ * message inline adjacent to the relevant field with an `aria-live="polite"`
+ * announcement"; Req 19.4: form errors announced through a live region).
+ *
+ * Usage contract:
+ *
+ *   - **Always mounted.** Like `FormError`, the element stays in the DOM even
+ *     when there is no error so assistive tech treats the next non-empty render
+ *     as a mutation of an *existing* live region (a region added to the DOM at
+ *     the same time as its content is frequently missed). React Hook Form's
+ *     `errors.<field>?.message` is passed straight in; the empty case collapses
+ *     to `null` content + `aria-hidden`.
+ *
+ *   - **Wired by `id`.** The caller gives the element a stable `id` and points
+ *     the field's `aria-describedby` at it (plus `aria-invalid` on the input),
+ *     so the error is programmatically associated with its control, not merely
+ *     visually adjacent.
+ *
+ *   - **Rendered as a `<p>`** (a phrasing-level block) so it sits naturally
+ *     beneath the input row without implying it is a standalone alert region
+ *     the way the form-level banner does; `aria-live="polite"` is sufficient
+ *     for the field-level announcement and avoids stacking multiple
+ *     `role="alert"` regions on one form.
+ *
+ * Server component by default — no state, no effects, no browser APIs.
+ *
+ * @example
+ *   <Input id="email" aria-invalid={!!errors.email} aria-describedby="email-error" {...register("email")} />
+ *   <FieldError id="email-error">{errors.email?.message}</FieldError>
+ */
+export function FieldError({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"p">): React.JSX.Element {
+  const isEmpty =
+    children === null ||
+    children === undefined ||
+    children === false ||
+    children === "";
+
+  return (
+    <p
+      aria-live="polite"
+      aria-hidden={isEmpty ? "true" : undefined}
+      className={cn("mt-1 text-sm text-danger", className)}
+      {...props}
+    >
+      {isEmpty ? null : children}
+    </p>
+  );
+}

@@ -66,9 +66,7 @@ PACKAGE_ARTIFACT: Path = (
 )
 BUILD_SCRIPT: Path = REPO_ROOT / "ml" / "pipelines" / "build_skill_lexicon.py"
 
-REMEDIATION = (
-    "Run: python3 ml/pipelines/build_skill_lexicon.py  (then commit both files)\n"
-)
+REMEDIATION = "Run: python3 ml/pipelines/build_skill_lexicon.py  (then commit both files)\n"
 
 
 # ---------------------------------------------------------------------------
@@ -89,15 +87,11 @@ def check_copy_matches_source() -> list[str]:
 
     source = _read_bytes(SOURCE_ARTIFACT)
     if source is None:
-        errors.append(
-            f"missing source artifact: {SOURCE_ARTIFACT.relative_to(REPO_ROOT)}"
-        )
+        errors.append(f"missing source artifact: {SOURCE_ARTIFACT.relative_to(REPO_ROOT)}")
 
     copy = _read_bytes(PACKAGE_ARTIFACT)
     if copy is None:
-        errors.append(
-            f"missing package copy: {PACKAGE_ARTIFACT.relative_to(REPO_ROOT)}"
-        )
+        errors.append(f"missing package copy: {PACKAGE_ARTIFACT.relative_to(REPO_ROOT)}")
 
     # Only compare when both are present; a missing file is already reported.
     if source is not None and copy is not None and source != copy:
@@ -127,9 +121,7 @@ def check_artifacts_are_current() -> list[str]:
     except SystemExit as exc:  # the pipeline calls raise SystemExit(main())
         code = exc.code if isinstance(exc.code, int) else 1
         if code != 0:
-            return [
-                "committed artifacts are stale vs ml/pipelines/build_skill_lexicon.py"
-            ]
+            return ["committed artifacts are stale vs ml/pipelines/build_skill_lexicon.py"]
     finally:
         sys.argv = argv_backup
     return []
@@ -140,9 +132,7 @@ def main() -> int:
     errors += check_artifacts_are_current()
 
     if not errors:
-        print(
-            "OK: skill_lexicon source and API package copy agree (byte-identical, current)."
-        )
+        print("OK: skill_lexicon source and API package copy agree (byte-identical, current).")
         return 0
 
     sys.stderr.write("error: skill_lexicon drift detected\n\n")

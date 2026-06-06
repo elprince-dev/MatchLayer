@@ -1,6 +1,39 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
+ * Path prefixes whose responses must carry `X-Robots-Tag: noindex, nofollow`
+ * per the `seo.md` route classification (Authenticated + API + Auth). These
+ * mirror the `(app)` route group, the `(auth)` pages, and the `/api/` JSON
+ * surface — the PII-bearing / authentication paths that must never be crawled
+ * or indexed. The public landing page (`/`) is intentionally absent so it
+ * stays the one indexable surface (Req 8.10).
+ */
+const NOINDEX_PATH_PREFIXES = [
+  "/api/",
+  "/login",
+  "/register",
+  "/upload",
+  "/matches",
+  "/library",
+  "/dashboard",
+  "/settings",
+] as const;
+
+/**
+ * True when `pathname` falls under a non-indexable route class. An exact match
+ * (e.g. `/login`) or a sub-path (e.g. `/matches/abc`) both count; `/api/` is a
+ * prefix so any `/api/...` path matches. The landing page `/` and other public
+ * routes return `false`.
+ */
+function isNoIndexPath(pathname: string): boolean {
+  return NOINDEX_PATH_PREFIXES.some(
+    (prefix) =>
+      pathname === prefix ||
+      pathname.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`),
+  );
+}
+
+/**
  * Security-headers proxy.
  *
  * Next.js 16 renamed the `middleware` file convention to `proxy` (see
@@ -37,9 +70,26 @@ import { NextResponse, type NextRequest } from "next/server";
  * form (and confusing in dev where we run on http://localhost:3000). In
  * production behind Vercel/CloudFront the edge will also set HSTS — that's
  * fine, the values match and HTTP headers are idempotent on duplicate set.
+ *
+ * `X-Robots-Tag: noindex, nofollow` is stamped on the non-indexable route
+ * classes only (`seo.md` route classification; Req 8.7, 8.8): the `(auth)`
+ * pages (`/login`, `/register`), the authenticated `(app)` paths (`/upload`,
+ * `/matches`, library, settings), and the `/api/` JSON surface. This is a
+ * privacy control as much as an SEO one — resume text, job descriptions, and
+ * match results must never be crawled or indexed — and it pairs with the
+ * `robots: { index: false, follow: false }` Metadata API export on the
+ * `(app)` and `(auth)` layouts as defense in depth (`security.md`, ADR 0006).
+ * The public landing page (`/`) is deliberately excluded so it remains the
+ * one indexable surface (Req 8.10).
  */
 export function proxy(request: NextRequest): NextResponse {
   const response = NextResponse.next();
+
+  // §seo.md route classification — stamp the noindex header on PII / auth /
+  // API paths only, never on the indexable landing page.
+  if (isNoIndexPath(request.nextUrl.pathname)) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
 
   // `'unsafe-eval'` is needed only by the Next.js dev runtime (see docstring);
   // production stays strict and never receives it.

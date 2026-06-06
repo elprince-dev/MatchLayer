@@ -23,8 +23,10 @@ import { cn } from "@/lib/utils";
  *     value is chosen to give form rows comfortable breathing room.
  *
  * Server component by default — no state, no effects, no browser APIs. The
- * surrounding `(auth)/layout.tsx` is a client component to drive the animated
- * noise overlay, but the card itself stays server-rendered.
+ * surrounding `(auth)/layout.tsx` is itself a Server Component (so it can
+ * export `robots` metadata); the animated gradient-mesh/noise background lives
+ * in the separate `<AuthBackground>` client island. The card stays
+ * server-rendered.
  *
  * Accepts a `className` so individual pages can extend (not replace) the
  * chrome — e.g., add a wider `max-w` for a future multi-step flow — without
