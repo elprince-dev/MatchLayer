@@ -11,8 +11,8 @@
  *
  * Why a hard-coded constant rather than an env var: the canonical origin is a
  * stable property of the product (`matchlayer.net`, see `product.md`). Reading
- * it from `process.env.NEXT_PUBLIC_*` would add an entry to the committed
- * `.env.example` contract (enforced by `tools/check_env_drift.py`) for a value
+ * it from a public (`NEXT_PUBLIC_`-prefixed) env var would add an entry to the
+ * committed `.env.example` contract (enforced by `tools/check_env_drift.py`) for a value
  * that does not vary per environment in any way the marketing metadata cares
  * about. When the `seo-foundation` spec needs per-environment canonical hosts
  * (e.g. a staging origin that must stay `noindex`), this can be promoted to a
