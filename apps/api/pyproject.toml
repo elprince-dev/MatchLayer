@@ -52,7 +52,7 @@ dependencies = [
     # the POST /api/v1/resumes ``UploadFile`` part (Requirement 2.1). FastAPI
     # raises at route-definition time if it is absent. ONLY used by the
     # multipart resume-upload route.
-    "python-multipart>=0.0.9,<0.1",
+    "python-multipart>=0.0.31,<0.1",
 ]
 
 [project.optional-dependencies]
