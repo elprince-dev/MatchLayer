@@ -15,7 +15,10 @@ export {
   buildMarketingMetadata,
   type MarketingMetadataInput,
 } from "./metadata";
+export { PUBLIC_ROUTES, type PublicRoute } from "./routes";
 export {
+  OG_DEFAULT,
+  SEARCH_CONSOLE_VERIFICATION,
   SITE_DEFAULT_TITLE,
   SITE_DESCRIPTION,
   SITE_NAME,

@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 
+import { SITE_URL } from "@/lib/seo";
+
 /**
  * Generated robots rules for the MatchLayer web app (Requirement 15.4;
  * `seo.md`; ADR 0006).
@@ -13,10 +15,12 @@ import type { MetadataRoute } from "next";
  * (Requirement 15.3). Authentication gating alone is not treated as sufficient
  * (Requirement 15.7).
  *
- * Per `seo.md` the eventual full public-page robots/sitemap is owned by the
- * `seo-foundation` spec; this route only encodes the disallow rules for the
- * PII-bearing authenticated and API paths. No `sitemap`/`host` entry is added
- * here so that no PII route is ever exposed via a sitemap reference.
+ * The `Sitemap` directive (added by the `seo-foundation` spec, Req 5.4) points
+ * crawlers at the generated `app/sitemap.ts`, which is itself a strict
+ * public-route allowlist (`lib/seo/routes.ts`) — so advertising the sitemap
+ * here can never expose a PII route. The `disallow` set stays scoped to the
+ * `/api/` surface and the authenticated `(app)` paths; no `Allow` rule for a
+ * non-public path is ever emitted (Req 5.2, 5.3, 5.5).
  */
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -24,5 +28,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       disallow: ["/api/", "/upload", "/matches", "/library", "/dashboard"],
     },
+    sitemap: new URL("/sitemap.xml", SITE_URL).toString(),
   };
 }

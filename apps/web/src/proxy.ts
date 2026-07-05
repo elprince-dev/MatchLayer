@@ -5,8 +5,14 @@ import { NextResponse, type NextRequest } from "next/server";
  * per the `seo.md` route classification (Authenticated + API + Auth). These
  * mirror the `(app)` route group, the `(auth)` pages, and the `/api/` JSON
  * surface — the PII-bearing / authentication paths that must never be crawled
- * or indexed. The public landing page (`/`) is intentionally absent so it
- * stays the one indexable surface (Req 8.10).
+ * or indexed.
+ *
+ * `/login` and `/register` stay in this set (design D1, Option B): they front
+ * the authentication flow, carry no marketing value, and indexing sign-in
+ * pages is a known anti-pattern, so the `seo-foundation` spec keeps the
+ * `frontend-redesign` `noindex` decision intact (they are also absent from
+ * `PUBLIC_ROUTES`/the sitemap). The public landing page (`/`) is intentionally
+ * absent so it stays the one indexable surface.
  */
 const NOINDEX_PATH_PREFIXES = [
   "/api/",
@@ -72,15 +78,15 @@ function isNoIndexPath(pathname: string): boolean {
  * fine, the values match and HTTP headers are idempotent on duplicate set.
  *
  * `X-Robots-Tag: noindex, nofollow` is stamped on the non-indexable route
- * classes only (`seo.md` route classification; Req 8.7, 8.8): the `(auth)`
- * pages (`/login`, `/register`), the authenticated `(app)` paths (`/upload`,
- * `/matches`, library, settings), and the `/api/` JSON surface. This is a
+ * classes only (`seo.md` route classification): the `(auth)` pages (`/login`,
+ * `/register`), the authenticated `(app)` paths (`/upload`, `/matches`,
+ * library, settings, dashboard), and the `/api/` JSON surface. This is a
  * privacy control as much as an SEO one — resume text, job descriptions, and
  * match results must never be crawled or indexed — and it pairs with the
- * `robots: { index: false, follow: false }` Metadata API export on the
- * `(app)` and `(auth)` layouts as defense in depth (`security.md`, ADR 0006).
- * The public landing page (`/`) is deliberately excluded so it remains the
- * one indexable surface (Req 8.10).
+ * `robots: { index: false, follow: false }` Metadata API export on the `(app)`
+ * and `(auth)` layouts as defense in depth (`security.md`, ADR 0006). The
+ * public landing page (`/`) is deliberately excluded so it remains the one
+ * indexable surface.
  */
 export function proxy(request: NextRequest): NextResponse {
   const response = NextResponse.next();

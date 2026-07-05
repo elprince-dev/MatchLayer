@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { SITE_URL } from "@/lib/seo";
+import { PUBLIC_ROUTES, SITE_URL } from "@/lib/seo";
 
 /**
  * Generated sitemap for the MatchLayer web app (Req 7.5, 8.9, 8.10, 21.7;
@@ -28,18 +28,15 @@ import { SITE_URL } from "@/lib/seo";
  * been classified Public per `seo.md`. If you cannot confidently classify a
  * route Public, it does not belong in this list.
  *
- * `lastModified` uses build time, which is sufficient for the single static
- * marketing page; per-page timestamps can be introduced when the
- * `seo-foundation` spec adds more public pages.
+ * `lastModified` uses build time, which is sufficient for the mostly-static
+ * marketing pages; per-page timestamps can be introduced later if a public
+ * page starts changing on its own cadence.
+ *
+ * The allowlist itself lives in `@/lib/seo` (`lib/seo/routes.ts`) as the single
+ * `PUBLIC_ROUTES` source shared by this sitemap, each page's canonical URL, and
+ * the tests — so the three can never drift (Req 2.4, 6.5). This file only maps
+ * that allowlist to absolute-URL sitemap entries.
  */
-
-/**
- * Allowlist of PUBLIC, indexable route paths (root-relative). Default-deny:
- * anything not in this array is excluded from the sitemap. Today this is just
- * the landing page; `/pricing`, `/about`, `/privacy`, `/terms` join it as the
- * `seo-foundation` spec builds those public pages.
- */
-const PUBLIC_ROUTES = ["/"] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();

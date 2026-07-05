@@ -13,6 +13,7 @@
     "test": "vitest run --passWithNoTests",
     "test:visual": "next build && playwright test",
     "test:visual:update": "next build && playwright test --update-snapshots",
+    "og:generate": "node scripts/generate-og-default.mjs",
     "format": "prettier --check 'src/**/*.{ts,tsx,js,jsx,css,md,json}' '*.{ts,mjs,cjs,json,md}'"
   },
   "dependencies": {

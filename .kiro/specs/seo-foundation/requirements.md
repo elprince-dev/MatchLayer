@@ -14,7 +14,7 @@ Steering clauses are referenced rather than restated; where this document cites 
 
 ## Glossary
 
-- **Marketing_Surface**: The set of Public routes per the route classification in `seo.md` — `/`, `/pricing`, `/about`, `/privacy`, `/terms`, and the auth entry pages (`/login`, `/register`). These are the only routes this spec applies SEO to. Realized in the `(marketing)` route group per `structure.md`.
+- **Marketing_Surface**: The set of indexable Public routes per the route classification in `seo.md` — `/`, `/pricing`, `/about`, `/privacy`, `/terms`. Realized in the `(marketing)` route group per `structure.md`. **Amended (design D1, Option B; ADR 0007):** the `(auth)` entry pages `/login` and `/register` are reclassified **Public-but-noindex** — they receive hygiene metadata (title/description/canonical) but are kept `noindex, nofollow` and are **excluded from the sitemap**. Where a requirement below says "every Marketing_Surface page/route," the metadata requirements (1–4, 7, 9, 10) apply to the auth pages too, but the sitemap-inclusion requirement (6.2) and any "indexable" implication do **not**.
 - **Indexing_Policy**: The mandatory route-classification and non-indexing policy defined in `seo.md` and ADR 0006. Classifies every route as Public, Authenticated, or API, and is default-deny (an unclassifiable route is Authenticated).
 - **Authenticated_Surface**: Every route in the Next.js `(app)` route group and every `/api/*` response, as classified by the Indexing_Policy. Owned for non-indexing by `phase-1-matching` Requirement 15; out of scope for this spec.
 - **Metadata_API**: The Next.js App Router metadata mechanism (`metadata` and `generateMetadata` exports). Per `conventions.md`, the only sanctioned source of page metadata.
@@ -98,7 +98,7 @@ Steering clauses are referenced rather than restated; where this document cites 
 #### Acceptance Criteria
 
 1. THE Sitemap_Generator SHALL be implemented as a generated `app/sitemap.ts` per `structure.md`, not as a static `sitemap.xml` file.
-2. THE Sitemap_Generator SHALL include every Marketing_Surface route as a sitemap entry.
+2. THE Sitemap_Generator SHALL include every indexable Marketing_Surface route as a sitemap entry. **Amended (design D1, Option B; ADR 0007):** the Public-but-noindex auth entry pages `/login` and `/register` are excluded from the sitemap, consistent with `seo.md` and the `frontend-redesign` non-indexing controls.
 3. THE Sitemap_Generator SHALL NOT emit any Authenticated_Surface route or `/api/` path as a sitemap entry; emitting such a path is a privacy defect, not solely an SEO defect.
 4. THE Sitemap_Generator SHALL express each entry as an absolute URL rooted at the configured site origin, matching the page's Canonical_URL.
 5. WHEN a new route is added to the Web_App, THE Sitemap_Generator SHALL include that route only WHERE the Indexing_Policy classifies it Public, so that the sitemap stays in sync with the route table without exposing non-public routes.

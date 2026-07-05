@@ -10,13 +10,16 @@ Always-loaded baseline for search-engine optimization **and** the privacy-critic
 
 Every route is classified before merge. There is no "unclassified" state.
 
-| Class             | Examples                                                                             | Indexing                                                 |
-| ----------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------- |
-| **Public**        | `/`, `/pricing`, `/about`, `/privacy`, `/terms`, `/login`, `/register`               | Full SEO, indexable, in sitemap                          |
-| **Authenticated** | everything in the `(app)` route group: `/upload`, `/matches/[id]`, library, settings | `noindex, nofollow`, robots-disallowed, never in sitemap |
-| **API**           | `/api/v1/*`                                                                          | `X-Robots-Tag: noindex, nofollow`                        |
+| Class                  | Examples                                                                             | Indexing                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| **Public**             | `/`, `/pricing`, `/about`, `/privacy`, `/terms`                                      | Full SEO, indexable, in sitemap                                                  |
+| **Public-but-noindex** | the `(auth)` entry pages: `/login`, `/register`                                      | Reachable + full metadata, but `noindex, nofollow` and excluded from the sitemap |
+| **Authenticated**      | everything in the `(app)` route group: `/upload`, `/matches/[id]`, library, settings | `noindex, nofollow`, robots-disallowed, never in sitemap                         |
+| **API**                | `/api/v1/*`                                                                          | `X-Robots-Tag: noindex, nofollow`                                                |
 
 When adding a route, if you cannot confidently classify it Public, it is Authenticated. Default-deny.
+
+**Why `/login` and `/register` are Public-but-noindex (ADR 0007).** They are publicly reachable (no auth required to view) and carry proper title/description metadata for hygiene, but they are kept out of the index and the sitemap: sign-in/sign-up pages carry no marketing value and indexing them is a known SEO anti-pattern. This matches what the `frontend-redesign` spec shipped and what ADR 0006 actually scoped (ADR 0006 lists only the marketing pages as the indexable Public surface, never the auth pages). The `seo-foundation` spec preserves this rather than overturning a tested decision.
 
 ## Non-indexing controls for Authenticated + API surfaces
 
