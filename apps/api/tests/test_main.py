@@ -90,12 +90,22 @@ def test_create_app_returns_fastapi_instance() -> None:
 def test_healthz_route_is_registered() -> None:
     """The factory mounts the ``/healthz`` router from §3.7.
 
-    Asserts on the app's router table rather than firing a request so
-    the test stays decoupled from the lifespan and the DB probe.
+    Asserts against the generated OpenAPI schema rather than firing a
+    request, so the test stays decoupled from the lifespan and the DB
+    probe while remaining robust to FastAPI's internal route-table
+    representation.
+
+    (FastAPI 0.139 changed ``include_router`` to append lazy
+    ``_IncludedRouter`` wrappers to ``app.routes`` instead of flattening
+    each router's routes into the top-level table, so the old
+    ``{route.path for route in app.routes}`` scan no longer surfaces
+    ``/healthz`` — the path is reachable only through the wrapper's
+    ``original_router``. ``app.openapi()["paths"]`` is the stable public
+    projection of the fully-resolved route set and needs no request or
+    lifespan.)
     """
     app = create_app(_build_settings())
-    paths = {getattr(route, "path", None) for route in app.routes}
-    assert "/healthz" in paths
+    assert "/healthz" in app.openapi()["paths"]
 
 
 # ---------------------------------------------------------------------------
