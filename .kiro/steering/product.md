@@ -35,7 +35,19 @@ Real ATS systems are opaque. Candidates optimize blindly. MatchLayer makes the m
 
 ## Current phase
 
-**Phase 0 — planning and scaffolding.** No phase work has started.
+**Phase 1 — MVP Foundation: substantially complete.** The end-to-end vertical slice is built and merged to `main`:
+
+- **Foundation** — monorepo, docker-compose (postgres/redis/minio), CI, pre-commit hooks, production Dockerfiles, OpenAPI→TS/Zod codegen, `/healthz`.
+- **Auth** — register/login/refresh-rotation/logout/password-reset, JWT (PyJWT), Argon2id, CSRF, Redis rate limiting, account lockout, append-only audit log.
+- **Matching** — resume upload to S3/MinIO, bounded PDF/DOCX extraction, deterministic TF-IDF + keyword `Match_Scorer`, skill lexicon, rule-based suggestions, resume/match APIs.
+- **Frontend** — marketing landing, auth pages, upload page, and the flagship results page on a token-based design system with dark-default theming and accessibility/visual test coverage.
+
+**In flight / remaining for Phase 1:**
+
+- `phase-1-learning-docs` — long-form learning library + compliance validator; authoring in progress.
+- `seo-foundation` — public-page SEO baseline for the marketing surface; at the design stage (requirements approved).
+
+Next major step after Phase 1 closes: **Phase 2 — NLP & Embeddings** (pgvector, Sentence Transformers, skill extraction).
 
 ## Out of scope (for now)
 

@@ -178,10 +178,15 @@ describe("non-indexing controls — app/robots.ts disallow rules (Requirement 21
     expect(disallow).toEqual(expect.arrayContaining([...FORBIDDEN_PATHS]));
   });
 
-  it("adds no sitemap entry that could reference a PII route", () => {
-    // Per `seo.md` and the design, no `sitemap`/`host` entry is added here so
-    // that no authenticated/PII route is ever surfaced via a robots-file link.
-    expect(result.sitemap).toBeUndefined();
+  it("advertises the sitemap via an absolute Sitemap directive (Req 5.4)", () => {
+    // The `seo-foundation` spec adds the `Sitemap` directive that the redesign
+    // deferred. Pointing crawlers at `app/sitemap.ts` is safe: the sitemap is a
+    // strict public-route allowlist (`lib/seo/routes.ts`) that never emits an
+    // `(app)`/PII or `/api/` path — nor `/login`/`/register` (Public-but-noindex,
+    // ADR 0007) — so advertising it cannot surface a private route.
+    expect(result.sitemap).toBe("https://matchlayer.net/sitemap.xml");
+    // No `host` directive: it is unnecessary and would hard-code the origin in
+    // two places.
     expect(result.host).toBeUndefined();
   });
 });

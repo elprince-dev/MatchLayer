@@ -197,6 +197,18 @@ filterwarnings = [
     # tests/ dir is empty (e.g., between scaffolding and task 3.11); ignore it
     # so an empty test tree doesn't fail-fast the suite.
     "ignore::pytest.PytestConfigWarning",
+    # Starlette 1.3.x (pulled in by the security bump that fixes PYSEC-2026-248
+    # and PYSEC-2026-249) deprecates using `httpx` with `starlette.testclient`
+    # in favor of `httpx2`, emitting a StarletteDeprecationWarning at import of
+    # `starlette.testclient`. `fastapi.testclient.TestClient` re-exports it, so
+    # the warning fires during collection of any test using TestClient
+    # (tests/test_main.py, tests/property/test_api_noindex_header.py) and —
+    # under `filterwarnings = ["error"]` — becomes a collection error.
+    # TestClient still works correctly on httpx; we scope-ignore just this
+    # message (category-agnostic so it matches regardless of the warning's base
+    # class). Follow-up: migrate those TestClient usages to httpx2 (or
+    # httpx.ASGITransport) and drop this entry.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
     # SQLAlchemy / asyncpg occasionally emit benign DeprecationWarnings from
     # third-party libs; promote-to-error catches our own. Add per-warning
     # ignores here as needed when they appear in CI.

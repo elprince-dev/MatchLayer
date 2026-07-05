@@ -12,6 +12,7 @@ When proposing or implementing changes, check this index first to avoid contradi
 - **0004 — Vector storage: pgvector over a dedicated vector DB.** One fewer service, sufficient at our scale.
 - **0005 — Package managers: pnpm + uv.** Strict isolation, monorepo workspaces, fast installs.
 - **0006 — SEO strategy and the public/authenticated indexing split.** Public marketing pages get full SEO; authenticated PII pages are never indexed (`noindex`, robots-disallowed, out of sitemap). JSON-LD via CSP nonce, deferred in Phase 1. See `seo.md`.
+- **0007 — Auth entry pages are Public-but-noindex.** `/login` and `/register` are publicly reachable and get hygiene metadata, but stay `noindex, nofollow` and out of the sitemap. Fills a gap ADR 0006 left and corrects the `seo.md` route table to match the shipped `frontend-redesign` decision. See `seo.md`.
 
 ## Conventions
 

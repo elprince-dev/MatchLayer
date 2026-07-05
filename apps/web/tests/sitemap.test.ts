@@ -67,12 +67,26 @@ describe("app/sitemap.ts — public allowlist (Req 7.5, 8.9; seo.md)", () => {
     }
   });
 
-  it("emits only the landing page today (default-deny allowlist)", () => {
-    // Pins the current public surface to exactly `/`. When the seo-foundation
-    // spec adds `/pricing`, `/about`, etc., this expectation is updated
-    // deliberately alongside that change — keeping the allowlist an explicit,
+  it("emits exactly the public marketing routes (default-deny allowlist)", () => {
+    // Pins the current public surface to the `seo-foundation` route set:
+    // the landing page plus the three secondary public pages. `/login` and
+    // `/register` are deliberately absent (Public-but-noindex; ADR 0007), as
+    // are all `(app)`/PII and `/api/` paths. When a new public page (e.g.
+    // `/pricing` in Phase 7) is added to `PUBLIC_ROUTES`, this expectation is
+    // updated deliberately alongside it — keeping the allowlist an explicit,
     // reviewed act rather than something that grows silently.
     const pathnames = urls.map((url) => new URL(url).pathname).sort();
-    expect(pathnames).toEqual(["/"]);
+    expect(pathnames).toEqual(["/", "/about", "/privacy", "/terms"]);
+  });
+
+  it("emits every entry as an absolute URL rooted at the site origin (Req 6.4)", () => {
+    // Compare the parsed origin exactly rather than a `startsWith` prefix
+    // check: a substring match on "https://matchlayer.net" would also accept
+    // "https://matchlayer.net.evil.com" (CodeQL
+    // js/incomplete-url-substring-sanitization). Parsing the URL and checking
+    // `.origin` is both safe and a stronger assertion of Req 6.4.
+    for (const url of urls) {
+      expect(new URL(url).origin).toBe("https://matchlayer.net");
+    }
   });
 });
