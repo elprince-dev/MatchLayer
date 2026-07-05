@@ -80,8 +80,13 @@ describe("app/sitemap.ts — public allowlist (Req 7.5, 8.9; seo.md)", () => {
   });
 
   it("emits every entry as an absolute URL rooted at the site origin (Req 6.4)", () => {
+    // Compare the parsed origin exactly rather than a `startsWith` prefix
+    // check: a substring match on "https://matchlayer.net" would also accept
+    // "https://matchlayer.net.evil.com" (CodeQL
+    // js/incomplete-url-substring-sanitization). Parsing the URL and checking
+    // `.origin` is both safe and a stronger assertion of Req 6.4.
     for (const url of urls) {
-      expect(url.startsWith("https://matchlayer.net")).toBe(true);
+      expect(new URL(url).origin).toBe("https://matchlayer.net");
     }
   });
 });
