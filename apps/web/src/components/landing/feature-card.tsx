@@ -102,7 +102,7 @@ export function FeatureCard({
       data-slot="feature-card"
       className={cn(
         // Fill the parent-owned grid cell; the grid columns are the parent's job.
-        "flex h-full w-full flex-col gap-4 rounded-hero border border-border-strong bg-bg-elevated p-6 shadow-resting",
+        "group relative flex h-full w-full flex-col gap-4 overflow-hidden rounded-hero border border-border-strong bg-bg-elevated p-6 shadow-resting",
         // Hover affordance (Req 4.6): elevate shadow + highlight border over the
         // 200ms micro token with the ease-out curve. Token-driven duration means
         // reduced-motion (→ 0ms) makes this instant with no animation.
@@ -111,9 +111,19 @@ export function FeatureCard({
         className,
       )}
     >
+      {/* Faint top glow that brightens on hover — pure CSS, token-driven, low
+          alpha, decorative (keeps the card a Server Component). */}
       <span
         aria-hidden="true"
-        className="flex size-10 shrink-0 items-center justify-center rounded-card border border-border bg-bg text-brand"
+        className="pointer-events-none absolute inset-x-0 top-0 h-20 opacity-0 transition-opacity duration-[var(--motion-micro)] ease-[var(--motion-ease)] group-hover:opacity-100"
+        style={{
+          backgroundImage:
+            "radial-gradient(70% 100% at 50% 0%, rgb(var(--color-brand) / 0.1), transparent 75%)",
+        }}
+      />
+      <span
+        aria-hidden="true"
+        className="flex size-11 shrink-0 items-center justify-center rounded-card border border-border bg-bg text-brand shadow-resting"
       >
         <Icon className="size-5" />
       </span>

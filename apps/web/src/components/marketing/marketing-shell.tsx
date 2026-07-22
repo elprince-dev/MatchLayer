@@ -40,8 +40,20 @@ export function MarketingShell({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-text">
-      <header className="border-b border-border">
+    <div className="relative isolate flex min-h-screen flex-col bg-bg text-text">
+      {/* Ambient page glow — the same token-driven aurora recipe as the
+          landing hero, at even lower alpha, so the secondary public pages
+          share the brand atmosphere (decorative, non-interactive). */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96"
+        style={{
+          backgroundImage:
+            "radial-gradient(55% 80% at 50% 0%, rgb(var(--color-brand) / 0.08), transparent 70%)",
+        }}
+      />
+
+      <header className="border-b border-border bg-bg-glass/65 backdrop-blur-md dark:bg-bg-glass/55">
         <nav
           aria-label="Primary"
           className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4"

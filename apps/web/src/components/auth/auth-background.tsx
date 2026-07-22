@@ -74,7 +74,10 @@ const NOISE_DATA_URL = `url("data:image/svg+xml;utf8,${NOISE_SVG}")`;
  */
 const GRADIENT_MESH =
   "radial-gradient(60% 55% at 12% 8%, rgb(var(--color-brand) / 0.07), transparent 70%)," +
-  "radial-gradient(55% 50% at 88% 92%, rgb(var(--color-brand-2) / 0.06), transparent 70%)";
+  "radial-gradient(55% 50% at 88% 92%, rgb(var(--color-brand-2) / 0.06), transparent 70%)," +
+  // Soft centered halo framing the AuthCard so the form has quiet depth
+  // behind it — same ≤7% alpha ceiling as the corner washes.
+  "radial-gradient(42% 36% at 50% 46%, rgb(var(--color-brand) / 0.05), transparent 72%)";
 
 export function AuthBackground(): React.JSX.Element {
   // Slow opacity breath on the noise layer only. The keyframe range is
