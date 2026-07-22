@@ -7,6 +7,11 @@
     "node": ">=24"
   },
   "packageManager": "pnpm@9.15.9",
+  "pnpm": {
+    "overrides": {
+      "sharp": "^0.35.3"
+    }
+  },
   "scripts": {
     "lint": "pnpm -r --parallel run lint",
     "typecheck": "pnpm -r --parallel run typecheck",
