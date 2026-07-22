@@ -380,7 +380,7 @@ This plan keeps the work granular: each leaf sub-task is a single PR-ready unit 
     - _Requirements: 14.6_
     - _Design: CSRF Strategy §9.2_
 
-- [ ] 15. Final QA / smoke
+- [x] 15. Final QA / smoke
 
 > **Spec-vs-implementation alignment (15.2 escalation, Option B).** Design §13.1 originally placed the dashboard at `/`; the foundation landed a public marketing page there per the workspace steering rule (`design.md` "Marketing pages (`/`, `/pricing`, `/about`): full polish"). Phase 1 chose to honor the workspace steering: `/` stays public marketing, the gated surface lives at `/dashboard` and below. Design §13.1, §13.2, §13.5, requirements §12.4, and tasks 12.6 / 13.4 were updated to match this reality. The 16.x "Authority" preamble below applies analogously here: this product-shape question was escalated to the user (Option A vs Option B), not resolved unilaterally. Option B was chosen.
 
@@ -397,7 +397,7 @@ This plan keeps the work granular: each leaf sub-task is a single PR-ready unit 
 - [x] 15.3 Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise. Run the backend suite from `apps/api/` (matching CI's `working-directory: apps/api`) so `asyncio_mode = "auto"` from `pyproject.toml` is honored: `cd apps/api && uv run pytest -m "not timing"`. Running from the repo root silently bypasses that config and makes async tests error.
 
-- [ ] 16. Test-suite stabilization (emerged from 15.3 checkpoint)
+- [x] 16. Test-suite stabilization (emerged from 15.3 checkpoint)
   - The 15.3 checkpoint surfaced eight reproducible failure clusters across the backend test suite. Each leaf below is one cluster. None are test-plumbing tweaks; each is a real defect in production code, test fixtures, or the migration. Land all eight, then re-run 15.3.
   - **Authority:** every leaf below has full authority to (a) replace deprecated APIs with their current alternatives anywhere in the touched scope, (b) amend other tasks or sections of `tasks.md` / `design.md` when the original prescription contradicts current best practice or the current behavior of the dependencies, (c) fix collateral defects discovered while implementing the leaf rather than leaving them for a follow-up. Do not weaken security, audit, or correctness contracts. Document any deviation from the original task wording in a one-paragraph comment in the affected file or commit message so the change is traceable.
 

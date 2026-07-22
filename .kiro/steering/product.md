@@ -35,19 +35,18 @@ Real ATS systems are opaque. Candidates optimize blindly. MatchLayer makes the m
 
 ## Current phase
 
-**Phase 1 — MVP Foundation: substantially complete.** The end-to-end vertical slice is built and merged to `main`:
+**Phase 1 — MVP Foundation: complete.** Everything below is built and merged to `main`:
 
 - **Foundation** — monorepo, docker-compose (postgres/redis/minio), CI, pre-commit hooks, production Dockerfiles, OpenAPI→TS/Zod codegen, `/healthz`.
 - **Auth** — register/login/refresh-rotation/logout/password-reset, JWT (PyJWT), Argon2id, CSRF, Redis rate limiting, account lockout, append-only audit log.
 - **Matching** — resume upload to S3/MinIO, bounded PDF/DOCX extraction, deterministic TF-IDF + keyword `Match_Scorer`, skill lexicon, rule-based suggestions, resume/match APIs.
 - **Frontend** — marketing landing, auth pages, upload page, and the flagship results page on a token-based design system with dark-default theming and accessibility/visual test coverage.
+- **Learning docs** — long-form learning library (`docs/learning/`, ~100 Topic_Docs across 12 thematic sections) + the `tools/learning_docs_check.py` compliance validator (LDC001–LDC020) with property-test coverage.
+- **SEO foundation** — public-page SEO baseline: metadata builder + route allowlist in `apps/web/src/lib/seo/`, `/about`, `/privacy`, `/terms` pages, branded OG image, sitemap/robots wiring, ADR 0007 (auth pages Public-but-noindex), release runbook in `docs/runbooks/seo-release.md`.
 
-**In flight / remaining for Phase 1:**
+All six Phase 1 specs (`phase-1-foundation`, `phase-1-auth`, `phase-1-matching`, `frontend-redesign`, `phase-1-learning-docs`, `seo-foundation`) are complete and merged.
 
-- `phase-1-learning-docs` — long-form learning library + compliance validator; authoring in progress.
-- `seo-foundation` — public-page SEO baseline for the marketing surface; at the design stage (requirements approved).
-
-Next major step after Phase 1 closes: **Phase 2 — NLP & Embeddings** (pgvector, Sentence Transformers, skill extraction).
+Current focus: **Phase 2 — NLP & Embeddings** (pgvector, Sentence Transformers, skill extraction). Not yet started — spec work is the next step.
 
 ## Out of scope (for now)
 
