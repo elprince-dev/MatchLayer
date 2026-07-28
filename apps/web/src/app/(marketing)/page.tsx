@@ -76,11 +76,13 @@ import { buildMarketingMetadata } from "@/lib/seo";
  * `alt` (empty `alt=""` for decorative imagery).
  *
  * ## Honesty (Req 5.1)
- * No copy on this page describes the scoring as semantic, embeddings-, AI-, or
- * LLM-powered — Phase 1 scoring is keyword + TF-IDF. The single roadmap feature
- * (semantic analysis) is rendered through {@link FeatureCard}'s `badge` as a
- * clearly-labelled "Coming soon" card with no usable control (Req 5.2, 5.3,
- * 5.5).
+ * Copy describes only what has shipped. Phase 2 (phase-2-nlp-embeddings)
+ * delivered semantic similarity via sentence embeddings, so "Semantic
+ * analysis" graduated from the roadmap card to a shipped capability and the
+ * scoring copy names semantic + keyword matching. No copy claims AI- or
+ * LLM-powered scoring — that remains unshipped roadmap, rendered through
+ * {@link FeatureCard}'s `badge` as a clearly-labelled "Coming soon" card with
+ * no usable control (Req 5.2, 5.3, 5.5).
  *
  * All styling is token-only — no hex, no inline color, no arbitrary bracket
  * color utilities (Req 21.2).
@@ -99,18 +101,19 @@ interface Feature {
 }
 
 /**
- * The Features grid content (Req 4.1, 5.1–5.3). Three current capabilities plus
+ * The Features grid content (Req 4.1, 5.1–5.3). Four current capabilities plus
  * one explicitly-labelled roadmap card. Every title ≤40 chars and description
- * ≤120 chars; current scoring is described only as keyword/TF-IDF (Req 5.1),
- * and the roadmap "Semantic analysis" card carries a "Coming soon" badge so it
- * is never presented as available now (Req 5.2, 5.3).
+ * ≤120 chars; current scoring is described as semantic + keyword matching
+ * (shipped in phase-2-nlp-embeddings — Req 5.1's honesty rule, updated), and
+ * the roadmap "AI resume coach" card carries a "Coming soon" badge so it is
+ * never presented as available now (Req 5.2, 5.3).
  */
 const FEATURES: readonly Feature[] = [
   {
     icon: ScanSearch,
     title: "Transparent ATS score",
     description:
-      "See how an ATS reads your resume against a job — keyword and TF-IDF based, never a black box.",
+      "See how an ATS reads your resume against a job — semantic and keyword based, never a black box.",
   },
   {
     icon: Tags,
@@ -122,13 +125,13 @@ const FEATURES: readonly Feature[] = [
     icon: BarChart3,
     title: "Score breakdown",
     description:
-      "See how text similarity and keyword coverage combine into your final match score.",
+      "See how semantic similarity and keyword coverage combine into your final match score.",
   },
   {
     icon: Sparkles,
-    title: "Semantic analysis",
+    title: "AI resume coach",
     description:
-      "Deeper meaning-based matching beyond keywords is on the roadmap — not part of this release.",
+      "AI-powered rewriting and coaching suggestions are on the roadmap — not part of this release.",
     badge: "Coming soon",
   },
 ];
@@ -162,8 +165,8 @@ export default function LandingPage(): React.JSX.Element {
                   Everything you need to read your resume like an ATS
                 </h2>
                 <p className="mt-4 text-base text-text-muted">
-                  Transparent, keyword-based scoring — see what matched, what is
-                  missing, and how the number is built.
+                  Transparent semantic + keyword scoring — see what matched,
+                  what is missing, and how the number is built.
                 </p>
               </div>
 
@@ -210,7 +213,7 @@ export default function LandingPage(): React.JSX.Element {
                 MatchLayer
               </span>
               <p className="max-w-xs text-sm leading-relaxed text-text-muted">
-                Transparent, keyword-based ATS scoring for your resume — see
+                Transparent semantic + keyword ATS scoring for your resume — see
                 what matched, what is missing, and how the number is built.
               </p>
             </div>
@@ -261,7 +264,7 @@ export default function LandingPage(): React.JSX.Element {
           <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 text-sm text-text-subtle sm:flex-row">
             <span>© {new Date().getFullYear()} MatchLayer</span>
             <span className="font-mono text-xs">
-              Keyword + TF-IDF scoring — no black box
+              Semantic + keyword scoring — no black box
             </span>
           </div>
         </div>

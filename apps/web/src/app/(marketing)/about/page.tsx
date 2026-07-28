@@ -14,15 +14,17 @@ import { buildMarketingMetadata } from "@/lib/seo";
  * canonical for `/about`, Open Graph + Twitter card, and the branded default OG
  * image. No `robots` directive, so the page stays indexable (Req 7.5).
  *
- * Honesty (Req 5.1 / `product.md`): the copy describes Phase 1 exactly — an ATS
- * simulator using transparent keyword + TF-IDF matching. It never claims
- * semantic, embeddings-, AI-, or LLM-based scoring.
+ * Honesty (Req 5.1 / `product.md`): the copy describes what has actually
+ * shipped. Phase 2 (phase-2-nlp-embeddings) added semantic similarity via
+ * sentence embeddings alongside keyword coverage — the copy now says so,
+ * fulfilling the Phase 1 promise to "say so plainly when it ships". It still
+ * never claims AI-, or LLM-based scoring (that remains unshipped roadmap).
  */
 export const metadata: Metadata = buildMarketingMetadata({
   path: "/about",
   title: "About MatchLayer — transparent ATS resume scoring",
   description:
-    "MatchLayer is an ATS simulator that scores your resume against a job using transparent keyword and TF-IDF matching — no black box, no hype.",
+    "MatchLayer is an ATS simulator that scores your resume against a job using semantic similarity and transparent keyword matching — no black box, no hype.",
 });
 
 export default function AboutPage(): React.JSX.Element {
@@ -47,17 +49,22 @@ export default function AboutPage(): React.JSX.Element {
           match score, the keywords your resume already hits and the ones it is
           missing, a breakdown of how the score is built, and rule-based
           suggestions for closing the gap. The scoring is deliberately
-          transparent: it combines text similarity (TF-IDF) with keyword
-          coverage. There is no hidden model deciding your fate.
+          transparent: it combines semantic similarity — sentence embeddings
+          that understand meaning, not just matching words — with keyword
+          coverage, and the breakdown shows you exactly how much each
+          contributed. There is no hidden model deciding your fate.
         </p>
 
         <h2 className="mt-12 text-2xl font-semibold tracking-tight text-text">
           What it is not
         </h2>
         <p className="mt-4 text-text-muted">
-          This release does not use semantic embeddings, AI, or large language
-          models to score your resume. Deeper meaning-based matching is on the
-          roadmap, and we will say so plainly when it ships — not before.
+          This release does not use generative AI or large language models to
+          score your resume. Semantic matching runs on open-source sentence
+          embeddings — deterministic and reproducible, so the same resume and
+          job always score the same. AI-powered coaching and rewriting
+          suggestions are on the roadmap, and we will say so plainly when they
+          ship — not before.
         </p>
 
         <h2 className="mt-12 text-2xl font-semibold tracking-tight text-text">

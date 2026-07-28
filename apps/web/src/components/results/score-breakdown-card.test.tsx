@@ -5,10 +5,12 @@
  * (Req 11.1, 11.2, 16.2; design Section 7.1 "ScoreBreakdownCard", Testing
  * Strategy):
  *
- *   - Req 11.1 — renders EXACTLY TWO labeled progress bars ("TF-IDF similarity"
+ *   - Req 11.1 — renders EXACTLY TWO labeled progress bars (the similarity bar
  *     ← `similarity_component`, "Keyword coverage" ← `keyword_coverage_component`),
  *     each `[0,1]` value scaled to a 0–100% display, and NEVER a third scoring
- *     dimension.
+ *     dimension. The similarity bar's label follows `similarity_method`
+ *     (phase-2 addition): "Semantic similarity" for `"semantic-embedding"`,
+ *     "TF-IDF similarity" for `"tfidf"` / `null` / absent.
  *   - Req 11.2 — surfaces both component weights (`weight_similarity`,
  *     `weight_keyword`) so the composition is explainable, plus a one-line
  *     "final = weighted sum" explainer using `final_score`.
@@ -47,15 +49,46 @@ describe("ScoreBreakdownCard — exactly two bars, never a third (Req 11.1)", ()
     expect(bars).toHaveLength(2);
   });
 
-  it("labels the two bars 'TF-IDF similarity' and 'Keyword coverage' and nothing else", () => {
+  it("labels the two bars from the contract and nothing else", () => {
+    // matchStrong is a Phase 2 semantic result (similarity_method:
+    // "semantic-embedding") → the similarity bar gets the semantic label.
     render(<ScoreBreakdownCard breakdown={matchStrong.score_breakdown} />);
 
-    expect(screen.getByText("TF-IDF similarity")).toBeInstanceOf(HTMLElement);
+    expect(screen.getByText("Semantic similarity")).toBeInstanceOf(HTMLElement);
     expect(screen.getByText("Keyword coverage")).toBeInstanceOf(HTMLElement);
 
     // No third dimension the backend never returns (Req 11.1, 20.3).
     expect(screen.queryByText(/experience relevance/i)).toBeNull();
     expect(screen.queryByText(/seniority/i)).toBeNull();
+  });
+
+  it("labels the similarity bar 'TF-IDF similarity' when similarity_method is absent (pre-Phase-2 rows)", () => {
+    // matchPartial deliberately omits similarity_method — absence implies the
+    // Phase 1 TF-IDF engine per the backend contract.
+    render(<ScoreBreakdownCard breakdown={matchPartial.score_breakdown} />);
+
+    expect(screen.getByText("TF-IDF similarity")).toBeInstanceOf(HTMLElement);
+    expect(screen.queryByText("Semantic similarity")).toBeNull();
+  });
+
+  it("labels the similarity bar 'TF-IDF similarity' for explicit 'tfidf' and null (fallback results)", () => {
+    const tfidfBreakdown = {
+      ...matchStrong.score_breakdown,
+      similarity_method: "tfidf",
+    };
+    const { unmount } = render(
+      <ScoreBreakdownCard breakdown={tfidfBreakdown} />,
+    );
+    expect(screen.getByText("TF-IDF similarity")).toBeInstanceOf(HTMLElement);
+    unmount();
+
+    const nullBreakdown = {
+      ...matchStrong.score_breakdown,
+      similarity_method: null,
+    };
+    render(<ScoreBreakdownCard breakdown={nullBreakdown} />);
+    expect(screen.getByText("TF-IDF similarity")).toBeInstanceOf(HTMLElement);
+    expect(screen.queryByText("Semantic similarity")).toBeNull();
   });
 
   it("scales each [0,1] component value to its 0–100% display", () => {

@@ -32,11 +32,12 @@ export const SITE_NAME = "MatchLayer";
 /**
  * Default marketing meta description (≤ 155 chars per `seo.md` / Req 7.1).
  *
- * Honesty constraint (Req 5.1): the current scoring is keyword + TF-IDF based.
- * This copy never describes it as semantic, embeddings, AI, or LLM powered.
+ * Honesty constraint (Req 5.1): scoring is semantic (sentence embeddings,
+ * shipped in phase-2-nlp-embeddings) plus keyword coverage. This copy never
+ * describes it as AI or LLM powered — that remains unshipped roadmap.
  */
 export const SITE_DESCRIPTION =
-  "See how real ATS systems read your resume. MatchLayer scores it against any job description using transparent keyword and TF-IDF matching.";
+  "See how real ATS systems read your resume. MatchLayer scores it against any job description using semantic similarity and keyword matching.";
 
 /**
  * Default marketing `<title>` (≤ 60 chars per `seo.md` / Req 7.1).
