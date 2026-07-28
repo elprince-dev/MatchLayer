@@ -20,6 +20,30 @@ Public surface (async), mirroring the design "Scoring_Service" interface:
 * :meth:`Scoring_Service.soft_delete_match` — idempotent soft delete that emits
   ``match_deleted`` only on the first delete (Requirements 9.4, 9.5).
 
+Phase 2 (phase-2-nlp-embeddings, "Match request flow" + "Fallback decision
+tree"): ``create_match`` scores through the semantic pipeline when it loaded
+at startup — reusing the stored resume Embedding when its recorded model
+name+revision match the loaded pipeline's, generating (and best-effort
+upserting) it otherwise, embedding the Job_Description under the configured
+timeout, scoring via the ``Semantic_Match_Scorer``, and persisting the JD
+Embedding best-effort alongside the ``match_results`` row (phase-2
+Requirements 2.6, 2.7, 2.8, 2.12). Every failure on that path falls back
+**per-request** to the untouched Phase 1 engine with the Phase 1
+``scorer_version`` stamp, no Embedding stored for the request, and exactly
+one structured event from the documented category set — ``embedding_timeout``,
+``embedding_runtime_error``, ``embedding_geometry_error``,
+``skill_extraction_error``, ``skill_extraction_empty`` — carrying
+``request_id`` (structlog contextvars) and internal ids only, never text or
+vector values (phase-2 Requirements 2.9, 3.10, 4.10, 4.12, 6.2, 7.3, 7.4).
+Startup Degraded_Mode (no loaded pipeline) uses the Phase 1 engine with **no**
+per-request event — the once-at-startup ``model_load_failure`` event already
+covers it (phase-2 Requirements 7.2, 7.6) — and a per-request fallback never
+flips the process into Degraded_Mode (phase-2 Requirement 7.3). The
+Idempotency-Key replay short-circuit lives in the router and returns the
+stored response before this service (and thus any Phase 2 work) is invoked;
+list/get/delete and pre-Phase-2 stored rows are untouched (phase-2
+Requirements 6.4, 9.4).
+
 Transaction model (mirrors :class:`~matchlayer_api.services.auth.Auth_Service`):
 the service is stateless and dependency-injected; every method takes the active
 request-scoped :class:`AsyncSession`, stages its rows via ``session.add`` (and
@@ -49,6 +73,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Final
 from uuid import UUID
 
+import structlog
 from sqlalchemy import func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
@@ -61,7 +86,22 @@ from matchlayer_api.core.errors import (
 )
 from matchlayer_api.db.models import MatchResult, Resume
 from matchlayer_api.ml import scorer_adapter
+from matchlayer_api.ml.semantic_adapter import (
+    EmbeddingTimeoutError,
+    SemanticPipeline,
+    embed_with_timeout,
+    get_semantic_pipeline,
+)
+from matchlayer_api.scoring.scorer import EmptyAnalyzedSetError, ScoreResult
+from matchlayer_api.scoring.semantic import EmbeddingGeometryError
 from matchlayer_api.services.audit import Audit_Service
+from matchlayer_api.services.vector_store import (
+    get_resume_embedding,
+    insert_match_embedding,
+    upsert_resume_embedding,
+)
+
+_log = structlog.get_logger(__name__)
 
 # The extraction status a Resume must carry before it can be scored
 # (Requirement 8.5). Mirrors the literal the Resume_Extractor writes on success.
@@ -164,6 +204,23 @@ def _decode_cursor(cursor: str) -> tuple[datetime, UUID] | None:
     return created_at, row_id
 
 
+@dataclass(frozen=True, slots=True)
+class _ScoreOutcome:
+    """One scoring step's result plus what (if anything) to persist as vectors.
+
+    ``jd_vector``/``pipeline`` are non-``None`` only when the Phase 2 semantic
+    path produced ``result``: the Scoring_Service then best-effort persists the
+    Job_Description Embedding stamped with the pipeline's model identity
+    (phase-2 Requirements 2.6, 2.10). On every fallback path — Degraded_Mode or
+    any per-request ladder rung — both are ``None``, so no Embedding is stored
+    for that request (phase-2 Requirements 7.2, 7.3).
+    """
+
+    result: ScoreResult
+    jd_vector: list[float] | None
+    pipeline: SemanticPipeline | None
+
+
 class Scoring_Service:  # noqa: N801 -- design uses the underscored class name.
     """Business logic for match creation, retrieval, listing, and deletion.
 
@@ -222,9 +279,14 @@ class Scoring_Service:  # noqa: N801 -- design uses the underscored class name.
            ``'succeeded'``; otherwise raise :class:`ResumeNotExtractableError`
            (422 ``resume_not_extractable``) and create nothing (Requirement
            8.5).
-        4. **Score** via ``ml.scorer_adapter.score`` with the Resume's extracted
-           text and the Job_Description. The adapter does all the arithmetic and
-           returns an immutable ``ScoreResult``.
+        4. **Score** via :meth:`_score_with_fallback`: the Phase 2 semantic
+           pipeline (stored-Embedding reuse, timeout-bounded embeds, the
+           ``Semantic_Match_Scorer``) when it loaded at startup, with every
+           failure completing the request through the Phase 1 engine per the
+           design fallback decision tree — never a 5xx (phase-2 Requirements
+           2.6-2.8, 7.2, 7.3). The returned ``ScoreResult`` is immutable and
+           carries the ``scorer_version`` stamp of whichever engine produced
+           it (phase-2 Requirements 6.1, 6.2).
         5. **Persist** a ``match_results`` row recording ``user_id``,
            ``resume_id``, the Restricted ``job_description_text``, and the
            scorer outputs serialised to their JSONB shapes, then emit a
@@ -272,11 +334,20 @@ class Scoring_Service:  # noqa: N801 -- design uses the underscored class name.
                 "scored. Upload a resume whose text extraction succeeded."
             )
 
-        # 4. Score via the ml/ adapter. ``extracted_text`` is non-null on a
-        #    succeeded extraction (Requirement 3.4); fall back to an empty
-        #    string defensively so the scorer's empty-input contract applies
-        #    rather than passing ``None`` into the scoring core.
-        result = scorer_adapter.score(resume.extracted_text or "", job_description)
+        # 4. Score. ``extracted_text`` is non-null on a succeeded extraction
+        #    (Requirement 3.4); fall back to an empty string defensively so the
+        #    scorer's empty-input contract applies rather than passing ``None``
+        #    into the scoring core. The Phase 2 semantic path (with its full
+        #    per-request fallback ladder) lives in ``_score_with_fallback``;
+        #    every path completes the request — never a 5xx (phase-2 Req 7.3).
+        outcome = await self._score_with_fallback(
+            session,
+            user_id=user_id,
+            resume_id=resume_id,
+            resume_text=resume.extracted_text or "",
+            job_description=job_description,
+        )
+        result = outcome.result
 
         # 5. Persist. The JSONB columns store plain dict/list structures the
         #    scorer's frozen dataclasses map onto field-for-field; this is the
@@ -295,6 +366,12 @@ class Scoring_Service:  # noqa: N801 -- design uses the underscored class name.
                 "weight_similarity": result.breakdown.weight_similarity,
                 "weight_keyword": result.breakdown.weight_keyword,
                 "final_score": result.breakdown.final_score,
+                # Phase 2 addition (Requirement 3.3 / phase-2 9.5): which
+                # algorithm produced the similarity component. A new, optional
+                # key only — every Phase 1 field keeps its name and type, and
+                # pre-Phase-2 stored rows (where the key is absent) are never
+                # rewritten (phase-2 Requirements 6.4, 9.4).
+                "similarity_method": result.breakdown.similarity_method,
             },
             matched_keywords=[
                 {"term": kw.term, "weight": kw.weight} for kw in result.matched_keywords
@@ -321,7 +398,191 @@ class Scoring_Service:  # noqa: N801 -- design uses the underscored class name.
             user_id=user_id,
             payload={"resume_id": str(resume_id), "match_id": str(match.id)},
         )
+
+        # 6. Best-effort JD Embedding persist (phase-2 Requirements 2.6, 2.12).
+        #    Only when the Phase 2 pipeline produced the result — fallback and
+        #    Degraded_Mode requests store no Embedding (phase-2 Req 7.2, 7.3).
+        #    The ``match_results`` row is already flushed above, so the FK
+        #    target exists; a persistence failure rolls back to the savepoint
+        #    only and never fails the request.
+        if outcome.jd_vector is not None and outcome.pipeline is not None:
+            try:
+                async with session.begin_nested():
+                    await insert_match_embedding(
+                        session,
+                        match_result_id=match.id,
+                        user_id=user_id,
+                        vector=outcome.jd_vector,
+                        model_name=outcome.pipeline.model_name,
+                        model_revision=outcome.pipeline.model_revision,
+                    )
+            except Exception as exc:  # Best-effort: persistence never fails the request.
+                _log.warning(
+                    "embedding_persist_failure",
+                    match_id=str(match.id),
+                    error_type=type(exc).__name__,
+                )
+
         return match
+
+    # ------------------------------------------------------------------
+    # Phase 2 scoring + fallback ladder (phase-2 Requirements 2.6-2.9,
+    # 2.12, 3.10, 4.10, 4.12, 6.2, 7.2, 7.3, 7.4).
+    # ------------------------------------------------------------------
+
+    async def _score_with_fallback(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: UUID,
+        resume_id: UUID,
+        resume_text: str,
+        job_description: str,
+    ) -> _ScoreOutcome:
+        """Score via the Phase 2 pipeline, falling back per the decision tree.
+
+        Implements the design "Fallback decision tree" exactly. Every rung
+        completes the request with the **untouched** Phase 1 engine (via
+        ``scorer_adapter.score``, whose result carries the Phase 1
+        ``scorer_version`` stamp — phase-2 Requirement 6.2), stores no
+        Embedding for the request, and emits exactly one structured event
+        per occurrence. Events carry ``request_id`` (bound by the request-id
+        middleware into structlog contextvars), internal ids, and — where an
+        exception class is informative — ``error_type`` only; never input
+        text, vector values, or exception messages that could echo Restricted
+        PII (phase-2 Requirements 2.9, 7.4).
+
+        The ladder, in evaluation order:
+
+        * **Degraded_Mode** — no loaded pipeline: Phase 1 engine, **no**
+          per-request event (startup already logged ``model_load_failure``
+          once; phase-2 Requirements 7.2, 7.6).
+        * **``embedding_timeout``** — either embed call exceeded the
+          configured wall-clock bound (phase-2 Requirement 2.8).
+        * **``embedding_runtime_error``** — any other failure while producing
+          the two vectors (encode errors, stored-Embedding read errors).
+        * **``embedding_geometry_error``** — the Semantic_Scorer found the
+          cosine undefined (phase-2 Requirement 3.10).
+        * **``skill_extraction_empty``** — non-empty JD but an empty analyzed
+          skill set: fall back to the full Phase 1 engine, whose keyword
+          derivation replaces the skill extraction (phase-2 Requirement 4.10,
+          design D8).
+        * **``skill_extraction_error``** — any other failure inside the
+          Phase 2 scoring step (phase-2 Requirement 4.12).
+
+        A fallback here is strictly per-request: no module or process state is
+        mutated, so the next request retries the full Phase 2 path and the
+        process never flips into Degraded_Mode (phase-2 Requirement 7.3).
+        """
+        pipeline = get_semantic_pipeline()
+        if pipeline is None:
+            # Degraded_Mode (phase-2 Req 7.2): Phase 1 engine, no per-request
+            # event — the once-at-startup ``model_load_failure`` covers it and
+            # per-request noise would violate the one-event-per-occurrence
+            # discipline (phase-2 Req 7.4, 7.6).
+            return _ScoreOutcome(scorer_adapter.score(resume_text, job_description), None, None)
+
+        timeout_seconds = float(self._settings.embedding_timeout_seconds)
+
+        try:
+            resume_vector = await self._resume_vector(
+                session,
+                pipeline=pipeline,
+                user_id=user_id,
+                resume_id=resume_id,
+                resume_text=resume_text,
+                timeout_seconds=timeout_seconds,
+            )
+            jd_vector = await embed_with_timeout(job_description, timeout_seconds)
+        except EmbeddingTimeoutError:
+            _log.warning("embedding_timeout", resume_id=str(resume_id))
+            return _ScoreOutcome(scorer_adapter.score(resume_text, job_description), None, None)
+        except Exception as exc:  # Any other embed-phase failure degrades.
+            _log.warning(
+                "embedding_runtime_error",
+                resume_id=str(resume_id),
+                error_type=type(exc).__name__,
+            )
+            return _ScoreOutcome(scorer_adapter.score(resume_text, job_description), None, None)
+
+        try:
+            result = pipeline.scorer.score(resume_text, job_description, resume_vector, jd_vector)
+        except EmbeddingGeometryError:
+            _log.warning("embedding_geometry_error", resume_id=str(resume_id))
+            return _ScoreOutcome(scorer_adapter.score(resume_text, job_description), None, None)
+        except EmptyAnalyzedSetError:
+            # Non-empty JD, empty analyzed skill set (phase-2 Req 4.10): the
+            # Phase 1 engine's keyword derivation takes over (design D8).
+            _log.warning("skill_extraction_empty", resume_id=str(resume_id))
+            return _ScoreOutcome(scorer_adapter.score(resume_text, job_description), None, None)
+        except Exception as exc:  # Any other Phase 2 scoring failure degrades.
+            _log.warning(
+                "skill_extraction_error",
+                resume_id=str(resume_id),
+                error_type=type(exc).__name__,
+            )
+            return _ScoreOutcome(scorer_adapter.score(resume_text, job_description), None, None)
+
+        return _ScoreOutcome(result, jd_vector, pipeline)
+
+    async def _resume_vector(
+        self,
+        session: AsyncSession,
+        *,
+        pipeline: SemanticPipeline,
+        user_id: UUID,
+        resume_id: UUID,
+        resume_text: str,
+        timeout_seconds: float,
+    ) -> list[float]:
+        """Return the resume's Embedding: stored-and-current, or regenerated.
+
+        The reuse-vs-regenerate decision (phase-2 Requirement 2.7) is made
+        from stored data alone: a stored Embedding is reused only when its
+        recorded model name **and** revision equal the loaded pipeline's;
+        anything else (missing row, stale identity) regenerates under the
+        configured timeout and best-effort upserts the fresh vector (phase-2
+        Requirements 2.6, 2.8).
+
+        Upsert semantics mirror ``Resume_Service._embed_resume_best_effort``:
+        ``flush`` pushes any pending outer-transaction state first, then the
+        upsert runs inside a SAVEPOINT so a DB rejection rolls back to the
+        savepoint only — one ``embedding_persist_failure`` event, and the
+        request proceeds with the in-memory vector (phase-2 Requirement 2.12;
+        persistence failure never fails the request). Embed errors propagate
+        to the caller, which categorizes them onto the fallback ladder.
+        """
+        stored = await get_resume_embedding(session, resume_id=resume_id, user_id=user_id)
+        if (
+            stored is not None
+            and stored.model_name == pipeline.model_name
+            and stored.model_revision == pipeline.model_revision
+        ):
+            return stored.vector
+
+        vector = await embed_with_timeout(resume_text, timeout_seconds)
+
+        # Best-effort upsert (phase-2 Req 2.12): flush the outer transaction,
+        # then isolate the write in a savepoint so a rejection (e.g. a
+        # wrong-dimension vector) cannot poison the request's transaction.
+        await session.flush()
+        try:
+            async with session.begin_nested():
+                await upsert_resume_embedding(
+                    session,
+                    resume_id=resume_id,
+                    user_id=user_id,
+                    vector=vector,
+                    model_name=pipeline.model_name,
+                    model_revision=pipeline.model_revision,
+                )
+        except Exception as exc:  # Best-effort: persistence never fails the request.
+            _log.warning(
+                "embedding_persist_failure",
+                resume_id=str(resume_id),
+                error_type=type(exc).__name__,
+            )
+        return vector
 
     # ------------------------------------------------------------------
     # list_matches (Requirement 9.1).

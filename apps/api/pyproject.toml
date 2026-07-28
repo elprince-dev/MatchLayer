@@ -53,6 +53,40 @@ dependencies = [
     # raises at route-definition time if it is absent. ONLY used by the
     # multipart resume-upload route.
     "python-multipart>=0.0.9,<0.1",
+    # phase-2-nlp-embeddings dependencies. Pinned by major.
+    # spaCy: tokenization / POS / PhraseMatcher for the Skill_Extractor
+    # (scoring/skills.py). An ML library permitted in scoring/ alongside
+    # scikit-learn (the boundary rule bans frameworks/storage/web, not ML
+    # libs). The en_core_web_sm pipeline artifact is NOT a dependency here —
+    # it is injected by the ml/ adapter and pinned as a wheel in task 8.3.
+    "spacy>=3.8,<4.0",
+    # pgvector: SQLAlchemy Vector column type for the Vector_Store tables
+    # (db/models.py). ONLY imported by db/models.py (and the services/
+    # vector_store.py access layer). The DDL itself lives in migration 0003,
+    # which deliberately does not import this package.
+    "pgvector>=0.4,<0.5",
+    # sentence-transformers: the Embedding_Model runtime (pulls PyTorch —
+    # expected and required). ONLY imported by ml/semantic_adapter.py, which
+    # loads the pinned model from a local path (never the hub at runtime,
+    # Requirement 10.6). Pinned by major per security.md.
+    "sentence-transformers>=5.0,<6.0",
+    # torch: declared explicitly ONLY so the CPU-only wheel index in
+    # [tool.uv.sources] applies to it. It is a transitive dependency of
+    # sentence-transformers, and `tool.uv.sources` is honoured for direct
+    # project requirements only — without this line the resolver takes the
+    # default PyPI torch, which bundles the entire CUDA stack (~6 GB of
+    # nvidia-* / triton wheels). MatchLayer runs CPU-only inference on a
+    # free-tier Fly machine, so the GPU runtime is pure bloat: it breaks the
+    # image-size budget for the target machine (Requirement 10.3/10.5) and
+    # the cost ceiling in docs/costs.md. Never imported directly by
+    # application code — only through sentence-transformers.
+    "torch>=2.13,<3.0",
+    # en_core_web_sm: the pinned spaCy pipeline artifact for the
+    # Skill_Extractor, as a direct wheel URL so `uv sync --frozen`
+    # reproduces the exact artifact (task 8.3, Requirement 10.2). The wheel
+    # constrains spacy to >=3.8,<3.9 — compatible with the pin above. ONLY
+    # loaded (by name, via spacy.load) in ml/semantic_adapter.py.
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
 ]
 
 [project.optional-dependencies]
@@ -90,6 +124,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/matchlayer_api"]
+
+[tool.hatch.metadata]
+# Required for the en_core_web_sm direct wheel-URL dependency above (task 8.3):
+# hatchling refuses direct references in project.dependencies by default.
+allow-direct-references = true
 
 # ---------------------------------------------------------------------------
 # Ruff — formatter + linter (replaces black, isort, flake8). conventions.md.
@@ -175,6 +214,24 @@ strict_equality = true
 extra_checks = true
 no_implicit_reexport = true
 
+# pgvector (0.4.x) ships no py.typed marker and no stubs exist on typeshed.
+# Scope the exemption to the package itself; our own annotations on the
+# Vector columns (Mapped[list[float]]) keep call sites typed.
+[[tool.mypy.overrides]]
+module = ["pgvector.*"]
+ignore_missing_imports = true
+
+# The sentence-transformers / transformers / torch stack is excluded from
+# strict analysis: transformers ships partial typing and torch's stubs are
+# enormous. `follow_imports = "skip"` makes their symbols `Any`; the
+# semantic adapter re-validates every value it extracts (dimension,
+# max_tokens, vectors) into plain typed Python before it crosses into the
+# strictly-typed Scoring_Core.
+[[tool.mypy.overrides]]
+module = ["sentence_transformers.*", "transformers.*", "torch.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
 # ---------------------------------------------------------------------------
 # Pytest — asyncio mode auto so we don't decorate every async test.
 # ---------------------------------------------------------------------------
@@ -213,3 +270,10 @@ filterwarnings = [
     # third-party libs; promote-to-error catches our own. Add per-warning
     # ignores here as needed when they appear in CI.
 ]
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

@@ -217,14 +217,27 @@ async def test_create_match_happy_201_full_field_set_and_audit(
     assert isinstance(body["score"], int) and not isinstance(body["score"], bool)
     assert 0 <= body["score"] <= 100
 
-    # Breakdown carries the five explainability fields (Requirement 5.5 shape).
-    assert set(body["score_breakdown"].keys()) == {
+    # Breakdown carries the five Phase 1 explainability fields (Requirement
+    # 5.5 shape). Phase 2 adds ``similarity_method`` as the one sanctioned
+    # optional addition (phase-2 Req 3.3 / 9.5), so it is permitted here and
+    # frozen as the *only* permitted addition — the exhaustive
+    # name/type/required snapshot lives in
+    # ``test_contract_continuity.py::test_breakdown_phase1_fields_keep_type_and_required_status``.
+    assert set(body["score_breakdown"].keys()) <= {
         "similarity_component",
         "keyword_coverage_component",
         "weight_similarity",
         "weight_keyword",
         "final_score",
+        "similarity_method",
     }
+    assert {
+        "similarity_component",
+        "keyword_coverage_component",
+        "weight_similarity",
+        "weight_keyword",
+        "final_score",
+    } <= set(body["score_breakdown"].keys())
     assert body["score_breakdown"]["final_score"] == body["score"]
 
     # Keyword/suggestion lists carry the declared item shapes.

@@ -13,7 +13,13 @@ Behaviour follows Design §6.5 / Requirements 4.7-4.9:
   exact connection path real traffic takes — pool checkout,
   ``pool_pre_ping``, asyncpg socket — not a parallel codepath that
   could pass while real requests fail.
-* On success the response is ``200 {"status": "ok"}``.
+* On success the response is
+  ``200 {"status": "ok", "semantic_scoring": "available" | "unavailable"}``.
+  The ``semantic_scoring`` field (Phase 2, Requirement 7.5) reports
+  semantic-pipeline availability via
+  :func:`~matchlayer_api.ml.semantic_adapter.semantic_available` and
+  never changes the status code — a Degraded_Mode instance still
+  reports serving.
 * On any :class:`SQLAlchemyError` the response is
   ``503 {"status": "unhealthy", "reason": "database_unreachable"}``
   and a structured warning log line is emitted carrying ONLY the
@@ -55,6 +61,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from matchlayer_api.core.db import get_session
+from matchlayer_api.ml.semantic_adapter import semantic_available
 
 # Module-level logger. The request-id middleware (§6.4) binds
 # ``request_id`` / ``route`` / ``method`` to a structlog contextvar at
@@ -82,6 +89,16 @@ class HealthResponse(BaseModel):
     status: Literal["ok"] = Field(
         default="ok",
         description="Liveness signal. Always the literal string 'ok' on a 200 response.",
+    )
+    semantic_scoring: Literal["available", "unavailable"] = Field(
+        description=(
+            "Phase 2 semantic-pipeline availability (Requirement 7.5). "
+            "'available' when the Embedding_Model + spaCy pipeline loaded at "
+            "startup; 'unavailable' in Degraded_Mode. Exactly these two "
+            "machine-readable values — a degraded instance still returns 200 "
+            "so orchestration never restart-loops it; operators detect "
+            "Degraded_Mode from this field without reading logs."
+        ),
     )
 
 
@@ -171,9 +188,18 @@ async def healthz(
             content={"status": "unhealthy", "reason": _REASON_DATABASE_UNREACHABLE},
         )
 
+    # Phase 2 (Requirement 7.5): report semantic-pipeline availability as a
+    # machine-readable field with exactly two values. The mapping is
+    # ``semantic_available() -> "available" | "unavailable"``; it never
+    # affects the status code — a Degraded_Mode instance is still serving,
+    # so it still returns 200 and orchestration does not restart-loop it.
+    semantic_scoring: Literal["available", "unavailable"] = (
+        "available" if semantic_available() else "unavailable"
+    )
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"status": "ok"},
+        content={"status": "ok", "semantic_scoring": semantic_scoring},
     )
 
 

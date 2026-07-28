@@ -62,6 +62,67 @@ COPY apps/api/alembic.ini ./
 COPY apps/api/alembic ./alembic
 RUN uv sync --frozen --no-dev
 
+# -----------------------------------------------------------------------------
+# Phase 2 (phase-2-nlp-embeddings, Requirements 10.2, 10.6): bake the pinned
+# SentenceTransformer Embedding_Model into the image at BUILD time.
+#
+# `huggingface_hub` is a resolved runtime dependency (via sentence-transformers
+# in uv.lock), so the snapshot uses the venv interpreter — no extra installs.
+# The name + revision below mirror the application defaults in
+# `matchlayer_api.config` (MATCHLAYER_EMBEDDING_MODEL_NAME / _REVISION); the
+# revision is a full commit SHA so the artifact is immutable and the build is
+# reproducible. The snapshot lands exactly where the runtime expects it
+# (MATCHLAYER_EMBEDDING_MODEL_PATH default: /app/models/all-MiniLM-L6-v2), and
+# the runtime never contacts the hub — HF_HUB_OFFLINE=1 is set in the final
+# stage below.
+#
+# The spaCy pipeline (en_core_web_sm) needs no step here: it is a pinned wheel
+# dependency in apps/api/pyproject.toml, installed by the `uv sync --frozen`
+# above (Requirement 10.2).
+#
+# NOTE: this step must run BEFORE the venv re-bind below — after the re-bind,
+# /app/.venv/bin/python points at the distroless interpreter path, which does
+# not exist in this builder stage.
+ARG EMBEDDING_MODEL_NAME="sentence-transformers/all-MiniLM-L6-v2"
+ARG EMBEDDING_MODEL_REVISION="c9745ed1d9f207416be6d2e6f8de32d1f16199bf"
+ARG EMBEDDING_MODEL_PATH="/app/models/all-MiniLM-L6-v2"
+# ARG values are exposed as environment variables to RUN steps in this stage.
+# ``allow_patterns`` is load-bearing, not an optimization detail. An
+# unfiltered snapshot_download pulls EVERY file in the repo, which for
+# all-MiniLM-L6-v2 means five redundant copies of the same weights — the
+# PyTorch .bin, TensorFlow .h5, Rust .ot, ONNX, and OpenVINO variants — and
+# produced a 977 MB image layer for a model whose safetensors weights are
+# ~90 MB. Only the files sentence-transformers actually reads when loading
+# with local_files_only=True are fetched: the module manifest, the
+# transformer + tokenizer config/vocab, the safetensors weights, and the
+# Pooling/Normalize module dirs named by modules.json. The list is explicit
+# (no globs) so the artifact set is deterministic and reviewable, and so a
+# new file appearing upstream can never silently re-inflate the image.
+# If a required file were omitted, the adapter's local load fails and the
+# instance starts in Degraded_Mode (Requirement 7.1) rather than reaching
+# for the hub — HF_HUB_OFFLINE=1 is set in the final stage.
+RUN /app/.venv/bin/python -c "\
+import os; \
+from huggingface_hub import snapshot_download; \
+snapshot_download( \
+    repo_id=os.environ['EMBEDDING_MODEL_NAME'], \
+    revision=os.environ['EMBEDDING_MODEL_REVISION'], \
+    local_dir=os.environ['EMBEDDING_MODEL_PATH'], \
+    allow_patterns=[ \
+        'config.json', \
+        'config_sentence_transformers.json', \
+        'sentence_bert_config.json', \
+        'modules.json', \
+        'model.safetensors', \
+        'tokenizer.json', \
+        'tokenizer_config.json', \
+        'special_tokens_map.json', \
+        'vocab.txt', \
+        '1_Pooling/config.json', \
+        '2_Normalize/*', \
+    ], \
+)"
+
 # Re-bind the venv to the distroless runtime interpreter.
 #
 # uv creates `/app/.venv/bin/python` as a symlink to the *builder* Python at
@@ -90,14 +151,24 @@ COPY --from=builder /app/.venv      /app/.venv
 COPY --from=builder /app/src        /app/src
 COPY --from=builder /app/alembic.ini /app/alembic.ini
 COPY --from=builder /app/alembic    /app/alembic
+# Phase 2: the baked Embedding_Model snapshot (see the builder-stage note).
+COPY --from=builder /app/models     /app/models
 
 # PATH puts the venv's console scripts (uvicorn, alembic) ahead of the system path.
 # PYTHONPATH lets the interpreter resolve `matchlayer_api` from /app/src directly, so the
 # package doesn't need to be pip-installed into site-packages.
+#
+# HF_HUB_OFFLINE=1 (Phase 2, Requirements 10.2, 10.6): the runtime must NEVER
+# contact the Hugging Face hub — the model was baked at build time from the
+# pinned name + revision, and the semantic adapter loads it with
+# local_files_only=True from MATCHLAYER_EMBEDDING_MODEL_PATH (whose default
+# matches the bake path above). A missing/broken artifact degrades the
+# instance (Degraded_Mode) rather than triggering a network fetch.
 ENV PATH="/app/.venv/bin:/usr/bin:${PATH}" \
     PYTHONPATH="/app/src" \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    HF_HUB_OFFLINE=1
 
 USER nonroot
 

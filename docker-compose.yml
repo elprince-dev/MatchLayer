@@ -1,7 +1,8 @@
 # MatchLayer — local development stack
 #
 # Three services on Docker's default bridge network:
-#   - postgres : Phase 1 primary datastore
+#   - postgres : primary datastore (pgvector-enabled image from Phase 2
+#                for embedding storage; plain PostgreSQL 16 otherwise)
 #   - redis    : Phase 4+ cache / rate-limit / agent state (kept here so
 #                local parity with prod is in place from day one)
 #   - minio    : S3-compatible object storage for resume uploads (Phase 1+)
@@ -19,7 +20,7 @@
 
 services:
   postgres:
-    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+    image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
     environment:
       POSTGRES_USER: matchlayer
       POSTGRES_PASSWORD: dev_only_password

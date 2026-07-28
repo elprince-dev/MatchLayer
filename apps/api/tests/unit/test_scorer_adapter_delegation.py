@@ -26,6 +26,7 @@ import direction noted in 10.1).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -168,6 +169,46 @@ def test_score_preserves_argument_order(monkeypatch: pytest.MonkeyPatch) -> None
     scorer_adapter.score("RESUME-TEXT", "JD-TEXT")
 
     assert spy.calls == [("RESUME-TEXT", "JD-TEXT")]
+
+
+# ---------------------------------------------------------------------------
+# get_semantic_scorer: Phase 2 lookup (phase-2-nlp-embeddings, task 8.4)
+# ---------------------------------------------------------------------------
+
+
+def test_get_semantic_scorer_returns_none_when_pipeline_not_loaded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Degraded_Mode contract: no loaded pipeline → ``None``.
+
+    ``get_semantic_scorer`` mirrors ``get_semantic_pipeline``'s ``None``
+    contract — when the semantic pipeline never loaded (or an artifact load
+    failed), the adapter reports ``None`` so callers fall back to the Phase 1
+    ``get_scorer`` path.
+
+    Validates: Requirements 12.1, 12.2.
+    """
+    monkeypatch.setattr(scorer_adapter, "get_semantic_pipeline", lambda: None)
+    assert scorer_adapter.get_semantic_scorer() is None
+
+
+def test_get_semantic_scorer_returns_the_pipeline_scorer_by_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Loaded pipeline → the adapter hands back ``pipeline.scorer`` unchanged.
+
+    A sentinel stands in for the composed ``Semantic_Match_Scorer``; the
+    adapter returning it *by identity* (``is``) is the observable proof it
+    constructed nothing, reshaped nothing, and computed no similarity,
+    coverage, or score value of its own — pure lookup over the pipeline the
+    semantic adapter loaded at startup.
+
+    Validates: Requirements 12.1, 12.2.
+    """
+    sentinel_scorer = object()
+    pipeline = SimpleNamespace(scorer=sentinel_scorer)
+    monkeypatch.setattr(scorer_adapter, "get_semantic_pipeline", lambda: pipeline)
+    assert scorer_adapter.get_semantic_scorer() is sentinel_scorer
 
 
 def test_adapter_reexports_from_scoring_not_the_reverse() -> None:

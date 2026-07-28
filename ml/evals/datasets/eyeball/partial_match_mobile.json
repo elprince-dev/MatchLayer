@@ -1,0 +1,12 @@
+{
+  "id": "eyeball-011",
+  "label": "Android developer vs full-stack JD — partial match",
+  "resume_text": "Mobile developer with five years of experience shipping Android applications in Kotlin and Java. I consume REST APIs, persist local data in SQLite, collaborate through Git with feature-branch workflows, and write unit tests for view models and repositories. I have published four apps end to end, from design review to store release.",
+  "jd_text": "We are hiring a Full-Stack Engineer to build our web product. You will develop user interfaces in TypeScript with React, implement backend services in Java with Spring, design REST APIs, store data in MySQL, write unit tests across both tiers, and collaborate through Git.",
+  "expected": {
+    "score_band": "medium",
+    "must_match_skills": ["java", "rest", "git", "unit testing"],
+    "must_miss_skills": []
+  },
+  "notes": "Third partial-match case: an Android developer against a full-stack web JD. Shares Java, REST, Git, and unit testing but lacks TypeScript, React, Spring, and MySQL, so the score should land in the medium band. Also exercises the java/javascript token-boundary contract from the resume side. Fully synthetic text — no real personal data."
+}

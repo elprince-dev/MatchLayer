@@ -399,16 +399,23 @@ async def test_match_scoring_quota_exceeded_429_with_detail_and_audit(
     quota = get_settings().match_daily_quota
     now = datetime.now(UTC)
     # One owning resume the seeded match rows reference (FK to resumes.id).
+    # Flushed on its own first: ``MatchResult`` declares no ORM relationship
+    # to ``Resume``, so the unit of work has no dependency edge to order the
+    # two INSERTs and can emit the ``match_results`` batch before the
+    # ``resumes`` row exists (ForeignKeyViolationError on
+    # ``match_results_resume_id_fkey``).
     resume = _make_resume_row(user.id, created_at=now)
     db_session.add(resume)
+    await db_session.flush()
+    resume_id = resume.id
     for _ in range(quota):
-        db_session.add(_make_match_row(user.id, resume.id, created_at=now))
+        db_session.add(_make_match_row(user.id, resume_id, created_at=now))
     await db_session.flush()
 
     res = await client_with_session.post(
         "/api/v1/matches",
         headers=_auth(token),
-        json={"resume_id": str(resume.id), "job_description": JOB_DESCRIPTION},
+        json={"resume_id": str(resume_id), "job_description": JOB_DESCRIPTION},
     )
 
     assert res.status_code == 429, res.text

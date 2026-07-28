@@ -1,0 +1,12 @@
+{
+  "id": "eyeball-009",
+  "label": "ML-focused data scientist vs data engineer JD — partial match",
+  "resume_text": "Data Scientist with four years of experience building machine learning models in Python. I do exploratory analysis in pandas and NumPy, train models with scikit-learn and PyTorch, and query training data with SQL. My work focuses on modeling and offline evaluation; production pipelines and infrastructure are handled by a separate platform team.",
+  "jd_text": "We are hiring a Data Engineer to build batch and streaming pipelines in Python. You will orchestrate workflows with Airflow, process large datasets with Spark, move events through Kafka, model warehouse tables in SQL and PostgreSQL, and deploy jobs to AWS. Experience with Docker and Linux environments is required.",
+  "expected": {
+    "score_band": "medium",
+    "must_match_skills": ["python", "sql"],
+    "must_miss_skills": []
+  },
+  "notes": "Adjacent-role partial match: a modeling-focused data scientist against a pipeline-focused data engineering JD. Shares the language and query skills but lacks Airflow, Spark, Kafka, PostgreSQL, AWS, Docker, and Linux, so the score should land in the medium band. Fully synthetic text — no real personal data."
+}

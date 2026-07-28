@@ -156,4 +156,6 @@ repos:
             | packages/shared-types/src/api-schemas\.ts
             | ml/lexicon/skill_lexicon\.v1\.json
             | apps/api/src/matchlayer_api/scoring/data/skill_lexicon\.v1\.json
+            | ml/lexicon/skill_lexicon\.v2\.json
+            | apps/api/src/matchlayer_api/scoring/data/skill_lexicon\.v2\.json
           )$

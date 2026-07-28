@@ -469,6 +469,12 @@ export interface components {
              * @constant
              */
             status: "ok";
+            /**
+             * Semantic Scoring
+             * @description Phase 2 semantic-pipeline availability (Requirement 7.5). 'available' when the Embedding_Model + spaCy pipeline loaded at startup; 'unavailable' in Degraded_Mode. Exactly these two machine-readable values — a degraded instance still returns 200 so orchestration never restart-loops it; operators detect Degraded_Mode from this field without reading logs.
+             * @enum {string}
+             */
+            semantic_scoring: "available" | "unavailable";
         };
         /**
          * HealthUnhealthyResponse
@@ -982,6 +988,11 @@ export interface components {
              * @description The combined, clamped integer score in [0, 100]; equals the enclosing MatchResponse.score.
              */
             final_score: number;
+            /**
+             * Similarity Method
+             * @description Which algorithm produced the similarity component: 'semantic-embedding' (Phase 2 pipeline) or 'tfidf' (Phase 1 engine or per-request fallback). Optional Phase 2 addition (phase-2 Requirements 3.3, 9.1, 9.5): null on pre-Phase-2 stored results, whose absence implies TF-IDF. Every Phase 1 field above keeps its name, type, and required status.
+             */
+            similarity_method?: string | null;
         };
         /**
          * SuggestionOut

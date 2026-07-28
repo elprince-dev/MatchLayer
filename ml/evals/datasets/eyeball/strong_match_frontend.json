@@ -1,0 +1,23 @@
+{
+  "id": "eyeball-007",
+  "label": "Frontend engineer — strong match",
+  "resume_text": "Frontend Engineer with six years of experience building production web applications in TypeScript and React. I have shipped several sites on Next.js with server-side rendering, styled with Tailwind, and validated with component tests in Jest and end-to-end suites in Playwright. I manage application state with Redux where it earns its place, consume REST and GraphQL APIs, and collaborate through Git with disciplined code review.",
+  "jd_text": "We are looking for a Senior Frontend Engineer to build rich web experiences in TypeScript with React and Next.js. You will style interfaces with Tailwind, write component tests in Jest and end-to-end tests in Playwright, manage complex state with Redux, and integrate REST and GraphQL APIs. Fluency with Git-based workflows is expected.",
+  "expected": {
+    "score_band": "high",
+    "must_match_skills": [
+      "typescript",
+      "react",
+      "next.js",
+      "tailwind",
+      "jest",
+      "playwright",
+      "redux",
+      "rest",
+      "graphql",
+      "git"
+    ],
+    "must_miss_skills": []
+  },
+  "notes": "Second strong-match case in a different domain (frontend) so the high band is exercised beyond the single backend JD. Every JD skill appears in real resume prose. Fully synthetic text — no real personal data."
+}

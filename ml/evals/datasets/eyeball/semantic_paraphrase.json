@@ -1,0 +1,20 @@
+{
+  "id": "eyeball-005",
+  "label": "Semantic paraphrase — same skills, different words",
+  "resume_text": "Server-side engineer, seven years shipping production software. My daily driver is py for all service code, exposing restful endpoints consumed by mobile and browser clients. Data lives in postgres, every schema change reviewed and migrated safely. Services run in isolated units via containerization, and everything is hosted on amazon web services with automated release trains built on continuous integration and continuous delivery. Quality is guarded by disciplined unit tests on every merge.",
+  "jd_text": "Seeking a Senior Backend Engineer to architect scalable REST APIs in Python. You will design relational models in PostgreSQL, package applications with Docker, and operate workloads on AWS. A mature CI/CD practice and a habit of thorough unit testing are essential for this role.",
+  "expected": {
+    "score_band": "high",
+    "must_match_skills": [
+      "python",
+      "rest",
+      "postgresql",
+      "docker",
+      "aws",
+      "ci/cd",
+      "unit testing"
+    ],
+    "must_miss_skills": []
+  },
+  "notes": "Semantic-paraphrase pair (Requirement 11.1/11.6): the resume expresses exactly the JD's skills but through lexicon aliases and different prose ('py' for python, 'restful' for rest, 'postgres' for postgresql, 'containerization' for docker, 'amazon web services' for aws, 'continuous integration and continuous delivery' for ci/cd, 'unit tests' for unit testing), so word-level TF-IDF overlap between the two texts is minimal and the Phase 1 similarity component stays low, keeping the Phase 1 score below the high band. Sentence-embedding similarity should recognize the shared meaning, so the Phase 2 score is expected to exceed the Phase 1 score and reach the high band. Fully synthetic text — no real personal data."
+}

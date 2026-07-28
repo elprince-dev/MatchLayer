@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from matchlayer_api.core.security.jwt import issue_refresh_token
 from matchlayer_api.db.models import AuditEvent, RefreshToken
 
-from ._cookies import set_auth_cookies
+from ._cookies import clear_auth_cookies, set_auth_cookies
 from .conftest import UserWithRefreshFactory, postgres_available, unique_email
 
 pytestmark = pytest.mark.skipif(
@@ -122,9 +122,14 @@ async def test_refresh_reuse_revokes_family(
         headers={"X-CSRF-Token": csrf_value},
     )
 
-    # The router clears cookies on a successful rotation and sets a
-    # fresh pair; replay the *original* (now-revoked) jti to exercise
-    # the reuse-detection branch.
+    # The successful rotation set a *fresh* refresh + CSRF pair on the
+    # client's cookie jar, scoped to the ``testserver`` domain. Setting the
+    # originals back on top of those would leave two same-named cookies in
+    # the jar (httpx ``Cookies.set`` uses an empty domain), so the request
+    # would send both values and the server's double-submit check would
+    # read the wrong one → 403 csrf_mismatch instead of the reuse branch.
+    # Clear first, then replay the *original* (now-revoked) jti.
+    clear_auth_cookies(client_with_session)
     set_auth_cookies(client_with_session, refresh=refresh_jwt, csrf=csrf_value)
 
     res = await client_with_session.post(

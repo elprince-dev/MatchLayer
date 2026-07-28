@@ -219,6 +219,15 @@ class ScoreBreakdownOut(BaseModel):
         description="The combined, clamped integer score in [0, 100]; equals "
         "the enclosing MatchResponse.score.",
     )
+    similarity_method: str | None = Field(
+        default=None,
+        description="Which algorithm produced the similarity component: "
+        "'semantic-embedding' (Phase 2 pipeline) or 'tfidf' (Phase 1 engine "
+        "or per-request fallback). Optional Phase 2 addition (phase-2 "
+        "Requirements 3.3, 9.1, 9.5): null on pre-Phase-2 stored results, "
+        "whose absence implies TF-IDF. Every Phase 1 field above keeps its "
+        "name, type, and required status.",
+    )
 
 
 # ---------------------------------------------------------------------------

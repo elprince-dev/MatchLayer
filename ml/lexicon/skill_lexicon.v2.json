@@ -1,0 +1,2020 @@
+{
+  "description": "MatchLayer Phase 2 Skill_Lexicon. Canonical skills, alias rules, per-term weights and metadata for the skill-only Skill_Extractor and the deterministic fallback Match_Scorer. Assembled from the documented open sources listed under 'sources'. Source of truth: ml/lexicon/skill_lexicon.v2.json; regenerate with ml/pipelines/build_skill_lexicon.py.",
+  "lexicon_version": "v2",
+  "schema_version": 1,
+  "skill_count": 235,
+  "skills": [
+    {
+      "aliases": [
+        "asp.net",
+        "aspnet",
+        "dot net",
+        "dotnet"
+      ],
+      "canonical": ".net",
+      "category": "framework",
+      "display": ".NET",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "flexibility"
+      ],
+      "canonical": "adaptability",
+      "category": "soft_skill",
+      "display": "Adaptability",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "kanban",
+        "scrum"
+      ],
+      "canonical": "agile",
+      "category": "practice",
+      "display": "Agile",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "apache airflow"
+      ],
+      "canonical": "airflow",
+      "category": "data",
+      "display": "Apache Airflow",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "algorithms",
+      "category": "practice",
+      "display": "Algorithms",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "analytical thinking"
+      ],
+      "canonical": "analytical skills",
+      "category": "soft_skill",
+      "display": "Analytical Skills",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "android development"
+      ],
+      "canonical": "android",
+      "category": "framework",
+      "display": "Android",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "angularjs"
+      ],
+      "canonical": "angular",
+      "category": "framework",
+      "display": "Angular",
+      "weight": 0.75
+    },
+    {
+      "aliases": [],
+      "canonical": "ansible",
+      "category": "devops",
+      "display": "Ansible",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "api design",
+      "category": "practice",
+      "display": "API Design",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "appsec"
+      ],
+      "canonical": "application security",
+      "category": "practice",
+      "display": "Application Security",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "detail oriented",
+        "detail-oriented"
+      ],
+      "canonical": "attention to detail",
+      "category": "soft_skill",
+      "display": "Attention to Detail",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "amazon web services"
+      ],
+      "canonical": "aws",
+      "category": "cloud",
+      "display": "AWS",
+      "weight": 0.95
+    },
+    {
+      "aliases": [
+        "cdk"
+      ],
+      "canonical": "aws cdk",
+      "category": "devops",
+      "display": "AWS CDK",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "microsoft azure"
+      ],
+      "canonical": "azure",
+      "category": "cloud",
+      "display": "Azure",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "sh",
+        "shell",
+        "shell scripting"
+      ],
+      "canonical": "bash",
+      "category": "language",
+      "display": "Bash",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "big data",
+      "category": "data",
+      "display": "Big Data",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "google bigquery"
+      ],
+      "canonical": "bigquery",
+      "category": "database",
+      "display": "BigQuery",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "bitbucket",
+      "category": "devops",
+      "display": "Bitbucket",
+      "weight": 0.35
+    },
+    {
+      "aliases": [],
+      "canonical": "blockchain",
+      "category": "practice",
+      "display": "Blockchain",
+      "weight": 0.45
+    },
+    {
+      "aliases": [],
+      "canonical": "bootstrap",
+      "category": "framework",
+      "display": "Bootstrap",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "c sharp",
+        "csharp",
+        "dotnet c#"
+      ],
+      "canonical": "c#",
+      "category": "language",
+      "display": "C#",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "c plus plus",
+        "cplusplus",
+        "cpp"
+      ],
+      "canonical": "c++",
+      "category": "language",
+      "display": "C++",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "apache cassandra"
+      ],
+      "canonical": "cassandra",
+      "category": "database",
+      "display": "Apache Cassandra",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "chef",
+      "category": "devops",
+      "display": "Chef",
+      "weight": 0.35
+    },
+    {
+      "aliases": [
+        "ci cd",
+        "cicd",
+        "continuous delivery",
+        "continuous integration"
+      ],
+      "canonical": "ci/cd",
+      "category": "devops",
+      "display": "CI/CD",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "cloud architecture",
+        "cloud infrastructure"
+      ],
+      "canonical": "cloud computing",
+      "category": "cloud",
+      "display": "Cloud Computing",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "aws cloudformation"
+      ],
+      "canonical": "cloudformation",
+      "category": "devops",
+      "display": "AWS CloudFormation",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "cobol",
+      "category": "language",
+      "display": "COBOL",
+      "weight": 0.3
+    },
+    {
+      "aliases": [
+        "code reviews"
+      ],
+      "canonical": "code review",
+      "category": "practice",
+      "display": "Code Review",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "team player",
+        "teamwork"
+      ],
+      "canonical": "collaboration",
+      "category": "soft_skill",
+      "display": "Collaboration",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "communication skills"
+      ],
+      "canonical": "communication",
+      "category": "soft_skill",
+      "display": "Communication",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "image processing"
+      ],
+      "canonical": "computer vision",
+      "category": "data",
+      "display": "Computer Vision",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "conflict resolution",
+      "category": "soft_skill",
+      "display": "Conflict Resolution",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "confluence",
+      "category": "tool",
+      "display": "Confluence",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "creativity",
+      "category": "soft_skill",
+      "display": "Creativity",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "critical thinking",
+      "category": "soft_skill",
+      "display": "Critical Thinking",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "encryption"
+      ],
+      "canonical": "cryptography",
+      "category": "practice",
+      "display": "Cryptography",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "css3"
+      ],
+      "canonical": "css",
+      "category": "language",
+      "display": "CSS",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "customer support"
+      ],
+      "canonical": "customer service",
+      "category": "soft_skill",
+      "display": "Customer Service",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "cyber security",
+        "information security",
+        "infosec"
+      ],
+      "canonical": "cybersecurity",
+      "category": "practice",
+      "display": "Cybersecurity",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "cypress",
+      "category": "testing",
+      "display": "Cypress",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "dart",
+      "category": "language",
+      "display": "Dart",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "data analytics"
+      ],
+      "canonical": "data analysis",
+      "category": "data",
+      "display": "Data Analysis",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "data pipeline",
+        "data pipelines"
+      ],
+      "canonical": "data engineering",
+      "category": "data",
+      "display": "Data Engineering",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "data modelling"
+      ],
+      "canonical": "data modeling",
+      "category": "data",
+      "display": "Data Modeling",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "data science",
+      "category": "data",
+      "display": "Data Science",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "data structures and algorithms"
+      ],
+      "canonical": "data structures",
+      "category": "practice",
+      "display": "Data Structures",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "data visualisation"
+      ],
+      "canonical": "data visualization",
+      "category": "data",
+      "display": "Data Visualization",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "data warehouse"
+      ],
+      "canonical": "data warehousing",
+      "category": "data",
+      "display": "Data Warehousing",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "dba"
+      ],
+      "canonical": "database administration",
+      "category": "database",
+      "display": "Database Administration",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "databricks",
+      "category": "data",
+      "display": "Databricks",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "datadog",
+      "category": "tool",
+      "display": "Datadog",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "dbt",
+      "category": "tool",
+      "display": "dbt",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "troubleshooting"
+      ],
+      "canonical": "debugging",
+      "category": "practice",
+      "display": "Debugging",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "decision-making"
+      ],
+      "canonical": "decision making",
+      "category": "soft_skill",
+      "display": "Decision Making",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "neural network",
+        "neural networks"
+      ],
+      "canonical": "deep learning",
+      "category": "data",
+      "display": "Deep Learning",
+      "weight": 0.65
+    },
+    {
+      "aliases": [],
+      "canonical": "design patterns",
+      "category": "practice",
+      "display": "Design Patterns",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "devops",
+      "category": "practice",
+      "display": "DevOps",
+      "weight": 0.8
+    },
+    {
+      "aliases": [],
+      "canonical": "devsecops",
+      "category": "practice",
+      "display": "DevSecOps",
+      "weight": 0.45
+    },
+    {
+      "aliases": [],
+      "canonical": "distributed systems",
+      "category": "practice",
+      "display": "Distributed Systems",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "django",
+      "category": "framework",
+      "display": "Django",
+      "weight": 0.85
+    },
+    {
+      "aliases": [],
+      "canonical": "dns",
+      "category": "tool",
+      "display": "DNS",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "containerization"
+      ],
+      "canonical": "docker",
+      "category": "devops",
+      "display": "Docker",
+      "weight": 0.9
+    },
+    {
+      "aliases": [
+        "ddd",
+        "domain driven design"
+      ],
+      "canonical": "domain-driven design",
+      "category": "practice",
+      "display": "Domain-Driven Design",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "dynamo"
+      ],
+      "canonical": "dynamodb",
+      "category": "database",
+      "display": "DynamoDB",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "amazon ecs",
+        "fargate"
+      ],
+      "canonical": "ecs",
+      "category": "cloud",
+      "display": "Amazon ECS",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "elastic search",
+        "es"
+      ],
+      "canonical": "elasticsearch",
+      "category": "database",
+      "display": "Elasticsearch",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "elixir",
+      "category": "language",
+      "display": "Elixir",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "embedded software"
+      ],
+      "canonical": "embedded systems",
+      "category": "practice",
+      "display": "Embedded Systems",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "emotional intelligence",
+      "category": "soft_skill",
+      "display": "Emotional Intelligence",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "e2e testing",
+        "end to end testing"
+      ],
+      "canonical": "end-to-end testing",
+      "category": "testing",
+      "display": "End-to-End Testing",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "elt",
+        "extract transform load"
+      ],
+      "canonical": "etl",
+      "category": "data",
+      "display": "ETL",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "event driven architecture"
+      ],
+      "canonical": "event-driven architecture",
+      "category": "practice",
+      "display": "Event-Driven Architecture",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "microsoft excel",
+        "spreadsheets"
+      ],
+      "canonical": "excel",
+      "category": "tool",
+      "display": "Microsoft Excel",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "express.js",
+        "expressjs"
+      ],
+      "canonical": "express",
+      "category": "framework",
+      "display": "Express",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "fast api"
+      ],
+      "canonical": "fastapi",
+      "category": "framework",
+      "display": "FastAPI",
+      "weight": 0.9
+    },
+    {
+      "aliases": [],
+      "canonical": "figma",
+      "category": "tool",
+      "display": "Figma",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "flask",
+      "category": "framework",
+      "display": "Flask",
+      "weight": 0.8
+    },
+    {
+      "aliases": [],
+      "canonical": "flutter",
+      "category": "framework",
+      "display": "Flutter",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "fortran",
+      "category": "language",
+      "display": "Fortran",
+      "weight": 0.3
+    },
+    {
+      "aliases": [],
+      "canonical": "functional programming",
+      "category": "practice",
+      "display": "Functional Programming",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "google cloud",
+        "google cloud platform"
+      ],
+      "canonical": "gcp",
+      "category": "cloud",
+      "display": "Google Cloud",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "version control"
+      ],
+      "canonical": "git",
+      "category": "tool",
+      "display": "Git",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "gha"
+      ],
+      "canonical": "github actions",
+      "category": "devops",
+      "display": "GitHub Actions",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "gitlab ci",
+        "gitlab ci/cd"
+      ],
+      "canonical": "gitlab",
+      "category": "devops",
+      "display": "GitLab",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "golang"
+      ],
+      "canonical": "go",
+      "category": "language",
+      "display": "Go",
+      "weight": 0.85
+    },
+    {
+      "aliases": [],
+      "canonical": "grafana",
+      "category": "devops",
+      "display": "Grafana",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "graph ql"
+      ],
+      "canonical": "graphql",
+      "category": "tool",
+      "display": "GraphQL",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "groovy",
+      "category": "language",
+      "display": "Groovy",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "grpc",
+      "category": "tool",
+      "display": "gRPC",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "apache hadoop",
+        "hdfs"
+      ],
+      "canonical": "hadoop",
+      "category": "data",
+      "display": "Apache Hadoop",
+      "weight": 0.45
+    },
+    {
+      "aliases": [],
+      "canonical": "haskell",
+      "category": "language",
+      "display": "Haskell",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "helm charts"
+      ],
+      "canonical": "helm",
+      "category": "devops",
+      "display": "Helm",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "hibernate",
+      "category": "framework",
+      "display": "Hibernate",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "html5"
+      ],
+      "canonical": "html",
+      "category": "language",
+      "display": "HTML",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "huggingface"
+      ],
+      "canonical": "hugging face",
+      "category": "data",
+      "display": "Hugging Face",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "iam"
+      ],
+      "canonical": "identity and access management",
+      "category": "practice",
+      "display": "Identity and Access Management",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "incident response",
+      "category": "practice",
+      "display": "Incident Response",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "iac"
+      ],
+      "canonical": "infrastructure as code",
+      "category": "devops",
+      "display": "Infrastructure as Code",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "integration tests"
+      ],
+      "canonical": "integration testing",
+      "category": "testing",
+      "display": "Integration Testing",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "ios development"
+      ],
+      "canonical": "ios",
+      "category": "framework",
+      "display": "iOS",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "internet of things"
+      ],
+      "canonical": "iot",
+      "category": "practice",
+      "display": "IoT",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "istio",
+      "category": "devops",
+      "display": "Istio",
+      "weight": 0.35
+    },
+    {
+      "aliases": [],
+      "canonical": "java",
+      "category": "language",
+      "display": "Java",
+      "weight": 0.9
+    },
+    {
+      "aliases": [
+        "ecmascript",
+        "js"
+      ],
+      "canonical": "javascript",
+      "category": "language",
+      "display": "JavaScript",
+      "weight": 1.0
+    },
+    {
+      "aliases": [],
+      "canonical": "jenkins",
+      "category": "devops",
+      "display": "Jenkins",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "jest",
+      "category": "testing",
+      "display": "Jest",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "jira",
+      "category": "tool",
+      "display": "Jira",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "jquery",
+      "category": "library",
+      "display": "jQuery",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "json",
+      "category": "tool",
+      "display": "JSON",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "julia",
+      "category": "language",
+      "display": "Julia",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "apache kafka"
+      ],
+      "canonical": "kafka",
+      "category": "tool",
+      "display": "Apache Kafka",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "keras",
+      "category": "data",
+      "display": "Keras",
+      "weight": 0.45
+    },
+    {
+      "aliases": [],
+      "canonical": "kotlin",
+      "category": "language",
+      "display": "Kotlin",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "k8s"
+      ],
+      "canonical": "kubernetes",
+      "category": "devops",
+      "display": "Kubernetes",
+      "weight": 0.85
+    },
+    {
+      "aliases": [
+        "aws lambda"
+      ],
+      "canonical": "lambda",
+      "category": "cloud",
+      "display": "AWS Lambda",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "laravel",
+      "category": "framework",
+      "display": "Laravel",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "team lead",
+        "tech lead"
+      ],
+      "canonical": "leadership",
+      "category": "soft_skill",
+      "display": "Leadership",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "unix"
+      ],
+      "canonical": "linux",
+      "category": "devops",
+      "display": "Linux",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "load balancer"
+      ],
+      "canonical": "load balancing",
+      "category": "tool",
+      "display": "Load Balancing",
+      "weight": 0.45
+    },
+    {
+      "aliases": [],
+      "canonical": "lua",
+      "category": "language",
+      "display": "Lua",
+      "weight": 0.35
+    },
+    {
+      "aliases": [
+        "ml"
+      ],
+      "canonical": "machine learning",
+      "category": "data",
+      "display": "Machine Learning",
+      "weight": 0.85
+    },
+    {
+      "aliases": [],
+      "canonical": "matlab",
+      "category": "language",
+      "display": "MATLAB",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "coaching",
+        "mentorship"
+      ],
+      "canonical": "mentoring",
+      "category": "soft_skill",
+      "display": "Mentoring",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "micro services",
+        "microservice"
+      ],
+      "canonical": "microservices",
+      "category": "practice",
+      "display": "Microservices",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "ml ops"
+      ],
+      "canonical": "mlops",
+      "category": "data",
+      "display": "MLOps",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "mobile app development"
+      ],
+      "canonical": "mobile development",
+      "category": "practice",
+      "display": "Mobile Development",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "mongo"
+      ],
+      "canonical": "mongodb",
+      "category": "database",
+      "display": "MongoDB",
+      "weight": 0.8
+    },
+    {
+      "aliases": [],
+      "canonical": "mysql",
+      "category": "database",
+      "display": "MySQL",
+      "weight": 0.8
+    },
+    {
+      "aliases": [],
+      "canonical": "negotiation",
+      "category": "soft_skill",
+      "display": "Negotiation",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "neo4j",
+      "category": "database",
+      "display": "Neo4j",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "nest js",
+        "nest.js"
+      ],
+      "canonical": "nestjs",
+      "category": "framework",
+      "display": "NestJS",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "network security",
+      "category": "practice",
+      "display": "Network Security",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "computer networking",
+        "tcp ip",
+        "tcp/ip"
+      ],
+      "canonical": "networking",
+      "category": "tool",
+      "display": "Networking",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "next js",
+        "nextjs"
+      ],
+      "canonical": "next.js",
+      "category": "framework",
+      "display": "Next.js",
+      "weight": 0.85
+    },
+    {
+      "aliases": [],
+      "canonical": "nginx",
+      "category": "devops",
+      "display": "Nginx",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "natural language processing"
+      ],
+      "canonical": "nlp",
+      "category": "data",
+      "display": "NLP",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "node",
+        "node js",
+        "nodejs"
+      ],
+      "canonical": "node.js",
+      "category": "framework",
+      "display": "Node.js",
+      "weight": 0.9
+    },
+    {
+      "aliases": [
+        "np"
+      ],
+      "canonical": "numpy",
+      "category": "data",
+      "display": "NumPy",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "oauth 2.0",
+        "oauth2",
+        "oidc",
+        "openid connect"
+      ],
+      "canonical": "oauth",
+      "category": "tool",
+      "display": "OAuth",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "object oriented programming",
+        "oop"
+      ],
+      "canonical": "object-oriented programming",
+      "category": "practice",
+      "display": "Object-Oriented Programming",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "objective c"
+      ],
+      "canonical": "objective-c",
+      "category": "language",
+      "display": "Objective-C",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "observability",
+      "category": "devops",
+      "display": "Observability",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "swagger"
+      ],
+      "canonical": "openapi",
+      "category": "tool",
+      "display": "OpenAPI",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "openshift",
+      "category": "devops",
+      "display": "OpenShift",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "oracle database",
+        "oracle db",
+        "pl/sql",
+        "plsql"
+      ],
+      "canonical": "oracle",
+      "category": "database",
+      "display": "Oracle Database",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "pair programming",
+      "category": "practice",
+      "display": "Pair Programming",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "pandas",
+      "category": "data",
+      "display": "pandas",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "pen testing",
+        "pentesting"
+      ],
+      "canonical": "penetration testing",
+      "category": "practice",
+      "display": "Penetration Testing",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "load testing"
+      ],
+      "canonical": "performance testing",
+      "category": "testing",
+      "display": "Performance Testing",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "perl",
+      "category": "language",
+      "display": "Perl",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "pg vector"
+      ],
+      "canonical": "pgvector",
+      "category": "database",
+      "display": "pgvector",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "php",
+      "category": "language",
+      "display": "PHP",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "playwright",
+      "category": "testing",
+      "display": "Playwright",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "postgre",
+        "postgres",
+        "psql"
+      ],
+      "canonical": "postgresql",
+      "category": "database",
+      "display": "PostgreSQL",
+      "weight": 0.9
+    },
+    {
+      "aliases": [
+        "microsoft power bi",
+        "powerbi"
+      ],
+      "canonical": "power bi",
+      "category": "tool",
+      "display": "Power BI",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "powershell",
+      "category": "language",
+      "display": "PowerShell",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "public speaking"
+      ],
+      "canonical": "presentation skills",
+      "category": "soft_skill",
+      "display": "Presentation Skills",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "problem-solving"
+      ],
+      "canonical": "problem solving",
+      "category": "soft_skill",
+      "display": "Problem Solving",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "product management",
+      "category": "practice",
+      "display": "Product Management",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "project planning"
+      ],
+      "canonical": "project management",
+      "category": "practice",
+      "display": "Project Management",
+      "weight": 0.65
+    },
+    {
+      "aliases": [],
+      "canonical": "prometheus",
+      "category": "devops",
+      "display": "Prometheus",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "puppet",
+      "category": "devops",
+      "display": "Puppet",
+      "weight": 0.35
+    },
+    {
+      "aliases": [],
+      "canonical": "pytest",
+      "category": "testing",
+      "display": "pytest",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "cpython",
+        "py",
+        "python3"
+      ],
+      "canonical": "python",
+      "category": "language",
+      "display": "Python",
+      "weight": 1.0
+    },
+    {
+      "aliases": [
+        "torch"
+      ],
+      "canonical": "pytorch",
+      "category": "data",
+      "display": "PyTorch",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "qa"
+      ],
+      "canonical": "quality assurance",
+      "category": "testing",
+      "display": "Quality Assurance",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "r programming"
+      ],
+      "canonical": "r",
+      "category": "language",
+      "display": "R",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "rabbit mq"
+      ],
+      "canonical": "rabbitmq",
+      "category": "tool",
+      "display": "RabbitMQ",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "ror",
+        "ruby on rails"
+      ],
+      "canonical": "rails",
+      "category": "framework",
+      "display": "Ruby on Rails",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "react.js",
+        "reactjs"
+      ],
+      "canonical": "react",
+      "category": "framework",
+      "display": "React",
+      "weight": 0.95
+    },
+    {
+      "aliases": [
+        "react-native"
+      ],
+      "canonical": "react native",
+      "category": "framework",
+      "display": "React Native",
+      "weight": 0.65
+    },
+    {
+      "aliases": [],
+      "canonical": "redis",
+      "category": "database",
+      "display": "Redis",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "amazon redshift"
+      ],
+      "canonical": "redshift",
+      "category": "database",
+      "display": "Amazon Redshift",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "redux",
+      "category": "library",
+      "display": "Redux",
+      "weight": 0.65
+    },
+    {
+      "aliases": [
+        "code refactoring"
+      ],
+      "canonical": "refactoring",
+      "category": "practice",
+      "display": "Refactoring",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "responsive web design"
+      ],
+      "canonical": "responsive design",
+      "category": "practice",
+      "display": "Responsive Design",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "rest api",
+        "restful",
+        "restful api"
+      ],
+      "canonical": "rest",
+      "category": "tool",
+      "display": "REST",
+      "weight": 0.85
+    },
+    {
+      "aliases": [],
+      "canonical": "ruby",
+      "category": "language",
+      "display": "Ruby",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "rust",
+      "category": "language",
+      "display": "Rust",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "amazon s3"
+      ],
+      "canonical": "s3",
+      "category": "cloud",
+      "display": "Amazon S3",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "salesforce",
+      "category": "tool",
+      "display": "Salesforce",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "sap",
+      "category": "tool",
+      "display": "SAP",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "scss"
+      ],
+      "canonical": "sass",
+      "category": "language",
+      "display": "Sass",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "scala",
+      "category": "language",
+      "display": "Scala",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "scikit learn",
+        "sklearn"
+      ],
+      "canonical": "scikit-learn",
+      "category": "data",
+      "display": "scikit-learn",
+      "weight": 0.75
+    },
+    {
+      "aliases": [],
+      "canonical": "selenium",
+      "category": "testing",
+      "display": "Selenium",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "search engine optimisation",
+        "search engine optimization"
+      ],
+      "canonical": "seo",
+      "category": "practice",
+      "display": "SEO",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "serverless architecture"
+      ],
+      "canonical": "serverless",
+      "category": "cloud",
+      "display": "Serverless",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "sre"
+      ],
+      "canonical": "site reliability engineering",
+      "category": "practice",
+      "display": "Site Reliability Engineering",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "snowflake",
+      "category": "database",
+      "display": "Snowflake",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "soap api"
+      ],
+      "canonical": "soap",
+      "category": "tool",
+      "display": "SOAP",
+      "weight": 0.35
+    },
+    {
+      "aliases": [
+        "solution architecture"
+      ],
+      "canonical": "software architecture",
+      "category": "practice",
+      "display": "Software Architecture",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "solidity",
+      "category": "language",
+      "display": "Solidity",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "apache spark",
+        "pyspark"
+      ],
+      "canonical": "spark",
+      "category": "data",
+      "display": "Apache Spark",
+      "weight": 0.65
+    },
+    {
+      "aliases": [],
+      "canonical": "splunk",
+      "category": "tool",
+      "display": "Splunk",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "spring boot",
+        "springboot"
+      ],
+      "canonical": "spring",
+      "category": "framework",
+      "display": "Spring",
+      "weight": 0.8
+    },
+    {
+      "aliases": [
+        "structured query language"
+      ],
+      "canonical": "sql",
+      "category": "language",
+      "display": "SQL",
+      "weight": 0.95
+    },
+    {
+      "aliases": [
+        "microsoft sql server",
+        "mssql",
+        "t-sql",
+        "tsql"
+      ],
+      "canonical": "sql server",
+      "category": "database",
+      "display": "Microsoft SQL Server",
+      "weight": 0.65
+    },
+    {
+      "aliases": [],
+      "canonical": "sqlalchemy",
+      "category": "library",
+      "display": "SQLAlchemy",
+      "weight": 0.55
+    },
+    {
+      "aliases": [],
+      "canonical": "sqlite",
+      "category": "database",
+      "display": "SQLite",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "stakeholder engagement"
+      ],
+      "canonical": "stakeholder management",
+      "category": "soft_skill",
+      "display": "Stakeholder Management",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "statistical analysis"
+      ],
+      "canonical": "statistics",
+      "category": "data",
+      "display": "Statistics",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "sveltekit"
+      ],
+      "canonical": "svelte",
+      "category": "framework",
+      "display": "Svelte",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "swift",
+      "category": "language",
+      "display": "Swift",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "symfony",
+      "category": "framework",
+      "display": "Symfony",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "system design",
+      "category": "practice",
+      "display": "System Design",
+      "weight": 0.65
+    },
+    {
+      "aliases": [],
+      "canonical": "tableau",
+      "category": "tool",
+      "display": "Tableau",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "tailwind css",
+        "tailwindcss"
+      ],
+      "canonical": "tailwind",
+      "category": "framework",
+      "display": "Tailwind CSS",
+      "weight": 0.7
+    },
+    {
+      "aliases": [
+        "test driven development",
+        "test-driven development"
+      ],
+      "canonical": "tdd",
+      "category": "practice",
+      "display": "Test-Driven Development",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "technical documentation",
+      "category": "practice",
+      "display": "Technical Documentation",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "tf"
+      ],
+      "canonical": "tensorflow",
+      "category": "data",
+      "display": "TensorFlow",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "terraform",
+      "category": "devops",
+      "display": "Terraform",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "automated testing"
+      ],
+      "canonical": "test automation",
+      "category": "testing",
+      "display": "Test Automation",
+      "weight": 0.6
+    },
+    {
+      "aliases": [],
+      "canonical": "time management",
+      "category": "soft_skill",
+      "display": "Time Management",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "ts"
+      ],
+      "canonical": "typescript",
+      "category": "language",
+      "display": "TypeScript",
+      "weight": 0.95
+    },
+    {
+      "aliases": [
+        "user interface design"
+      ],
+      "canonical": "ui design",
+      "category": "practice",
+      "display": "UI Design",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "unit tests"
+      ],
+      "canonical": "unit testing",
+      "category": "testing",
+      "display": "Unit Testing",
+      "weight": 0.75
+    },
+    {
+      "aliases": [
+        "unity3d"
+      ],
+      "canonical": "unity",
+      "category": "framework",
+      "display": "Unity",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "unreal"
+      ],
+      "canonical": "unreal engine",
+      "category": "framework",
+      "display": "Unreal Engine",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "user experience design",
+        "ux research"
+      ],
+      "canonical": "ux design",
+      "category": "practice",
+      "display": "UX Design",
+      "weight": 0.6
+    },
+    {
+      "aliases": [
+        "vb.net",
+        "vba"
+      ],
+      "canonical": "visual basic",
+      "category": "language",
+      "display": "Visual Basic",
+      "weight": 0.3
+    },
+    {
+      "aliases": [],
+      "canonical": "vite",
+      "category": "tool",
+      "display": "Vite",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "vpn",
+      "category": "tool",
+      "display": "VPN",
+      "weight": 0.35
+    },
+    {
+      "aliases": [
+        "vue.js",
+        "vuejs"
+      ],
+      "canonical": "vue",
+      "category": "framework",
+      "display": "Vue",
+      "weight": 0.75
+    },
+    {
+      "aliases": [],
+      "canonical": "vulnerability management",
+      "category": "practice",
+      "display": "Vulnerability Management",
+      "weight": 0.45
+    },
+    {
+      "aliases": [
+        "a11y",
+        "wcag"
+      ],
+      "canonical": "web accessibility",
+      "category": "practice",
+      "display": "Web Accessibility",
+      "weight": 0.55
+    },
+    {
+      "aliases": [
+        "web application development"
+      ],
+      "canonical": "web development",
+      "category": "practice",
+      "display": "Web Development",
+      "weight": 0.7
+    },
+    {
+      "aliases": [],
+      "canonical": "webpack",
+      "category": "tool",
+      "display": "webpack",
+      "weight": 0.5
+    },
+    {
+      "aliases": [
+        "websocket"
+      ],
+      "canonical": "websockets",
+      "category": "tool",
+      "display": "WebSockets",
+      "weight": 0.5
+    },
+    {
+      "aliases": [],
+      "canonical": "windows server",
+      "category": "devops",
+      "display": "Windows Server",
+      "weight": 0.4
+    },
+    {
+      "aliases": [],
+      "canonical": "xamarin",
+      "category": "framework",
+      "display": "Xamarin",
+      "weight": 0.35
+    },
+    {
+      "aliases": [],
+      "canonical": "xml",
+      "category": "tool",
+      "display": "XML",
+      "weight": 0.4
+    },
+    {
+      "aliases": [
+        "yml"
+      ],
+      "canonical": "yaml",
+      "category": "tool",
+      "display": "YAML",
+      "weight": 0.4
+    }
+  ],
+  "source": "ml/pipelines/build_skill_lexicon.py",
+  "sources": [
+    {
+      "license": "Repository license (see LICENSE)",
+      "name": "MatchLayer curated seed (Phase 1)",
+      "retrieved": "2026-07-26",
+      "url": "ml/pipelines/build_skill_lexicon.py",
+      "version": "1.0.0"
+    },
+    {
+      "license": "CC BY 4.0 (ESCO copyright notice for skills/competences: https://esco.ec.europa.eu/en/copyright-notice-esco-skills-competences)",
+      "name": "ESCO — European Skills, Competences, Qualifications and Occupations, skills pillar (curated subset)",
+      "retrieved": "2026-07-26",
+      "url": "https://esco.ec.europa.eu/",
+      "version": "1.2.1"
+    }
+  ]
+}
