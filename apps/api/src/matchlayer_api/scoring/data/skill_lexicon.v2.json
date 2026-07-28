@@ -5,28 +5,40 @@
   "skill_count": 235,
   "skills": [
     {
-      "aliases": ["asp.net", "aspnet", "dot net", "dotnet"],
+      "aliases": [
+        "asp.net",
+        "aspnet",
+        "dot net",
+        "dotnet"
+      ],
       "canonical": ".net",
       "category": "framework",
       "display": ".NET",
       "weight": 0.75
     },
     {
-      "aliases": ["flexibility"],
+      "aliases": [
+        "flexibility"
+      ],
       "canonical": "adaptability",
       "category": "soft_skill",
       "display": "Adaptability",
       "weight": 0.45
     },
     {
-      "aliases": ["kanban", "scrum"],
+      "aliases": [
+        "kanban",
+        "scrum"
+      ],
       "canonical": "agile",
       "category": "practice",
       "display": "Agile",
       "weight": 0.7
     },
     {
-      "aliases": ["apache airflow"],
+      "aliases": [
+        "apache airflow"
+      ],
       "canonical": "airflow",
       "category": "data",
       "display": "Apache Airflow",
@@ -40,21 +52,27 @@
       "weight": 0.6
     },
     {
-      "aliases": ["analytical thinking"],
+      "aliases": [
+        "analytical thinking"
+      ],
       "canonical": "analytical skills",
       "category": "soft_skill",
       "display": "Analytical Skills",
       "weight": 0.55
     },
     {
-      "aliases": ["android development"],
+      "aliases": [
+        "android development"
+      ],
       "canonical": "android",
       "category": "framework",
       "display": "Android",
       "weight": 0.7
     },
     {
-      "aliases": ["angularjs"],
+      "aliases": [
+        "angularjs"
+      ],
       "canonical": "angular",
       "category": "framework",
       "display": "Angular",
@@ -75,42 +93,57 @@
       "weight": 0.6
     },
     {
-      "aliases": ["appsec"],
+      "aliases": [
+        "appsec"
+      ],
       "canonical": "application security",
       "category": "practice",
       "display": "Application Security",
       "weight": 0.55
     },
     {
-      "aliases": ["detail oriented", "detail-oriented"],
+      "aliases": [
+        "detail oriented",
+        "detail-oriented"
+      ],
       "canonical": "attention to detail",
       "category": "soft_skill",
       "display": "Attention to Detail",
       "weight": 0.45
     },
     {
-      "aliases": ["amazon web services"],
+      "aliases": [
+        "amazon web services"
+      ],
       "canonical": "aws",
       "category": "cloud",
       "display": "AWS",
       "weight": 0.95
     },
     {
-      "aliases": ["cdk"],
+      "aliases": [
+        "cdk"
+      ],
       "canonical": "aws cdk",
       "category": "devops",
       "display": "AWS CDK",
       "weight": 0.55
     },
     {
-      "aliases": ["microsoft azure"],
+      "aliases": [
+        "microsoft azure"
+      ],
       "canonical": "azure",
       "category": "cloud",
       "display": "Azure",
       "weight": 0.8
     },
     {
-      "aliases": ["sh", "shell", "shell scripting"],
+      "aliases": [
+        "sh",
+        "shell",
+        "shell scripting"
+      ],
       "canonical": "bash",
       "category": "language",
       "display": "Bash",
@@ -124,7 +157,9 @@
       "weight": 0.55
     },
     {
-      "aliases": ["google bigquery"],
+      "aliases": [
+        "google bigquery"
+      ],
       "canonical": "bigquery",
       "category": "database",
       "display": "BigQuery",
@@ -152,21 +187,31 @@
       "weight": 0.5
     },
     {
-      "aliases": ["c sharp", "csharp", "dotnet c#"],
+      "aliases": [
+        "c sharp",
+        "csharp",
+        "dotnet c#"
+      ],
       "canonical": "c#",
       "category": "language",
       "display": "C#",
       "weight": 0.85
     },
     {
-      "aliases": ["c plus plus", "cplusplus", "cpp"],
+      "aliases": [
+        "c plus plus",
+        "cplusplus",
+        "cpp"
+      ],
       "canonical": "c++",
       "category": "language",
       "display": "C++",
       "weight": 0.8
     },
     {
-      "aliases": ["apache cassandra"],
+      "aliases": [
+        "apache cassandra"
+      ],
       "canonical": "cassandra",
       "category": "database",
       "display": "Apache Cassandra",
@@ -192,14 +237,19 @@
       "weight": 0.85
     },
     {
-      "aliases": ["cloud architecture", "cloud infrastructure"],
+      "aliases": [
+        "cloud architecture",
+        "cloud infrastructure"
+      ],
       "canonical": "cloud computing",
       "category": "cloud",
       "display": "Cloud Computing",
       "weight": 0.7
     },
     {
-      "aliases": ["aws cloudformation"],
+      "aliases": [
+        "aws cloudformation"
+      ],
       "canonical": "cloudformation",
       "category": "devops",
       "display": "AWS CloudFormation",
@@ -213,28 +263,37 @@
       "weight": 0.3
     },
     {
-      "aliases": ["code reviews"],
+      "aliases": [
+        "code reviews"
+      ],
       "canonical": "code review",
       "category": "practice",
       "display": "Code Review",
       "weight": 0.6
     },
     {
-      "aliases": ["team player", "teamwork"],
+      "aliases": [
+        "team player",
+        "teamwork"
+      ],
       "canonical": "collaboration",
       "category": "soft_skill",
       "display": "Collaboration",
       "weight": 0.55
     },
     {
-      "aliases": ["communication skills"],
+      "aliases": [
+        "communication skills"
+      ],
       "canonical": "communication",
       "category": "soft_skill",
       "display": "Communication",
       "weight": 0.6
     },
     {
-      "aliases": ["image processing"],
+      "aliases": [
+        "image processing"
+      ],
       "canonical": "computer vision",
       "category": "data",
       "display": "Computer Vision",
@@ -269,28 +328,38 @@
       "weight": 0.5
     },
     {
-      "aliases": ["encryption"],
+      "aliases": [
+        "encryption"
+      ],
       "canonical": "cryptography",
       "category": "practice",
       "display": "Cryptography",
       "weight": 0.5
     },
     {
-      "aliases": ["css3"],
+      "aliases": [
+        "css3"
+      ],
       "canonical": "css",
       "category": "language",
       "display": "CSS",
       "weight": 0.8
     },
     {
-      "aliases": ["customer support"],
+      "aliases": [
+        "customer support"
+      ],
       "canonical": "customer service",
       "category": "soft_skill",
       "display": "Customer Service",
       "weight": 0.45
     },
     {
-      "aliases": ["cyber security", "information security", "infosec"],
+      "aliases": [
+        "cyber security",
+        "information security",
+        "infosec"
+      ],
       "canonical": "cybersecurity",
       "category": "practice",
       "display": "Cybersecurity",
@@ -311,21 +380,28 @@
       "weight": 0.5
     },
     {
-      "aliases": ["data analytics"],
+      "aliases": [
+        "data analytics"
+      ],
       "canonical": "data analysis",
       "category": "data",
       "display": "Data Analysis",
       "weight": 0.7
     },
     {
-      "aliases": ["data pipeline", "data pipelines"],
+      "aliases": [
+        "data pipeline",
+        "data pipelines"
+      ],
       "canonical": "data engineering",
       "category": "data",
       "display": "Data Engineering",
       "weight": 0.65
     },
     {
-      "aliases": ["data modelling"],
+      "aliases": [
+        "data modelling"
+      ],
       "canonical": "data modeling",
       "category": "data",
       "display": "Data Modeling",
@@ -339,28 +415,36 @@
       "weight": 0.7
     },
     {
-      "aliases": ["data structures and algorithms"],
+      "aliases": [
+        "data structures and algorithms"
+      ],
       "canonical": "data structures",
       "category": "practice",
       "display": "Data Structures",
       "weight": 0.6
     },
     {
-      "aliases": ["data visualisation"],
+      "aliases": [
+        "data visualisation"
+      ],
       "canonical": "data visualization",
       "category": "data",
       "display": "Data Visualization",
       "weight": 0.6
     },
     {
-      "aliases": ["data warehouse"],
+      "aliases": [
+        "data warehouse"
+      ],
       "canonical": "data warehousing",
       "category": "data",
       "display": "Data Warehousing",
       "weight": 0.6
     },
     {
-      "aliases": ["dba"],
+      "aliases": [
+        "dba"
+      ],
       "canonical": "database administration",
       "category": "database",
       "display": "Database Administration",
@@ -388,21 +472,28 @@
       "weight": 0.5
     },
     {
-      "aliases": ["troubleshooting"],
+      "aliases": [
+        "troubleshooting"
+      ],
       "canonical": "debugging",
       "category": "practice",
       "display": "Debugging",
       "weight": 0.55
     },
     {
-      "aliases": ["decision-making"],
+      "aliases": [
+        "decision-making"
+      ],
       "canonical": "decision making",
       "category": "soft_skill",
       "display": "Decision Making",
       "weight": 0.45
     },
     {
-      "aliases": ["neural network", "neural networks"],
+      "aliases": [
+        "neural network",
+        "neural networks"
+      ],
       "canonical": "deep learning",
       "category": "data",
       "display": "Deep Learning",
@@ -451,35 +542,48 @@
       "weight": 0.4
     },
     {
-      "aliases": ["containerization"],
+      "aliases": [
+        "containerization"
+      ],
       "canonical": "docker",
       "category": "devops",
       "display": "Docker",
       "weight": 0.9
     },
     {
-      "aliases": ["ddd", "domain driven design"],
+      "aliases": [
+        "ddd",
+        "domain driven design"
+      ],
       "canonical": "domain-driven design",
       "category": "practice",
       "display": "Domain-Driven Design",
       "weight": 0.5
     },
     {
-      "aliases": ["dynamo"],
+      "aliases": [
+        "dynamo"
+      ],
       "canonical": "dynamodb",
       "category": "database",
       "display": "DynamoDB",
       "weight": 0.7
     },
     {
-      "aliases": ["amazon ecs", "fargate"],
+      "aliases": [
+        "amazon ecs",
+        "fargate"
+      ],
       "canonical": "ecs",
       "category": "cloud",
       "display": "Amazon ECS",
       "weight": 0.6
     },
     {
-      "aliases": ["elastic search", "es"],
+      "aliases": [
+        "elastic search",
+        "es"
+      ],
       "canonical": "elasticsearch",
       "category": "database",
       "display": "Elasticsearch",
@@ -493,7 +597,9 @@
       "weight": 0.45
     },
     {
-      "aliases": ["embedded software"],
+      "aliases": [
+        "embedded software"
+      ],
       "canonical": "embedded systems",
       "category": "practice",
       "display": "Embedded Systems",
@@ -507,42 +613,58 @@
       "weight": 0.4
     },
     {
-      "aliases": ["e2e testing", "end to end testing"],
+      "aliases": [
+        "e2e testing",
+        "end to end testing"
+      ],
       "canonical": "end-to-end testing",
       "category": "testing",
       "display": "End-to-End Testing",
       "weight": 0.55
     },
     {
-      "aliases": ["elt", "extract transform load"],
+      "aliases": [
+        "elt",
+        "extract transform load"
+      ],
       "canonical": "etl",
       "category": "data",
       "display": "ETL",
       "weight": 0.65
     },
     {
-      "aliases": ["event driven architecture"],
+      "aliases": [
+        "event driven architecture"
+      ],
       "canonical": "event-driven architecture",
       "category": "practice",
       "display": "Event-Driven Architecture",
       "weight": 0.55
     },
     {
-      "aliases": ["microsoft excel", "spreadsheets"],
+      "aliases": [
+        "microsoft excel",
+        "spreadsheets"
+      ],
       "canonical": "excel",
       "category": "tool",
       "display": "Microsoft Excel",
       "weight": 0.5
     },
     {
-      "aliases": ["express.js", "expressjs"],
+      "aliases": [
+        "express.js",
+        "expressjs"
+      ],
       "canonical": "express",
       "category": "framework",
       "display": "Express",
       "weight": 0.75
     },
     {
-      "aliases": ["fast api"],
+      "aliases": [
+        "fast api"
+      ],
       "canonical": "fastapi",
       "category": "framework",
       "display": "FastAPI",
@@ -584,35 +706,47 @@
       "weight": 0.5
     },
     {
-      "aliases": ["google cloud", "google cloud platform"],
+      "aliases": [
+        "google cloud",
+        "google cloud platform"
+      ],
       "canonical": "gcp",
       "category": "cloud",
       "display": "Google Cloud",
       "weight": 0.8
     },
     {
-      "aliases": ["version control"],
+      "aliases": [
+        "version control"
+      ],
       "canonical": "git",
       "category": "tool",
       "display": "Git",
       "weight": 0.85
     },
     {
-      "aliases": ["gha"],
+      "aliases": [
+        "gha"
+      ],
       "canonical": "github actions",
       "category": "devops",
       "display": "GitHub Actions",
       "weight": 0.65
     },
     {
-      "aliases": ["gitlab ci", "gitlab ci/cd"],
+      "aliases": [
+        "gitlab ci",
+        "gitlab ci/cd"
+      ],
       "canonical": "gitlab",
       "category": "devops",
       "display": "GitLab",
       "weight": 0.5
     },
     {
-      "aliases": ["golang"],
+      "aliases": [
+        "golang"
+      ],
       "canonical": "go",
       "category": "language",
       "display": "Go",
@@ -626,7 +760,9 @@
       "weight": 0.55
     },
     {
-      "aliases": ["graph ql"],
+      "aliases": [
+        "graph ql"
+      ],
       "canonical": "graphql",
       "category": "tool",
       "display": "GraphQL",
@@ -647,7 +783,10 @@
       "weight": 0.6
     },
     {
-      "aliases": ["apache hadoop", "hdfs"],
+      "aliases": [
+        "apache hadoop",
+        "hdfs"
+      ],
       "canonical": "hadoop",
       "category": "data",
       "display": "Apache Hadoop",
@@ -661,7 +800,9 @@
       "weight": 0.4
     },
     {
-      "aliases": ["helm charts"],
+      "aliases": [
+        "helm charts"
+      ],
       "canonical": "helm",
       "category": "devops",
       "display": "Helm",
@@ -675,21 +816,27 @@
       "weight": 0.5
     },
     {
-      "aliases": ["html5"],
+      "aliases": [
+        "html5"
+      ],
       "canonical": "html",
       "category": "language",
       "display": "HTML",
       "weight": 0.8
     },
     {
-      "aliases": ["huggingface"],
+      "aliases": [
+        "huggingface"
+      ],
       "canonical": "hugging face",
       "category": "data",
       "display": "Hugging Face",
       "weight": 0.5
     },
     {
-      "aliases": ["iam"],
+      "aliases": [
+        "iam"
+      ],
       "canonical": "identity and access management",
       "category": "practice",
       "display": "Identity and Access Management",
@@ -703,28 +850,36 @@
       "weight": 0.5
     },
     {
-      "aliases": ["iac"],
+      "aliases": [
+        "iac"
+      ],
       "canonical": "infrastructure as code",
       "category": "devops",
       "display": "Infrastructure as Code",
       "weight": 0.65
     },
     {
-      "aliases": ["integration tests"],
+      "aliases": [
+        "integration tests"
+      ],
       "canonical": "integration testing",
       "category": "testing",
       "display": "Integration Testing",
       "weight": 0.6
     },
     {
-      "aliases": ["ios development"],
+      "aliases": [
+        "ios development"
+      ],
       "canonical": "ios",
       "category": "framework",
       "display": "iOS",
       "weight": 0.7
     },
     {
-      "aliases": ["internet of things"],
+      "aliases": [
+        "internet of things"
+      ],
       "canonical": "iot",
       "category": "practice",
       "display": "IoT",
@@ -745,7 +900,10 @@
       "weight": 0.9
     },
     {
-      "aliases": ["ecmascript", "js"],
+      "aliases": [
+        "ecmascript",
+        "js"
+      ],
       "canonical": "javascript",
       "category": "language",
       "display": "JavaScript",
@@ -794,7 +952,9 @@
       "weight": 0.4
     },
     {
-      "aliases": ["apache kafka"],
+      "aliases": [
+        "apache kafka"
+      ],
       "canonical": "kafka",
       "category": "tool",
       "display": "Apache Kafka",
@@ -815,14 +975,18 @@
       "weight": 0.75
     },
     {
-      "aliases": ["k8s"],
+      "aliases": [
+        "k8s"
+      ],
       "canonical": "kubernetes",
       "category": "devops",
       "display": "Kubernetes",
       "weight": 0.85
     },
     {
-      "aliases": ["aws lambda"],
+      "aliases": [
+        "aws lambda"
+      ],
       "canonical": "lambda",
       "category": "cloud",
       "display": "AWS Lambda",
@@ -836,21 +1000,28 @@
       "weight": 0.55
     },
     {
-      "aliases": ["team lead", "tech lead"],
+      "aliases": [
+        "team lead",
+        "tech lead"
+      ],
       "canonical": "leadership",
       "category": "soft_skill",
       "display": "Leadership",
       "weight": 0.6
     },
     {
-      "aliases": ["unix"],
+      "aliases": [
+        "unix"
+      ],
       "canonical": "linux",
       "category": "devops",
       "display": "Linux",
       "weight": 0.75
     },
     {
-      "aliases": ["load balancer"],
+      "aliases": [
+        "load balancer"
+      ],
       "canonical": "load balancing",
       "category": "tool",
       "display": "Load Balancing",
@@ -864,7 +1035,9 @@
       "weight": 0.35
     },
     {
-      "aliases": ["ml"],
+      "aliases": [
+        "ml"
+      ],
       "canonical": "machine learning",
       "category": "data",
       "display": "Machine Learning",
@@ -878,35 +1051,47 @@
       "weight": 0.5
     },
     {
-      "aliases": ["coaching", "mentorship"],
+      "aliases": [
+        "coaching",
+        "mentorship"
+      ],
       "canonical": "mentoring",
       "category": "soft_skill",
       "display": "Mentoring",
       "weight": 0.5
     },
     {
-      "aliases": ["micro services", "microservice"],
+      "aliases": [
+        "micro services",
+        "microservice"
+      ],
       "canonical": "microservices",
       "category": "practice",
       "display": "Microservices",
       "weight": 0.75
     },
     {
-      "aliases": ["ml ops"],
+      "aliases": [
+        "ml ops"
+      ],
       "canonical": "mlops",
       "category": "data",
       "display": "MLOps",
       "weight": 0.55
     },
     {
-      "aliases": ["mobile app development"],
+      "aliases": [
+        "mobile app development"
+      ],
       "canonical": "mobile development",
       "category": "practice",
       "display": "Mobile Development",
       "weight": 0.6
     },
     {
-      "aliases": ["mongo"],
+      "aliases": [
+        "mongo"
+      ],
       "canonical": "mongodb",
       "category": "database",
       "display": "MongoDB",
@@ -934,7 +1119,10 @@
       "weight": 0.4
     },
     {
-      "aliases": ["nest js", "nest.js"],
+      "aliases": [
+        "nest js",
+        "nest.js"
+      ],
       "canonical": "nestjs",
       "category": "framework",
       "display": "NestJS",
@@ -948,14 +1136,21 @@
       "weight": 0.5
     },
     {
-      "aliases": ["computer networking", "tcp ip", "tcp/ip"],
+      "aliases": [
+        "computer networking",
+        "tcp ip",
+        "tcp/ip"
+      ],
       "canonical": "networking",
       "category": "tool",
       "display": "Networking",
       "weight": 0.6
     },
     {
-      "aliases": ["next js", "nextjs"],
+      "aliases": [
+        "next js",
+        "nextjs"
+      ],
       "canonical": "next.js",
       "category": "framework",
       "display": "Next.js",
@@ -969,42 +1164,60 @@
       "weight": 0.6
     },
     {
-      "aliases": ["natural language processing"],
+      "aliases": [
+        "natural language processing"
+      ],
       "canonical": "nlp",
       "category": "data",
       "display": "NLP",
       "weight": 0.65
     },
     {
-      "aliases": ["node", "node js", "nodejs"],
+      "aliases": [
+        "node",
+        "node js",
+        "nodejs"
+      ],
       "canonical": "node.js",
       "category": "framework",
       "display": "Node.js",
       "weight": 0.9
     },
     {
-      "aliases": ["np"],
+      "aliases": [
+        "np"
+      ],
       "canonical": "numpy",
       "category": "data",
       "display": "NumPy",
       "weight": 0.7
     },
     {
-      "aliases": ["oauth 2.0", "oauth2", "oidc", "openid connect"],
+      "aliases": [
+        "oauth 2.0",
+        "oauth2",
+        "oidc",
+        "openid connect"
+      ],
       "canonical": "oauth",
       "category": "tool",
       "display": "OAuth",
       "weight": 0.6
     },
     {
-      "aliases": ["object oriented programming", "oop"],
+      "aliases": [
+        "object oriented programming",
+        "oop"
+      ],
       "canonical": "object-oriented programming",
       "category": "practice",
       "display": "Object-Oriented Programming",
       "weight": 0.65
     },
     {
-      "aliases": ["objective c"],
+      "aliases": [
+        "objective c"
+      ],
       "canonical": "objective-c",
       "category": "language",
       "display": "Objective-C",
@@ -1018,7 +1231,9 @@
       "weight": 0.5
     },
     {
-      "aliases": ["swagger"],
+      "aliases": [
+        "swagger"
+      ],
       "canonical": "openapi",
       "category": "tool",
       "display": "OpenAPI",
@@ -1032,7 +1247,12 @@
       "weight": 0.4
     },
     {
-      "aliases": ["oracle database", "oracle db", "pl/sql", "plsql"],
+      "aliases": [
+        "oracle database",
+        "oracle db",
+        "pl/sql",
+        "plsql"
+      ],
       "canonical": "oracle",
       "category": "database",
       "display": "Oracle Database",
@@ -1053,14 +1273,19 @@
       "weight": 0.75
     },
     {
-      "aliases": ["pen testing", "pentesting"],
+      "aliases": [
+        "pen testing",
+        "pentesting"
+      ],
       "canonical": "penetration testing",
       "category": "practice",
       "display": "Penetration Testing",
       "weight": 0.5
     },
     {
-      "aliases": ["load testing"],
+      "aliases": [
+        "load testing"
+      ],
       "canonical": "performance testing",
       "category": "testing",
       "display": "Performance Testing",
@@ -1074,7 +1299,9 @@
       "weight": 0.4
     },
     {
-      "aliases": ["pg vector"],
+      "aliases": [
+        "pg vector"
+      ],
       "canonical": "pgvector",
       "category": "database",
       "display": "pgvector",
@@ -1095,14 +1322,21 @@
       "weight": 0.55
     },
     {
-      "aliases": ["postgre", "postgres", "psql"],
+      "aliases": [
+        "postgre",
+        "postgres",
+        "psql"
+      ],
       "canonical": "postgresql",
       "category": "database",
       "display": "PostgreSQL",
       "weight": 0.9
     },
     {
-      "aliases": ["microsoft power bi", "powerbi"],
+      "aliases": [
+        "microsoft power bi",
+        "powerbi"
+      ],
       "canonical": "power bi",
       "category": "tool",
       "display": "Power BI",
@@ -1116,14 +1350,18 @@
       "weight": 0.55
     },
     {
-      "aliases": ["public speaking"],
+      "aliases": [
+        "public speaking"
+      ],
       "canonical": "presentation skills",
       "category": "soft_skill",
       "display": "Presentation Skills",
       "weight": 0.45
     },
     {
-      "aliases": ["problem-solving"],
+      "aliases": [
+        "problem-solving"
+      ],
       "canonical": "problem solving",
       "category": "soft_skill",
       "display": "Problem Solving",
@@ -1137,7 +1375,9 @@
       "weight": 0.55
     },
     {
-      "aliases": ["project planning"],
+      "aliases": [
+        "project planning"
+      ],
       "canonical": "project management",
       "category": "practice",
       "display": "Project Management",
@@ -1165,56 +1405,76 @@
       "weight": 0.65
     },
     {
-      "aliases": ["cpython", "py", "python3"],
+      "aliases": [
+        "cpython",
+        "py",
+        "python3"
+      ],
       "canonical": "python",
       "category": "language",
       "display": "Python",
       "weight": 1.0
     },
     {
-      "aliases": ["torch"],
+      "aliases": [
+        "torch"
+      ],
       "canonical": "pytorch",
       "category": "data",
       "display": "PyTorch",
       "weight": 0.7
     },
     {
-      "aliases": ["qa"],
+      "aliases": [
+        "qa"
+      ],
       "canonical": "quality assurance",
       "category": "testing",
       "display": "Quality Assurance",
       "weight": 0.6
     },
     {
-      "aliases": ["r programming"],
+      "aliases": [
+        "r programming"
+      ],
       "canonical": "r",
       "category": "language",
       "display": "R",
       "weight": 0.6
     },
     {
-      "aliases": ["rabbit mq"],
+      "aliases": [
+        "rabbit mq"
+      ],
       "canonical": "rabbitmq",
       "category": "tool",
       "display": "RabbitMQ",
       "weight": 0.6
     },
     {
-      "aliases": ["ror", "ruby on rails"],
+      "aliases": [
+        "ror",
+        "ruby on rails"
+      ],
       "canonical": "rails",
       "category": "framework",
       "display": "Ruby on Rails",
       "weight": 0.65
     },
     {
-      "aliases": ["react.js", "reactjs"],
+      "aliases": [
+        "react.js",
+        "reactjs"
+      ],
       "canonical": "react",
       "category": "framework",
       "display": "React",
       "weight": 0.95
     },
     {
-      "aliases": ["react-native"],
+      "aliases": [
+        "react-native"
+      ],
       "canonical": "react native",
       "category": "framework",
       "display": "React Native",
@@ -1228,7 +1488,9 @@
       "weight": 0.8
     },
     {
-      "aliases": ["amazon redshift"],
+      "aliases": [
+        "amazon redshift"
+      ],
       "canonical": "redshift",
       "category": "database",
       "display": "Amazon Redshift",
@@ -1242,21 +1504,29 @@
       "weight": 0.65
     },
     {
-      "aliases": ["code refactoring"],
+      "aliases": [
+        "code refactoring"
+      ],
       "canonical": "refactoring",
       "category": "practice",
       "display": "Refactoring",
       "weight": 0.5
     },
     {
-      "aliases": ["responsive web design"],
+      "aliases": [
+        "responsive web design"
+      ],
       "canonical": "responsive design",
       "category": "practice",
       "display": "Responsive Design",
       "weight": 0.5
     },
     {
-      "aliases": ["rest api", "restful", "restful api"],
+      "aliases": [
+        "rest api",
+        "restful",
+        "restful api"
+      ],
       "canonical": "rest",
       "category": "tool",
       "display": "REST",
@@ -1277,7 +1547,9 @@
       "weight": 0.8
     },
     {
-      "aliases": ["amazon s3"],
+      "aliases": [
+        "amazon s3"
+      ],
       "canonical": "s3",
       "category": "cloud",
       "display": "Amazon S3",
@@ -1298,7 +1570,9 @@
       "weight": 0.45
     },
     {
-      "aliases": ["scss"],
+      "aliases": [
+        "scss"
+      ],
       "canonical": "sass",
       "category": "language",
       "display": "Sass",
@@ -1312,7 +1586,10 @@
       "weight": 0.7
     },
     {
-      "aliases": ["scikit learn", "sklearn"],
+      "aliases": [
+        "scikit learn",
+        "sklearn"
+      ],
       "canonical": "scikit-learn",
       "category": "data",
       "display": "scikit-learn",
@@ -1326,21 +1603,28 @@
       "weight": 0.5
     },
     {
-      "aliases": ["search engine optimisation", "search engine optimization"],
+      "aliases": [
+        "search engine optimisation",
+        "search engine optimization"
+      ],
       "canonical": "seo",
       "category": "practice",
       "display": "SEO",
       "weight": 0.45
     },
     {
-      "aliases": ["serverless architecture"],
+      "aliases": [
+        "serverless architecture"
+      ],
       "canonical": "serverless",
       "category": "cloud",
       "display": "Serverless",
       "weight": 0.55
     },
     {
-      "aliases": ["sre"],
+      "aliases": [
+        "sre"
+      ],
       "canonical": "site reliability engineering",
       "category": "practice",
       "display": "Site Reliability Engineering",
@@ -1354,14 +1638,18 @@
       "weight": 0.6
     },
     {
-      "aliases": ["soap api"],
+      "aliases": [
+        "soap api"
+      ],
       "canonical": "soap",
       "category": "tool",
       "display": "SOAP",
       "weight": 0.35
     },
     {
-      "aliases": ["solution architecture"],
+      "aliases": [
+        "solution architecture"
+      ],
       "canonical": "software architecture",
       "category": "practice",
       "display": "Software Architecture",
@@ -1375,7 +1663,10 @@
       "weight": 0.4
     },
     {
-      "aliases": ["apache spark", "pyspark"],
+      "aliases": [
+        "apache spark",
+        "pyspark"
+      ],
       "canonical": "spark",
       "category": "data",
       "display": "Apache Spark",
@@ -1389,21 +1680,31 @@
       "weight": 0.45
     },
     {
-      "aliases": ["spring boot", "springboot"],
+      "aliases": [
+        "spring boot",
+        "springboot"
+      ],
       "canonical": "spring",
       "category": "framework",
       "display": "Spring",
       "weight": 0.8
     },
     {
-      "aliases": ["structured query language"],
+      "aliases": [
+        "structured query language"
+      ],
       "canonical": "sql",
       "category": "language",
       "display": "SQL",
       "weight": 0.95
     },
     {
-      "aliases": ["microsoft sql server", "mssql", "t-sql", "tsql"],
+      "aliases": [
+        "microsoft sql server",
+        "mssql",
+        "t-sql",
+        "tsql"
+      ],
       "canonical": "sql server",
       "category": "database",
       "display": "Microsoft SQL Server",
@@ -1424,21 +1725,27 @@
       "weight": 0.55
     },
     {
-      "aliases": ["stakeholder engagement"],
+      "aliases": [
+        "stakeholder engagement"
+      ],
       "canonical": "stakeholder management",
       "category": "soft_skill",
       "display": "Stakeholder Management",
       "weight": 0.5
     },
     {
-      "aliases": ["statistical analysis"],
+      "aliases": [
+        "statistical analysis"
+      ],
       "canonical": "statistics",
       "category": "data",
       "display": "Statistics",
       "weight": 0.6
     },
     {
-      "aliases": ["sveltekit"],
+      "aliases": [
+        "sveltekit"
+      ],
       "canonical": "svelte",
       "category": "framework",
       "display": "Svelte",
@@ -1473,14 +1780,20 @@
       "weight": 0.55
     },
     {
-      "aliases": ["tailwind css", "tailwindcss"],
+      "aliases": [
+        "tailwind css",
+        "tailwindcss"
+      ],
       "canonical": "tailwind",
       "category": "framework",
       "display": "Tailwind CSS",
       "weight": 0.7
     },
     {
-      "aliases": ["test driven development", "test-driven development"],
+      "aliases": [
+        "test driven development",
+        "test-driven development"
+      ],
       "canonical": "tdd",
       "category": "practice",
       "display": "Test-Driven Development",
@@ -1494,7 +1807,9 @@
       "weight": 0.5
     },
     {
-      "aliases": ["tf"],
+      "aliases": [
+        "tf"
+      ],
       "canonical": "tensorflow",
       "category": "data",
       "display": "TensorFlow",
@@ -1508,7 +1823,9 @@
       "weight": 0.75
     },
     {
-      "aliases": ["automated testing"],
+      "aliases": [
+        "automated testing"
+      ],
       "canonical": "test automation",
       "category": "testing",
       "display": "Test Automation",
@@ -1522,49 +1839,65 @@
       "weight": 0.45
     },
     {
-      "aliases": ["ts"],
+      "aliases": [
+        "ts"
+      ],
       "canonical": "typescript",
       "category": "language",
       "display": "TypeScript",
       "weight": 0.95
     },
     {
-      "aliases": ["user interface design"],
+      "aliases": [
+        "user interface design"
+      ],
       "canonical": "ui design",
       "category": "practice",
       "display": "UI Design",
       "weight": 0.55
     },
     {
-      "aliases": ["unit tests"],
+      "aliases": [
+        "unit tests"
+      ],
       "canonical": "unit testing",
       "category": "testing",
       "display": "Unit Testing",
       "weight": 0.75
     },
     {
-      "aliases": ["unity3d"],
+      "aliases": [
+        "unity3d"
+      ],
       "canonical": "unity",
       "category": "framework",
       "display": "Unity",
       "weight": 0.45
     },
     {
-      "aliases": ["unreal"],
+      "aliases": [
+        "unreal"
+      ],
       "canonical": "unreal engine",
       "category": "framework",
       "display": "Unreal Engine",
       "weight": 0.4
     },
     {
-      "aliases": ["user experience design", "ux research"],
+      "aliases": [
+        "user experience design",
+        "ux research"
+      ],
       "canonical": "ux design",
       "category": "practice",
       "display": "UX Design",
       "weight": 0.6
     },
     {
-      "aliases": ["vb.net", "vba"],
+      "aliases": [
+        "vb.net",
+        "vba"
+      ],
       "canonical": "visual basic",
       "category": "language",
       "display": "Visual Basic",
@@ -1585,7 +1918,10 @@
       "weight": 0.35
     },
     {
-      "aliases": ["vue.js", "vuejs"],
+      "aliases": [
+        "vue.js",
+        "vuejs"
+      ],
       "canonical": "vue",
       "category": "framework",
       "display": "Vue",
@@ -1599,14 +1935,19 @@
       "weight": 0.45
     },
     {
-      "aliases": ["a11y", "wcag"],
+      "aliases": [
+        "a11y",
+        "wcag"
+      ],
       "canonical": "web accessibility",
       "category": "practice",
       "display": "Web Accessibility",
       "weight": 0.55
     },
     {
-      "aliases": ["web application development"],
+      "aliases": [
+        "web application development"
+      ],
       "canonical": "web development",
       "category": "practice",
       "display": "Web Development",
@@ -1620,7 +1961,9 @@
       "weight": 0.5
     },
     {
-      "aliases": ["websocket"],
+      "aliases": [
+        "websocket"
+      ],
       "canonical": "websockets",
       "category": "tool",
       "display": "WebSockets",
@@ -1648,7 +1991,9 @@
       "weight": 0.4
     },
     {
-      "aliases": ["yml"],
+      "aliases": [
+        "yml"
+      ],
       "canonical": "yaml",
       "category": "tool",
       "display": "YAML",

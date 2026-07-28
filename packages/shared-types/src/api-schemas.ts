@@ -2,8 +2,10 @@ import { makeApi, Zodios, type ZodiosOptions } from "@zodios/core";
 import { z } from "zod";
 
 const HealthResponse = z
-  .object({ status: z.string().default("ok") })
-  .partial()
+  .object({
+    status: z.string().optional().default("ok"),
+    semantic_scoring: z.enum(["available", "unavailable"]),
+  })
   .passthrough();
 const HealthUnhealthyResponse = z
   .object({
@@ -93,6 +95,7 @@ const ScoreBreakdownOut = z
     weight_similarity: z.number(),
     weight_keyword: z.number(),
     final_score: z.number().int(),
+    similarity_method: z.union([z.string(), z.null()]).optional(),
   })
   .passthrough();
 const KeywordOut = z
@@ -642,10 +645,7 @@ Returns:
     &#x60;&#x60;{&quot;status&quot;: &quot;unhealthy&quot;, &quot;reason&quot;: &quot;database_unreachable&quot;}&#x60;&#x60;
     when SQLAlchemy raises any subclass of :class:&#x60;SQLAlchemyError&#x60;.`,
     requestFormat: "json",
-    response: z
-      .object({ status: z.string().default("ok") })
-      .partial()
-      .passthrough(),
+    response: HealthResponse,
     errors: [
       {
         status: 503,
