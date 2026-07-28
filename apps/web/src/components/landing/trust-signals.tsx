@@ -131,23 +131,25 @@ export function TrustSignals({
 
         <ul
           role="list"
-          className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4"
+          className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
         >
           {TRUST_SIGNALS.map(({ icon: Icon, title, description }) => (
             <li
               key={title}
-              className="flex flex-col items-center gap-3 text-center"
+              className="flex flex-col gap-3 rounded-hero border border-border bg-bg-elevated p-6 shadow-resting"
             >
               <span
                 aria-hidden="true"
-                className="flex size-10 shrink-0 items-center justify-center rounded-card border border-border bg-bg-elevated text-brand"
+                className="flex size-10 shrink-0 items-center justify-center rounded-card border border-border bg-bg text-brand"
               >
                 <Icon className="size-5" />
               </span>
               <h3 className="text-base font-semibold tracking-tight text-text">
                 {title}
               </h3>
-              <p className="text-sm text-text-muted">{description}</p>
+              <p className="text-sm leading-relaxed text-text-muted">
+                {description}
+              </p>
             </li>
           ))}
         </ul>
@@ -181,27 +183,63 @@ export function About({
       aria-labelledby="about-heading"
       className={cn("scroll-mt-20 py-16 md:py-24", className)}
     >
-      <div className="mx-auto max-w-3xl px-6">
-        <h2
-          id="about-heading"
-          className="text-3xl font-semibold tracking-tight text-text md:text-4xl"
+      <div className="mx-auto grid max-w-7xl items-start gap-10 px-6 lg:grid-cols-2 lg:gap-16">
+        <div>
+          <h2
+            id="about-heading"
+            className="text-3xl font-semibold tracking-tight text-text md:text-4xl"
+          >
+            About MatchLayer
+          </h2>
+          <div className="mt-6 flex flex-col gap-4 text-base leading-relaxed text-text-muted">
+            <p>
+              MatchLayer is an ATS (Applicant Tracking System) simulator and
+              resume-match analysis tool. Upload your resume and a job
+              description, and you get a transparent match score that shows how
+              an applicant tracking system would read your application against
+              that role.
+            </p>
+            <p>
+              Today, scoring is based on keyword matching and TF-IDF
+              term-weighting — not a black box. You see which keywords matched,
+              which are missing, and how the final score is composed, so every
+              number is explainable. Richer semantic analysis is planned, but it
+              is not part of this Phase 1 release.
+            </p>
+          </div>
+        </div>
+
+        {/* Decorative "explainability" panel — a mono-type card restating the
+            two real scoring signals. Purely illustrative (aria-hidden): the
+            adjacent prose carries the same information for assistive tech. */}
+        <div
+          aria-hidden="true"
+          className="relative isolate overflow-hidden rounded-hero border border-border-strong bg-bg-elevated p-6 font-mono text-sm shadow-resting"
         >
-          About MatchLayer
-        </h2>
-        <div className="mt-6 flex flex-col gap-4 text-base leading-relaxed text-text-muted">
-          <p>
-            MatchLayer is an ATS (Applicant Tracking System) simulator and
-            resume-match analysis tool. Upload your resume and a job
-            description, and you get a transparent match score that shows how an
-            applicant tracking system would read your application against that
-            role.
-          </p>
-          <p>
-            Today, scoring is based on keyword matching and TF-IDF
-            term-weighting — not a black box. You see which keywords matched,
-            which are missing, and how the final score is composed, so every
-            number is explainable. Richer semantic analysis is planned, but it
-            is not part of this Phase 1 release.
+          <span
+            className="pointer-events-none absolute inset-x-0 top-0 h-24 -z-10"
+            style={{
+              backgroundImage:
+                "radial-gradient(70% 100% at 50% 0%, rgb(var(--color-brand) / 0.08), transparent 75%)",
+            }}
+          />
+          <p className="text-text-subtle"># how your score is built</p>
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between rounded-card border border-border bg-bg px-4 py-3">
+              <span className="text-text">text_similarity</span>
+              <span className="text-text-subtle">TF-IDF cosine</span>
+            </div>
+            <div className="flex items-center justify-between rounded-card border border-border bg-bg px-4 py-3">
+              <span className="text-text">keyword_coverage</span>
+              <span className="text-text-subtle">lexicon overlap</span>
+            </div>
+            <div className="flex items-center justify-between rounded-card border border-brand bg-brand/15 px-4 py-3">
+              <span className="font-semibold text-text">match_score</span>
+              <span className="text-text">weighted blend</span>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-text-subtle">
+            every component is shown with your result — nothing hidden
           </p>
         </div>
       </div>
