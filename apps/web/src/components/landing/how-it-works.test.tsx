@@ -9,8 +9,9 @@
  *     on `useReducedMotion()` and, when reduced, returns a plain `<div>` (no
  *     `whileInView` scroll trigger), so the three steps are present without
  *     waiting to scroll into view.
- *   - Req 5.1 — step 3 describes the output as a keyword / TF-IDF match score,
- *     never "semantic", "AI", or "LLM".
+ *   - Req 5.1 (updated for phase-2-nlp-embeddings) — step 3 describes the
+ *     output as a semantic and keyword match score (semantic shipped in
+ *     phase 2), never "AI" or "LLM" (unshipped roadmap).
  *
  * The reveal reads `window.matchMedia` via framer-motion's `useReducedMotion()`,
  * stubbed to "reduced" here (mirrors `results-page.test.tsx`) so content paints
@@ -80,13 +81,12 @@ describe("HowItWorks — reduced motion renders the final state (Req 4.9)", () =
   });
 });
 
-describe("HowItWorks — honest scoring copy (Req 5.1)", () => {
-  it("describes the output as a keyword / TF-IDF score, not semantic/AI/LLM", () => {
+describe("HowItWorks — honest scoring copy (Req 5.1, phase-2 update)", () => {
+  it("describes the output as a semantic and keyword score, never AI/LLM", () => {
     render(<HowItWorks />);
 
     const text = document.body.textContent ?? "";
-    expect(text).toMatch(/keyword and TF-IDF/i);
-    expect(text).not.toMatch(/semantic/i);
+    expect(text).toMatch(/semantic and keyword/i);
     expect(text).not.toMatch(/\bai\b/i);
     expect(text).not.toMatch(/\bllm\b/i);
   });

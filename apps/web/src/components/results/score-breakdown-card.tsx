@@ -10,17 +10,24 @@ import { cn } from "@/lib/utils";
  *
  * ## Contract (Req 20 — never invent fields)
  * The card consumes the curated `ScoreBreakdown` type generated from the FastAPI
- * OpenAPI spec (`@matchlayer/shared-types`). That type carries **exactly** five
+ * OpenAPI spec (`@matchlayer/shared-types`). That type carries the five Phase 1
  * fields — `similarity_component`, `keyword_coverage_component`,
- * `weight_similarity`, `weight_keyword`, `final_score` — and this component
- * renders **exactly two** progress bars from the two component values. There is
+ * `weight_similarity`, `weight_keyword`, `final_score` — plus the optional
+ * Phase 2 `similarity_method` discriminator, and this component renders
+ * **exactly two** progress bars from the two component values. There is
  * structurally **no third scoring dimension** here, and no field outside the
  * generated contract is read or displayed.
  *
  * ## What it renders
  *   - Two labeled determinate progress bars, reusing the `ui/progress.tsx`
  *     primitive (task 1.5):
- *       1. **"TF-IDF similarity"**  ← `similarity_component`
+ *       1. **"Semantic similarity"** or **"TF-IDF similarity"**
+ *          ← `similarity_component`, labeled by `similarity_method`:
+ *          `"semantic-embedding"` (Phase 2 pipeline) shows "Semantic
+ *          similarity"; `"tfidf"`, `null`, or absent (Phase 1 engine,
+ *          per-request fallback, or pre-Phase-2 stored results) shows
+ *          "TF-IDF similarity". The absence default matches the backend
+ *          contract: a missing method implies the TF-IDF engine.
  *       2. **"Keyword coverage"**   ← `keyword_coverage_component`
  *     Each backend value is a raw `[0, 1]` fraction (per the contract docs), so
  *     it is scaled to a 0–100% integer for **both** the bar fill and the
@@ -64,6 +71,19 @@ function toPercent(value: number): number {
   return Math.round(value * 100);
 }
 
+/**
+ * Resolve the similarity bar's label from the backend's `similarity_method`
+ * discriminator. Only the exact `"semantic-embedding"` value earns the
+ * semantic label; `"tfidf"`, `null`, absent, and any unrecognized future
+ * value fall back to the TF-IDF wording — the conservative reading of the
+ * contract (never claim semantic scoring unless the backend stamped it).
+ */
+function similarityLabel(method: string | null | undefined): string {
+  return method === "semantic-embedding"
+    ? "Semantic similarity"
+    : "TF-IDF similarity";
+}
+
 export function ScoreBreakdownCard({
   breakdown,
   className,
@@ -74,6 +94,7 @@ export function ScoreBreakdownCard({
     weight_similarity,
     weight_keyword,
     final_score,
+    similarity_method,
   } = breakdown;
 
   return (
@@ -90,7 +111,7 @@ export function ScoreBreakdownCard({
 
       <div className="space-y-6">
         <BreakdownBar
-          label="TF-IDF similarity"
+          label={similarityLabel(similarity_method)}
           value={similarity_component}
           weight={weight_similarity}
         />

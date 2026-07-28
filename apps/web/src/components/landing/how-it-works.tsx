@@ -24,9 +24,9 @@ import { cn } from "@/lib/utils";
  * no fade-up (Req 4.9; see {@link Reveal}).
  *
  * ## Honesty (Req 5.1, 5.4)
- * Step 3 describes the output as a **keyword and TF-IDF** match score, never
- * "semantic", "AI", or "LLM" — the current MVP scorer is keyword/TF-IDF based,
- * and this copy must not overstate it.
+ * Step 3 describes the output as a **semantic and keyword** match score —
+ * semantic similarity shipped in phase-2-nlp-embeddings — never "AI" or
+ * "LLM", which remain unshipped roadmap this copy must not overstate.
  *
  * ## Markup & accessibility
  *   - A `<section id="how-it-works">` so the GlassNav `#how-it-works` anchor
@@ -77,7 +77,7 @@ const STEPS: readonly Step[] = [
     number: 3,
     title: "Get your ATS score",
     description:
-      "See a transparent keyword and TF-IDF match score, with matched and missing terms, in seconds.",
+      "See a transparent semantic and keyword match score, with matched and missing terms, in seconds.",
     icon: Gauge,
   },
 ];

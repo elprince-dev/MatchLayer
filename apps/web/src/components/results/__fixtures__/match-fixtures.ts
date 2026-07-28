@@ -83,6 +83,9 @@ export const matchStrong: MatchResponse = {
     weight_similarity: 0.6,
     weight_keyword: 0.4,
     final_score: 85,
+    // Phase 2 semantic result: the card labels the similarity bar
+    // "Semantic similarity" from this discriminator.
+    similarity_method: "semantic-embedding",
   },
   matched_keywords: [
     { term: "python", weight: 0.97 },
@@ -109,7 +112,8 @@ export const matchStrong: MatchResponse = {
       text: "If you have provisioned infrastructure as code, name Terraform explicitly and describe the resources you managed.",
     },
   ],
-  scorer_version: "tfidf-keyword@1.3.0+lexicon.2025-02-01",
+  scorer_version:
+    "2.0.0+lex.v2+emb.sentence-transformers/all-MiniLM-L6-v2@c9745ed1d9f207416be6d2e6f8de32d1f16199bf+spacy.en_core_web_sm@3.8.0",
   created_at: "2025-02-18T14:33:12Z",
   updated_at: "2025-02-18T14:33:12Z",
 };
@@ -117,6 +121,10 @@ export const matchStrong: MatchResponse = {
 // ---------------------------------------------------------------------------
 // 5.3 — ATS fixture B: partial match (score ≈ 52)
 // ---------------------------------------------------------------------------
+//
+// Deliberately a PRE-Phase-2 stored result: `similarity_method` is absent
+// (and `scorer_version` keeps the Phase 1 stamp), exercising the card's
+// fallback labeling ("TF-IDF similarity") for legacy rows.
 //
 // Recompute check:
 //   round(100 × (0.6 × 0.48 + 0.4 × 0.5833))

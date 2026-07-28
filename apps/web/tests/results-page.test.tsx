@@ -369,7 +369,9 @@ describe("ResultsView — fixture A: strong match 85 (Requirements 11.1–11.5, 
     expect(screen.getByText("Excellent")).toBeInstanceOf(HTMLElement);
 
     // Both breakdown bars render with their scaled percentages and weights.
-    expect(screen.getByText("TF-IDF similarity")).toBeInstanceOf(HTMLElement);
+    // matchStrong is a Phase 2 semantic result (similarity_method:
+    // "semantic-embedding"), so the similarity bar carries the semantic label.
+    expect(screen.getByText("Semantic similarity")).toBeInstanceOf(HTMLElement);
     expect(screen.getByText("Keyword coverage")).toBeInstanceOf(HTMLElement);
     expect(screen.getByText("81%")).toBeInstanceOf(HTMLElement); // 0.8123 → 81
     expect(screen.getByText("90%")).toBeInstanceOf(HTMLElement); // 0.9000 → 90

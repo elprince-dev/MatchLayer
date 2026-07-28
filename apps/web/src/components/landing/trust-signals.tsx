@@ -31,11 +31,11 @@ import { cn } from "@/lib/utils";
  * support, secure file handling, and fast ATS analysis — and every claim
  * describes something that exists in the current Phase 1 product.
  *
- * The current scoring approach is described **only** as keyword + TF-IDF
- * matching; it is never called semantic, embeddings-based, AI-, or LLM-powered
- * (Req 5.1). Where the {@link About} copy touches the roadmap (richer semantic
- * analysis), it is stated as explicitly **not** part of this release, so a
- * planned capability is never presented as available today.
+ * The current scoring approach is described as semantic + keyword matching —
+ * semantic similarity shipped in phase-2-nlp-embeddings — and is never called
+ * AI- or LLM-powered (Req 5.1, updated). Where copy touches the roadmap
+ * (AI-powered coaching), it is stated as explicitly **not** part of this
+ * release, so a planned capability is never presented as available today.
  *
  * ## Server Components (no `"use client"`)
  *
@@ -68,8 +68,8 @@ interface TrustSignal {
 /**
  * The four sanctioned trust signals (Req 4.4). Every entry maps to a capability
  * that exists in the Phase 1 MVP; none asserts a metric, testimonial, or logo
- * (Req 4.3). The "fast ATS analysis" copy keeps the scoring description to
- * keyword + TF-IDF — never semantic/AI/LLM (Req 5.1).
+ * (Req 4.3). The "fast ATS analysis" copy describes the scoring as semantic +
+ * keyword (shipped in phase-2-nlp-embeddings) — never AI/LLM (Req 5.1).
  */
 const TRUST_SIGNALS: ReadonlyArray<TrustSignal> = [
   {
@@ -94,7 +94,7 @@ const TRUST_SIGNALS: ReadonlyArray<TrustSignal> = [
     icon: Zap,
     title: "Fast ATS analysis",
     description:
-      "Get a transparent keyword and TF-IDF match score in seconds — no black box, no waiting.",
+      "Get a transparent semantic and keyword match score in seconds — no black box, no waiting.",
   },
 ];
 
@@ -163,10 +163,11 @@ export function TrustSignals({
  *
  * This is the scroll target for the GlassNav "About" in-page link (`#about`).
  * It gives a concise, truthful description of what MatchLayer is and what it
- * can do **today** in Phase 1: an ATS simulator and resume-match analysis tool
- * that scores a resume against a job description using transparent keyword +
- * TF-IDF matching (Req 4.7, 5.1). The roadmap mention (richer semantic
- * analysis) is stated as explicitly **not** part of this release, so a planned
+ * can do **today**: an ATS simulator and resume-match analysis tool that
+ * scores a resume against a job description using semantic similarity
+ * (sentence embeddings, shipped in phase-2-nlp-embeddings) plus transparent
+ * keyword matching (Req 4.7, 5.1). The roadmap mention (AI-powered coaching)
+ * is stated as explicitly **not** part of this release, so a planned
  * capability is never implied to be available now.
  *
  * `scroll-mt-20` offsets the anchored scroll position so the heading clears the
@@ -200,11 +201,12 @@ export function About({
               that role.
             </p>
             <p>
-              Today, scoring is based on keyword matching and TF-IDF
-              term-weighting — not a black box. You see which keywords matched,
-              which are missing, and how the final score is composed, so every
-              number is explainable. Richer semantic analysis is planned, but it
-              is not part of this Phase 1 release.
+              Scoring combines semantic similarity — sentence embeddings that
+              understand meaning, not just matching words — with keyword
+              coverage. Not a black box: you see which keywords matched, which
+              are missing, and how the final score is composed, so every number
+              is explainable. AI-powered coaching and rewriting suggestions are
+              planned, but they are not part of this release.
             </p>
           </div>
         </div>
@@ -226,8 +228,8 @@ export function About({
           <p className="text-text-subtle"># how your score is built</p>
           <div className="mt-4 flex flex-col gap-3">
             <div className="flex items-center justify-between rounded-card border border-border bg-bg px-4 py-3">
-              <span className="text-text">text_similarity</span>
-              <span className="text-text-subtle">TF-IDF cosine</span>
+              <span className="text-text">semantic_similarity</span>
+              <span className="text-text-subtle">embedding cosine</span>
             </div>
             <div className="flex items-center justify-between rounded-card border border-border bg-bg px-4 py-3">
               <span className="text-text">keyword_coverage</span>

@@ -28,10 +28,10 @@ import { cn } from "@/lib/utils";
  * {@link SAMPLE_SCORE} constant, never to the API or a real `MatchResponse`,
  * and it is explicitly labelled as a sample "not a real analysis" so assistive
  * tech can never mistake it for a genuine score. The honesty note
- * "Basic keyword match — semantic analysis coming soon" sits directly beneath
- * it. None of the hero copy describes the scoring as semantic, embeddings-,
- * AI-, or LLM-powered — Phase 1 scoring is keyword + TF-IDF, and the
- * subheadline says exactly that ("keyword-based ATS score").
+ * "Semantic + keyword scoring — sample preview, not a real analysis" sits
+ * directly beneath it. The hero copy describes the scoring as semantic +
+ * keyword (shipped in phase-2-nlp-embeddings) and never as AI- or LLM-powered
+ * — that remains unshipped roadmap (Req 5.1's honesty rule, updated).
  *
  * ## Motion (Req 3.6, 3.8) — reduced-motion correctness
  *
@@ -160,15 +160,16 @@ export function Hero({ className }: HeroProps): React.JSX.Element {
           See how real ATS systems evaluate your resume
         </MotionSafe>
 
-        {/* Subheadline ≤150 chars at text-muted (Req 3.2). The "keyword-based"
-            wording keeps the scoring description honest (Req 5.1). */}
+        {/* Subheadline ≤150 chars at text-muted (Req 3.2). The "semantic +
+            keyword" wording keeps the scoring description honest (Req 5.1) —
+            semantic similarity shipped in phase-2-nlp-embeddings. */}
         <MotionSafe
           as="p"
           className="max-w-2xl text-pretty text-lg leading-relaxed text-text-muted sm:text-xl"
           {...fadeUp(2, reduced)}
         >
-          Upload a resume and a job description. Get a transparent,
-          keyword-based ATS score in seconds.
+          Upload a resume and a job description. Get a transparent, semantic +
+          keyword ATS score in seconds.
         </MotionSafe>
 
         {/* CTA row: primary → /register (≥44px tall, Signature_Gradient on
@@ -446,10 +447,10 @@ function HeroDemoPreview({ reduced }: HeroDemoPreviewProps): React.JSX.Element {
         </div>
       </div>
 
-      {/* The mandated honesty note (Req 5.4) — so the preview never overstates
-          the current keyword/TF-IDF capability. */}
+      {/* The mandated honesty note (Req 5.4) — semantic scoring shipped in
+          phase-2-nlp-embeddings; the sample itself is still illustrative. */}
       <p className="mt-4 text-center text-sm text-text-muted">
-        Basic keyword match — semantic analysis coming soon
+        Semantic + keyword scoring — sample preview, not a real analysis
       </p>
     </div>
   );

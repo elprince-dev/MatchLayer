@@ -4,13 +4,13 @@
  * Validates the Landing_Page hero against its acceptance criteria (Req 3.8,
  * 5.1, 5.4; design Section 8.2):
  *
- *   - Req 5.4 — the mandated honesty note "Basic keyword match — semantic
- *     analysis coming soon" is rendered where the scoring approach is shown.
- *   - Req 5.1 — the current scoring is NEVER described as semantic, AI-,
- *     LLM-, or embeddings-powered. The only permitted occurrence of "semantic"
- *     is inside the honesty note's "semantic analysis coming soon" roadmap
- *     disclaimer; the test strips that note and asserts none of the forbidden
- *     tokens remain in the rendered copy.
+ *   - Req 5.4 — the mandated honesty note "Semantic + keyword scoring —
+ *     sample preview, not a real analysis" is rendered where the scoring
+ *     approach is shown.
+ *   - Req 5.1 (updated for phase-2-nlp-embeddings) — semantic scoring
+ *     SHIPPED, so "semantic"/"embeddings" are now truthful copy. The scoring
+ *     is still NEVER described as AI- or LLM-powered (unshipped roadmap);
+ *     the test asserts those tokens never appear in the rendered copy.
  *   - Req 3.8 — under `prefers-reduced-motion` the hero renders its final,
  *     visible state immediately: the `<h1>` is present and the illustrative
  *     demo gauge shows the final sample value (78) with no count-up from 0.
@@ -41,8 +41,9 @@ import { Hero } from "@/components/landing/hero";
 /** The illustrative sample score the demo gauge resolves to (Hero SAMPLE_SCORE). */
 const SAMPLE_SCORE = "78";
 
-/** The mandated honesty note copy (Req 5.4). */
-const HONESTY_NOTE = "Basic keyword match — semantic analysis coming soon";
+/** The mandated honesty note copy (Req 5.4, updated for phase 2). */
+const HONESTY_NOTE =
+  "Semantic + keyword scoring — sample preview, not a real analysis";
 
 /**
  * Stub `window.matchMedia` so framer-motion's `useReducedMotion()` resolves to
@@ -78,35 +79,30 @@ afterEach(() => {
 });
 
 describe("Hero — honesty note present (Req 5.4)", () => {
-  it("renders the 'Basic keyword match — semantic analysis coming soon' note", () => {
+  it("renders the 'Semantic + keyword scoring' sample-preview note", () => {
     render(<Hero />);
     expect(screen.getByText(HONESTY_NOTE)).toBeInstanceOf(HTMLElement);
   });
 });
 
-describe("Hero — scoring never described as semantic/AI/LLM/embedding (Req 5.1)", () => {
-  it("contains none of the forbidden tokens outside the roadmap honesty note", () => {
+describe("Hero — scoring never described as AI/LLM (Req 5.1, phase-2 update)", () => {
+  it("contains no AI/LLM claims anywhere in the rendered copy", () => {
     render(<Hero />);
 
     const fullText = document.body.textContent ?? "";
-    // The honesty note is the one sanctioned use of "semantic" (an explicit
-    // roadmap disclaimer). Remove it, then assert the remaining copy describing
-    // the CURRENT scoring carries none of the forbidden tokens.
-    expect(fullText).toContain(HONESTY_NOTE);
-    const withoutNote = fullText.split(HONESTY_NOTE).join(" ");
-
-    expect(withoutNote).not.toMatch(/semantic/i);
-    expect(withoutNote).not.toMatch(/embedding/i);
-    // Word-boundary matches so standalone "AI"/"LLM" are caught without
-    // flagging substrings inside ordinary words.
-    expect(withoutNote).not.toMatch(/\bai\b/i);
-    expect(withoutNote).not.toMatch(/\bllm\b/i);
+    // Semantic scoring shipped in phase-2-nlp-embeddings, so "semantic" is
+    // now truthful copy. AI/LLM remain unshipped roadmap and must never be
+    // claimed. Word-boundary matches so standalone "AI"/"LLM" are caught
+    // without flagging substrings inside ordinary words.
+    expect(fullText).not.toMatch(/\bai\b/i);
+    expect(fullText).not.toMatch(/\bllm\b/i);
   });
 
-  it("describes the scoring honestly as keyword-based", () => {
+  it("describes the scoring honestly as semantic + keyword", () => {
     render(<Hero />);
-    // The subheadline pins the current capability to keyword-based matching.
-    expect(screen.getByText(/keyword-based ATS score/i)).toBeInstanceOf(
+    // The subheadline pins the current capability to semantic + keyword
+    // matching — exactly what the Phase 2 backend does.
+    expect(screen.getByText(/semantic \+ keyword ATS score/i)).toBeInstanceOf(
       HTMLElement,
     );
   });
