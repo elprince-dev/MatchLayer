@@ -1,0 +1,12 @@
+{
+  "id": "eyeball-008",
+  "label": "Florist vs data engineer — clear mismatch",
+  "resume_text": "Florist and shop owner with nine years of experience designing wedding bouquets, seasonal arrangements, and corporate event installations. I source fresh stems from regional growers, negotiate wholesale pricing, manage cold-chain storage, and run the shop's social media presence. I train part-time staff on floral care, ribbon work, and customer service during peak holidays.",
+  "jd_text": "We are hiring a Data Engineer to build batch and streaming pipelines in Python. You will orchestrate workflows with Airflow, process large datasets with Spark, move events through Kafka, model warehouse tables in SQL and PostgreSQL, and deploy jobs to AWS. Experience with Docker and Linux environments is required.",
+  "expected": {
+    "score_band": "low",
+    "must_match_skills": [],
+    "must_miss_skills": []
+  },
+  "notes": "Second clear-mismatch case against a different (data engineering) JD so the low band is exercised beyond the single backend JD. The resume covers none of the JD skills. Fully synthetic text — no real personal data."
+}

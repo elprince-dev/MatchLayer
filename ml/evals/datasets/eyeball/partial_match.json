@@ -1,0 +1,12 @@
+{
+  "id": "eyeball-004",
+  "label": "Django backend dev vs FastAPI JD — partial match",
+  "resume_text": "Backend developer with five years of experience building web applications in Python. I have built and maintained REST APIs with Django, designed schemas in PostgreSQL, and written extensive pytest suites for every service I own. I collaborate closely with frontend teams, review pull requests daily, and mentor one junior developer. Most of my deployment experience is on a traditional Linux virtual machine managed by an operations team.",
+  "jd_text": "We are hiring a Senior Backend Engineer to design and build scalable REST APIs in Python using the FastAPI framework. You will model data in PostgreSQL, containerize services with Docker, and deploy to AWS. Strong experience with CI/CD pipelines and automated testing with pytest is required. Familiarity with Redis caching and Kubernetes is preferred.",
+  "expected": {
+    "score_band": "medium",
+    "must_match_skills": ["python", "postgresql", "pytest", "rest"],
+    "must_miss_skills": []
+  },
+  "notes": "Partial match: the candidate covers the core language, database, testing, and API skills but has no FastAPI, Docker, AWS, CI/CD, Redis, or Kubernetes experience. Roughly half the JD skills are missing, so the score should land in the medium band. Fully synthetic text — no real personal data."
+}

@@ -254,6 +254,99 @@ The tighter per-minute sliding-window rate limits (Redis-backed) are tunable in 
 
 Raise them when developing locally so test loops don't trip the 429; keep production values conservative.
 
+## Phase 2 semantic scoring — runbook
+
+Phase 2 (`phase-2-nlp-embeddings`) replaces the naive TF-IDF similarity with
+sentence-embedding similarity plus spaCy-based skill extraction, with the
+Phase 1 engine retained verbatim as the fallback path.
+
+### How a document becomes an embedding (chunking strategy)
+
+The `Embedding_Service` embeds each text with the pinned SentenceTransformer
+(`all-MiniLM-L6-v2`, 384 dimensions). Documents that fit within the model's
+token window are encoded in one pass. Longer documents are split into
+**non-overlapping, consecutive chunks** using the model's own tokenizer (so
+chunk boundaries are exactly the model's token boundaries), each chunk is
+encoded separately, and the chunk vectors are combined as a
+**token-count-weighted mean** which is then **L2-normalized**. The full
+document is always covered — no token is dropped — and the whole procedure is
+deterministic, entirely in memory, and bounded by
+`MATCHLAYER_EMBEDDING_TIMEOUT_SECONDS` (default 20s) end to end.
+
+### How the score is computed (cosine → component transformation)
+
+Cosine similarity between the two L2-normalized vectors lands in `[-1, 1]`.
+The similarity component the score uses is:
+
+```
+similarity_component = clamp((cosine + 1) / 2, 0, 1)
+```
+
+The final score is the same weighted combine as Phase 1:
+`round(100 * (w_similarity * similarity_component + w_keyword * coverage))`,
+clamped to `[0, 100]`, with `coverage = |matched| / |analyzed|` computed over
+the spaCy `Skill_Extractor`'s lexicon-gated skill sets. The
+`score_breakdown.similarity_method` field records which engine produced the
+similarity: `"semantic-embedding"` (Phase 2) or `"tfidf"` (Phase 1 /
+fallback); its absence on older stored results implies TF-IDF.
+
+### Degraded_Mode
+
+The semantic pipeline (SentenceTransformer + spaCy + v2 lexicon) is loaded
+**once at startup** by the FastAPI lifespan. If any artifact fails to load,
+the instance starts anyway in **Degraded_Mode**: every match request is
+served by the Phase 1 engine with the Phase 1 `scorer_version` stamp, no
+embeddings are generated or stored, and exactly one `model_load_failure`
+structured event is logged at startup (no per-request noise). `GET /healthz`
+reports it as `"semantic_scoring": "unavailable"` while still returning 200 —
+a degraded instance is serving, so orchestration must not restart-loop it.
+The only way out of Degraded_Mode is a process restart with a working model;
+rows created during the degraded window are retained unchanged.
+
+One deliberate exception: if the model loads but its output dimension does
+not equal `MATCHLAYER_EMBEDDING_DIMENSION` (the pgvector DDL literal, 384),
+startup **fails fast** — every generated vector would be rejected by the
+database, which is a deployment bug to surface, not degrade around.
+
+### Per-request fallback events (the documented category set)
+
+Any failure on the Phase 2 path falls back **per-request** to the Phase 1
+engine — never a 5xx, never a flip into Degraded_Mode — and emits exactly one
+structured event per occurrence, carrying `request_id` and internal ids only
+(never text or vector content):
+
+| Event                       | Trigger                                                     |
+| --------------------------- | ----------------------------------------------------------- |
+| `embedding_timeout`         | An embed call exceeded the configured wall-clock bound      |
+| `embedding_runtime_error`   | Any other failure while producing the two vectors           |
+| `embedding_geometry_error`  | Undefined cosine (zero magnitude / dimension mismatch)      |
+| `skill_extraction_empty`    | Non-empty JD but an empty analyzed skill set                |
+| `skill_extraction_error`    | Any other failure inside Phase 2 scoring                    |
+| `embedding_persist_failure` | Best-effort vector persistence rejected (request succeeds)  |
+| `model_load_failure`        | Startup artifact load failed (once, entering Degraded_Mode) |
+
+### Deployment notes (model bake + memory)
+
+The API image bakes the model at **build** time
+(`huggingface_hub.snapshot_download` of the pinned name + revision into
+`MATCHLAYER_EMBEDDING_MODEL_PATH`) and sets `HF_HUB_OFFLINE=1` at runtime —
+production never contacts a model hub. The spaCy pipeline
+(`en_core_web_sm`) is a pinned wheel dependency installed by
+`uv sync --frozen`.
+
+**Peak-RSS measurement procedure (before sizing the Fly machine):** run the
+production image locally with `docker run --read-only --tmpfs /tmp -m 1g`,
+wait for `/healthz` to report `semantic_scoring: available`, drive one warm-up
+match request, then read peak RSS via
+`docker stats --no-stream` (or `cat /sys/fs/cgroup/memory.peak` inside the
+container's cgroup). Record the number and the chosen machine size in
+`docs/costs.md`. Expected footprint for the 384-dim MiniLM model plus
+`en_core_web_sm` is roughly 500–800MB at ready-to-serve, which is why the
+target Fly machine is **shared-cpu-1x with 1GB RAM** (512MB is borderline; if
+measured peak RSS exceeds the 1GB machine, the documented remediation is to
+move scoring to a worker or downsize the model — decision recorded in
+`docs/costs.md` when taken).
+
 ## Branch & PR conventions
 
 The Phase 1 foundation lands on the branch **`phase-1/foundation`**. All subsequent feature work follows the `phase-N/short-description` pattern, with PRs merged into `main` (never pushed directly).

@@ -1,0 +1,26 @@
+{
+  "id": "eyeball-006",
+  "label": "Generic-term leak — non-skill JD words must never appear as skills",
+  "resume_text": "Software engineer with six years of experience developing services in Python. I build REST APIs with FastAPI, store data in PostgreSQL, and ship containers with Docker. I write pytest suites for all business logic and maintain the team's CI/CD pipeline in GitHub Actions.",
+  "jd_text": "Our selection process starts with a background check and a team interview. The successful candidate will check code quality daily, participate in the sprint selection of tickets, and bring proven experience to the team. Required skills: Python, FastAPI, PostgreSQL, Docker, pytest, and CI/CD. We value strong experience, careful selection of tools, and a rigorous check on every release.",
+  "expected": {
+    "score_band": "high",
+    "must_match_skills": [
+      "python",
+      "fastapi",
+      "postgresql",
+      "docker",
+      "pytest",
+      "ci/cd"
+    ],
+    "must_miss_skills": [
+      "check",
+      "selection",
+      "experience",
+      "team",
+      "process",
+      "candidate"
+    ]
+  },
+  "notes": "Generic-term-leak pair (Requirement 11.1/11.5): the JD deliberately repeats generic job-posting words ('check', 'selection', 'experience', 'team') so that under the Phase 1 single-document TF-IDF derivation they rank as high-TF-IDF keywords and leak into the analyzed/missing sets. Phase 2's Skill_Extractor is skill-only by construction, so must_miss_skills asserts none of these words appear in the analyzed, matched, or missing sets. Fully synthetic text — no real personal data."
+}

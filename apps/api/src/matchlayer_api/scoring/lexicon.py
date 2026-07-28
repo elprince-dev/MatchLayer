@@ -52,10 +52,14 @@ ALGORITHM_VERSION: Final[str] = "1.0.0"
 # build pipeline's ``SCHEMA_VERSION`` whenever the artifact layout changes.
 SUPPORTED_SCHEMA_VERSION: Final[int] = 1
 
-# Where the committed runtime artifact lives, as an importable package + name.
+# Where the committed runtime artifacts live, as an importable package + name.
 # Resolved through importlib.resources so it works from a built wheel too.
+# v1 backs the Phase 1 fallback engine (load_lexicon); v2 backs the Phase 2
+# semantic pipeline (load_lexicon_v2) — same schema version, same loader
+# validation, strictly more canonical terms (phase-2 Requirement 5.2).
 _ARTIFACT_PACKAGE: Final[str] = "matchlayer_api.scoring.data"
 _ARTIFACT_NAME: Final[str] = "skill_lexicon.v1.json"
+_ARTIFACT_NAME_V2: Final[str] = "skill_lexicon.v2.json"
 
 
 def scorer_version(lexicon_version: str) -> str:
@@ -267,21 +271,41 @@ def _parse_skill(raw: dict[str, Any]) -> SkillEntry:
 # ---------------------------------------------------------------------------
 
 
-def _read_artifact_text() -> str:
-    """Read the committed lexicon artifact's bytes via importlib.resources."""
-    resource = resources.files(_ARTIFACT_PACKAGE).joinpath(_ARTIFACT_NAME)
+def _read_artifact_text(artifact_name: str = _ARTIFACT_NAME) -> str:
+    """Read a committed lexicon artifact's bytes via importlib.resources."""
+    resource = resources.files(_ARTIFACT_PACKAGE).joinpath(artifact_name)
     return resource.read_text(encoding="utf-8")
+
+
+def _load_artifact(artifact_name: str) -> Skill_Lexicon:
+    """Read, parse, and validate one committed artifact into a lexicon."""
+    raw: Any = json.loads(_read_artifact_text(artifact_name))
+    if not isinstance(raw, dict):
+        raise LexiconError("lexicon artifact must be a JSON object")
+    return Skill_Lexicon(raw)
 
 
 @lru_cache(maxsize=1)
 def load_lexicon() -> Skill_Lexicon:
-    """Load and cache the committed Skill_Lexicon shipped as package data.
+    """Load and cache the committed v1 Skill_Lexicon shipped as package data.
 
     Cached: the artifact is immutable for the life of the process, and the
     ``ml/`` scorer adapter builds a single scorer from it. Tests that need a
-    distinct instance construct :class:`Skill_Lexicon` directly.
+    distinct instance construct :class:`Skill_Lexicon` directly. This is the
+    Phase 1 artifact backing the fallback ``Match_Scorer``; the Phase 2
+    semantic pipeline loads the v2 artifact via :func:`load_lexicon_v2`.
     """
-    raw: Any = json.loads(_read_artifact_text())
-    if not isinstance(raw, dict):
-        raise LexiconError("lexicon artifact must be a JSON object")
-    return Skill_Lexicon(raw)
+    return _load_artifact(_ARTIFACT_NAME)
+
+
+@lru_cache(maxsize=1)
+def load_lexicon_v2() -> Skill_Lexicon:
+    """Load and cache the committed v2 Skill_Lexicon shipped as package data.
+
+    The Phase 2 artifact (``lexicon_version: "v2"``, same schema version and
+    the same loader validation as v1 — phase-2 Requirements 5.2, 5.4, 5.8)
+    that the ML_Adapter injects into the semantic pipeline. Cached separately
+    from :func:`load_lexicon` because both artifacts stay live in the same
+    process: v1 for the fallback engine, v2 for the semantic scorer.
+    """
+    return _load_artifact(_ARTIFACT_NAME_V2)

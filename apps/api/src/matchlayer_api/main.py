@@ -91,6 +91,7 @@ from matchlayer_api.core.db import verify_database_connection
 from matchlayer_api.core.errors import register_exception_handlers
 from matchlayer_api.core.logging import configure_logging
 from matchlayer_api.core.middleware import ApiNoIndexMiddleware, RequestIdMiddleware
+from matchlayer_api.ml.semantic_adapter import load_semantic_pipeline
 
 # Module-level logger. The startup probe runs *before* any HTTP
 # request, so the contextvar fields the request-id middleware binds
@@ -160,6 +161,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # is released when the process exits, and Phase 1 has no other
         # resources (no Redis client, no S3 client) to drain.
         await verify_database_connection()
+        # Phase 2 — load the semantic pipeline exactly once (design §5,
+        # phase-2-nlp-embeddings task 8.4). On any artifact-load failure the
+        # call returns ``None`` and the app starts in Degraded_Mode, serving
+        # every request with the Phase 1 engine (Requirement 7.1) — including
+        # local dev, where the model artifact is typically absent. The one
+        # deliberate exception: ``EmbeddingDimensionMismatchError`` propagates
+        # out of this lifespan so uvicorn exits non-zero before binding a
+        # port — a dimension mismatch is a deployment bug, not a runtime
+        # condition to degrade around (Requirements 1.6, 1.7).
+        load_semantic_pipeline()
         _log.info(
             "application_started",
             environment=cfg.environment,

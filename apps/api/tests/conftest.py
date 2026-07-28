@@ -46,6 +46,7 @@ import warnings
 from collections.abc import AsyncIterator, Callable, Iterator
 from unittest.mock import AsyncMock, MagicMock
 
+import freezegun
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -179,6 +180,33 @@ hypothesis_settings.register_profile(
     max_examples=200,
 )
 hypothesis_settings.load_profile("auth")
+
+# ---------------------------------------------------------------------------
+# freezegun: never walk the ML dependency trees (phase-2-nlp-embeddings).
+#
+# ``freeze_time().start()`` iterates every module in ``sys.modules`` and calls
+# ``dir(module)`` on it to find aliased ``datetime``/``time`` references to
+# patch. ``transformers`` (pulled in transitively by ``sentence-transformers``)
+# installs a lazy ``__dir__`` hook that *imports* its lazy submodules on
+# access, and at least one of those (``transformers.models.gemma4.
+# image_processing_pil_gemma4``) raises ``NameError`` at import time when
+# Pillow is absent — it only imports ``PILImageResampling`` under a
+# Pillow-available guard.
+#
+# The failure surfaces inside ``freeze_time.__enter__``, i.e. *after*
+# freezegun has already swapped the real clock functions but before it
+# finishes and registers its undo list. The half-applied patch is never
+# reverted, so the process clock stays frozen for the rest of the session and
+# every later timing-dependent test misbehaves (``asyncio.wait_for`` timeouts
+# stop firing, pytest reports absurd durations). Symptom is order-dependent:
+# it only bites when an earlier test has imported ``transformers`` — which is
+# why ``tests/unit`` is green on its own and red after ``tests/integration``.
+#
+# Adding the prefix to freezegun's ignore list makes ``start()`` skip those
+# modules entirely. Nothing is lost: no test freezes time expecting the ML
+# libraries to observe the fake clock.
+# ---------------------------------------------------------------------------
+freezegun.configure(extend_ignore_list=["transformers", "sentence_transformers"])
 
 # Type alias for the factory the override fixture exposes. Tests call
 # the returned callable with either no argument (success path) or a

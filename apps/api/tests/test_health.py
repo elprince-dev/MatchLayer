@@ -4,9 +4,15 @@ Covers Task 3.11 (Requirements 4.7, 4.8, 4.9, 4.14 / Design §6.5):
 
 * **Success path** — when the request-scoped session's ``SELECT 1``
   probe completes, the endpoint returns ``200`` with body
-  ``{"status": "ok"}``. The probe runs through FastAPI's dependency
-  override on :func:`~matchlayer_api.core.db.get_session` so no real
-  Postgres is required.
+  ``{"status": "ok", "semantic_scoring": ...}``. The probe runs
+  through FastAPI's dependency override on
+  :func:`~matchlayer_api.core.db.get_session` so no real Postgres is
+  required.
+* **Semantic availability (Phase 2, Requirement 7.5)** — the
+  ``semantic_scoring`` field maps
+  :func:`~matchlayer_api.ml.semantic_adapter.semantic_available` to
+  exactly ``"available"`` / ``"unavailable"`` without changing the
+  status-code semantics.
 * **Failure path** — when the probe raises any subclass of
   :class:`sqlalchemy.exc.SQLAlchemyError`, the endpoint returns
   ``503`` with body
@@ -32,6 +38,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
@@ -64,13 +71,41 @@ async def test_healthz_returns_200_ok_when_db_probe_succeeds(
     The dependency override yields a stub session whose ``execute``
     resolves to a benign :class:`MagicMock` — exactly the shape the
     real handler expects from :py:meth:`AsyncSession.execute`.
+
+    Phase 2 (Requirement 7.5): the body also carries the
+    ``semantic_scoring`` availability field. No model artifact loads in
+    the test environment, so it reports ``"unavailable"`` — while the
+    status code stays 200, proving Degraded_Mode never flips the
+    instance to unhealthy.
     """
     override_get_session(None)
 
     response = await client.get("/healthz")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "semantic_scoring": "unavailable"}
+
+
+async def test_healthz_semantic_scoring_reports_available_when_pipeline_loaded(
+    client: AsyncClient,
+    override_get_session: OverrideGetSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Requirement 7.5: a loaded semantic pipeline maps to ``"available"``.
+
+    Patches :func:`matchlayer_api.ml.semantic_adapter.semantic_available`
+    at the name the health router imported, simulating a successfully
+    loaded Phase 2 pipeline without requiring the real model artifact.
+    Status-code semantics are identical in both states — only the field
+    value changes.
+    """
+    monkeypatch.setattr("matchlayer_api.api.health.semantic_available", lambda: True)
+    override_get_session(None)
+
+    response = await client.get("/healthz")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "semantic_scoring": "available"}
 
 
 async def test_healthz_returns_503_unhealthy_when_db_probe_raises(

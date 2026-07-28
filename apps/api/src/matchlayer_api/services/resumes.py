@@ -38,6 +38,16 @@ Resumes are referenced in logs and audit rows by their ``id`` only. The
 these fields, so the mypy overload chain is the enforcement mechanism;
 this module additionally never passes them to any logger.
 
+Phase 2 (phase-2-nlp-embeddings, "Resume upload flow"): after a successful
+extraction the upload additionally generates and persists the resume's
+Embedding **best-effort** under the configured timeout. Any embedding or
+persistence failure is swallowed (one structured event, no PII) and the
+upload response stays identical to Phase 1 — HTTP 201 with
+``extraction_status`` reflecting extraction alone — with the Embedding
+generated lazily at match time instead (phase-2 Requirements 2.5, 2.11,
+9.7). See :meth:`Resume_Service._embed_resume_best_effort` for the
+savepoint-based transaction rationale.
+
 Design reference: Components and Interfaces -- "Resume_Service"; the
 upload data flow sequence; "Quota enforcement".
 Requirements covered: 1.4, 2.5, 2.6, 2.7, 3.4, 3.5, 3.6, 4.1, 4.5, 4.6,
@@ -69,8 +79,14 @@ from matchlayer_api.core.errors import (
 from matchlayer_api.core.mime import detect as detect_mime
 from matchlayer_api.core.storage import Resume_Storage, build_object_key, get_resume_storage
 from matchlayer_api.db.models import Resume, User
+from matchlayer_api.ml.semantic_adapter import (
+    EmbeddingTimeoutError,
+    embed_with_timeout,
+    get_semantic_pipeline,
+)
 from matchlayer_api.services.audit import Audit_Service
 from matchlayer_api.services.extraction import extract, guard_docx_archive
+from matchlayer_api.services.vector_store import upsert_resume_embedding
 
 __all__ = ["ResumePage", "Resume_Service"]
 
@@ -246,6 +262,12 @@ class Resume_Service:  # noqa: N801 -- design uses the underscored class name.
            only -- never bytes or text (Requirement 3.7).
         8. **Audit** ``resume_uploaded {resume_id}`` (Requirement 2.7),
            internal id only.
+        9. **Best-effort Embedding** (phase-2 Requirements 2.5, 2.11,
+           9.7). When extraction succeeded with non-empty text and the
+           semantic pipeline is loaded, generate the Embedding under the
+           configured timeout and upsert it — every failure is swallowed
+           (see :meth:`_embed_resume_best_effort`) so the response is
+           byte-identical to Phase 1 in all cases.
 
         The client-supplied ``original_filename`` is stored verbatim for
         display only and is never logged or placed in an audit payload
@@ -380,7 +402,101 @@ class Resume_Service:  # noqa: N801 -- design uses the underscored class name.
             payload={"resume_id": str(resume.id)},
         )
 
+        # --- 9. Best-effort embedding at upload (Phase 2) -------------
+        # Only when extraction produced non-empty text; every failure is
+        # swallowed so the upload response stays byte-identical to Phase 1
+        # (Requirements 2.5, 2.11, 9.7).
+        if resume.extraction_status == "succeeded" and resume.extracted_text:
+            await self._embed_resume_best_effort(session, resume=resume)
+
         return resume
+
+    async def _embed_resume_best_effort(
+        self,
+        session: AsyncSession,
+        *,
+        resume: Resume,
+    ) -> None:
+        """Generate and persist the resume Embedding; never raise (Req 2.5, 2.11).
+
+        Runs after extraction succeeds with non-empty text. Best-effort by
+        contract (Requirement 9.7): any embedding or persistence failure is
+        caught here, one structured event from the documented set is logged
+        (``embedding_timeout`` / ``embedding_runtime_error`` /
+        ``embedding_persist_failure`` — design fallback table), and the
+        upload proceeds exactly as Phase 1; the resume is then embedded
+        lazily at match time (Requirement 2.7).
+
+        In Degraded_Mode (no loaded semantic pipeline) this is a silent
+        no-op — the once-at-startup ``model_load_failure`` event already
+        covers it, and per-request noise would violate the one-event-per-
+        occurrence discipline (Requirement 7.4).
+
+        Transaction semantics (deliberate, documented choice): the service
+        never commits — the router owns the transaction — so a failed
+        embedding INSERT must not poison the session's transaction and take
+        the ``resumes`` row down with it at commit time. Two steps ensure
+        that:
+
+        1. ``session.flush()`` **before** the savepoint pushes the pending
+           ``resumes`` INSERT (and audit rows) to the DB inside the *outer*
+           transaction, so the Embedding row's FK target exists and the
+           resume INSERT can never be rolled back by the savepoint below.
+           A flush failure here is a genuine resume-persistence failure —
+           the same error the router's commit would raise — so it
+           propagates (not an embedding failure).
+        2. The upsert runs inside ``session.begin_nested()`` (a SAVEPOINT):
+           a DB rejection (e.g. a wrong-dimension vector, Requirement 1.6)
+           rolls back to the savepoint only, leaving the outer transaction
+           healthy for the router's commit.
+
+        PII discipline (Requirement 2.9): events carry the resume id, the
+        failure category, and the exception class name only — never the
+        extracted text, the vector values, or the exception message (which
+        for a DB error could echo parameter values). ``request_id`` flows
+        in via the structlog contextvars bound by the request-id middleware.
+        """
+        pipeline = get_semantic_pipeline()
+        if pipeline is None:
+            # Degraded_Mode: skip silently; lazy embedding at match time.
+            return
+
+        text = resume.extracted_text
+        if not text:  # pragma: no cover -- guarded by the caller.
+            return
+
+        try:
+            vector = await embed_with_timeout(text, float(self._settings.embedding_timeout_seconds))
+        except EmbeddingTimeoutError:
+            _log.warning("embedding_timeout", resume_id=str(resume.id))
+            return
+        except Exception as exc:  # Best-effort: any encode error degrades.
+            _log.warning(
+                "embedding_runtime_error",
+                resume_id=str(resume.id),
+                error_type=type(exc).__name__,
+            )
+            return
+
+        # Flush the resumes row (outer transaction) so the FK target exists
+        # and the savepoint rollback below can never undo it.
+        await session.flush()
+        try:
+            async with session.begin_nested():
+                await upsert_resume_embedding(
+                    session,
+                    resume_id=resume.id,
+                    user_id=resume.user_id,
+                    vector=vector,
+                    model_name=pipeline.model_name,
+                    model_revision=pipeline.model_revision,
+                )
+        except Exception as exc:  # Best-effort: persistence failure degrades.
+            _log.warning(
+                "embedding_persist_failure",
+                resume_id=str(resume.id),
+                error_type=type(exc).__name__,
+            )
 
     # ------------------------------------------------------------------
     # Listing (Requirement 4.1).

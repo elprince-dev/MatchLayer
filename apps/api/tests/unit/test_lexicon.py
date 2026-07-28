@@ -1,5 +1,12 @@
 """Unit tests for the Skill_Lexicon loader and Scorer_Version (task 3.3).
 
+Phase 2 (phase-2-nlp-embeddings, task 5.4) extends this module with loader
+coverage for the expanded v2 artifact — it loads through the unchanged
+Scoring_Core loader with ``lexicon_version "v2"`` and strictly more canonical
+terms than v1 (Requirements 5.2, 5.4) — and for schema-version rejection: an
+artifact with an unsupported ``schema_version`` fails with an error naming
+the version, before any skill is parsed (no partial load, Requirement 5.8).
+
 Concrete-example coverage for
 :mod:`matchlayer_api.scoring.lexicon` — the committed-artifact loader behind
 Requirements 10.3 and 10.4. Two contracts are pinned here:
@@ -31,12 +38,16 @@ References:
 
 from __future__ import annotations
 
+import json
+from importlib import resources
 from typing import Any
 
 import pytest
 
 from matchlayer_api.scoring.lexicon import (
     ALGORITHM_VERSION,
+    SUPPORTED_SCHEMA_VERSION,
+    LexiconError,
     Skill_Lexicon,
     load_lexicon,
     scorer_version,
@@ -242,3 +253,88 @@ def test_load_lexicon_alias_rules_resolve_real_terms() -> None:
     assert lex.normalize("postgres") == "postgresql"
     # An unknown free-text term still passes through normalized.
     assert lex.normalize("Some Unlisted Skill") == "some unlisted skill"
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — v2 artifact loads and exceeds the v1 canonical-term count
+# (Requirements 5.2, 5.4 — task 5.4)
+# ---------------------------------------------------------------------------
+
+_DATA_PACKAGE = "matchlayer_api.scoring.data"
+
+
+def _read_committed_artifact(name: str) -> dict[str, Any]:
+    """Parse a committed package-data lexicon artifact by file name."""
+    text = resources.files(_DATA_PACKAGE).joinpath(name).read_text(encoding="utf-8")
+    document: Any = json.loads(text)
+    assert isinstance(document, dict)
+    return document
+
+
+def test_v2_artifact_loads_through_the_unchanged_loader() -> None:
+    """The committed v2 artifact loads without error, versioned ``"v2"``.
+
+    Requirement 5.4: the expanded artifact loads through the Scoring_Core
+    ``Skill_Lexicon`` loader preserved from Phase 1 — the same constructor,
+    the same schema version — and Requirement 5.2's version fields are intact.
+    """
+    lex = Skill_Lexicon(_read_committed_artifact("skill_lexicon.v2.json"))
+
+    assert lex.lexicon_version == "v2"
+    assert len(lex.canonical_terms) > 0
+    # The lexicon version flows into the Scorer_Version (Requirement 5.2).
+    assert lex.scorer_version == scorer_version("v2")
+
+
+def test_v2_artifact_exceeds_v1_canonical_term_count() -> None:
+    """The v2 lexicon has strictly more canonical terms than v1 (Req 5.2)."""
+    v1 = Skill_Lexicon(_read_committed_artifact("skill_lexicon.v1.json"))
+    v2 = Skill_Lexicon(_read_committed_artifact("skill_lexicon.v2.json"))
+
+    assert len(v2.canonical_terms) > len(v1.canonical_terms)
+    # Same schema (the loader accepted both), distinct content versions —
+    # hence distinct Scorer_Version stamps.
+    assert v1.lexicon_version != v2.lexicon_version
+    assert v1.scorer_version != v2.scorer_version
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — unsupported schema versions are rejected without partial load
+# (Requirement 5.8 — task 5.4)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad_schema_version", [0, 2, 999])
+def test_loader_rejects_unsupported_schema_version(bad_schema_version: int) -> None:
+    """An unsupported ``schema_version`` fails with an error naming it.
+
+    The document's skills are otherwise perfectly valid, so the rejection is
+    attributable to the schema version alone.
+    """
+    document = _artifact()
+    document["schema_version"] = bad_schema_version
+
+    with pytest.raises(LexiconError) as excinfo:
+        Skill_Lexicon(document)
+
+    message = str(excinfo.value)
+    assert "schema_version" in message
+    assert str(bad_schema_version) in message
+    assert str(SUPPORTED_SCHEMA_VERSION) in message
+
+
+def test_schema_rejection_happens_before_any_skill_is_parsed() -> None:
+    """No partial load: the schema gate fires before skills are touched.
+
+    The document pairs an unsupported schema version with skills that would
+    themselves fail parsing; the error raised is the schema-version error,
+    proving the loader never began consuming skill entries.
+    """
+    document: dict[str, Any] = {
+        "schema_version": SUPPORTED_SCHEMA_VERSION + 1,
+        "lexicon_version": "v99",
+        "skills": [{"canonical": ""}],  # would raise its own LexiconError
+    }
+
+    with pytest.raises(LexiconError, match="unsupported lexicon schema_version"):
+        Skill_Lexicon(document)

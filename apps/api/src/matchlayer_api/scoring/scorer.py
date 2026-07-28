@@ -41,12 +41,21 @@ weights and caps are **injected** through the constructor by the ``ml/`` adapter
 (a later task), keeping the scoring core free of settings access.
 
 Design reference: "Match_Scorer". Requirements covered: 5.1 through 5.8.
+
+Phase 2 (phase-2-nlp-embeddings, task 7.1) adds :class:`Semantic_Match_Scorer`
+— the semantic composition that swaps the TF-IDF similarity half for an
+embedding-based component and the TF-IDF keyword derivation for the spaCy
+:class:`~matchlayer_api.scoring.skills.Skill_Extractor`, while preserving the
+Phase 1 combination contract. The Phase 1 :class:`Match_Scorer` above stays
+untouched as the Degraded_Mode / per-request fallback engine (design D8); the
+only Phase 1-visible change is the additive optional
+:attr:`ScoreBreakdown.similarity_method` field (Requirements 3.3, 9.5).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from sklearn.feature_extraction.text import (  # type: ignore[import-untyped]
     TfidfVectorizer,  # scikit-learn ships no py.typed / stubs
@@ -62,6 +71,12 @@ from matchlayer_api.scoring.keyword_analyzer import (
 )
 from matchlayer_api.scoring.lexicon import Skill_Lexicon
 from matchlayer_api.scoring.suggestions import Suggestion, Suggestion_Generator
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from matchlayer_api.scoring.semantic import Semantic_Scorer
+    from matchlayer_api.scoring.skills import Skill_Extractor
 
 # ---------------------------------------------------------------------------
 # Result types
@@ -81,6 +96,13 @@ class ScoreBreakdown:
     ``round(100 * (weight_similarity * similarity_component +
     weight_keyword * keyword_coverage_component))`` and arrive at
     ``final_score``.
+
+    ``similarity_method`` (Phase 2, Requirements 3.3, 9.5) identifies which
+    algorithm produced the similarity component: ``"tfidf"`` for the Phase 1
+    :class:`Match_Scorer`, ``"semantic-embedding"`` for the Phase 2
+    :class:`Semantic_Match_Scorer`. It is optional and defaults to ``None`` so
+    every Phase 1 field keeps its name and type and pre-Phase 2 stored rows
+    (where the field is absent) remain valid — absence implies TF-IDF.
     """
 
     similarity_component: float
@@ -88,6 +110,7 @@ class ScoreBreakdown:
     weight_similarity: float
     weight_keyword: float
     final_score: int
+    similarity_method: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +221,7 @@ class Match_Scorer:  # noqa: N801 -- design uses the underscored component name.
             weight_similarity=self._w_similarity,
             weight_keyword=self._w_keyword,
             final_score=final_score,
+            similarity_method="tfidf",
         )
 
         return ScoreResult(
@@ -252,3 +276,165 @@ def _similarity(resume_norm: str, jd_norm: str) -> float:
         return 0.0
     sim = float(cosine_similarity(matrix[0:1], matrix[1:2])[0][0])
     return max(0.0, min(1.0, sim))
+
+
+# ---------------------------------------------------------------------------
+# Semantic_Match_Scorer (Phase 2)
+# ---------------------------------------------------------------------------
+
+
+class EmptyAnalyzedSetError(ValueError):
+    """The Skill_Extractor derived no skills from a non-empty JD (Requirement 4.10).
+
+    Raised by :meth:`Semantic_Match_Scorer.score` when both input texts are
+    non-empty after normalization but the analyzed skill set is empty, so the
+    Scoring_Service can fall back to the Phase 1 keyword derivation for that
+    request (stamped per Requirement 6.2) instead of silently reporting a
+    coverage of 0 over an empty set. A subclass of :class:`ValueError` for
+    consistency with the sibling ``EmbeddingGeometryError``.
+    """
+
+
+class Semantic_Match_Scorer:  # noqa: N801 -- design uses the underscored component name.
+    """Phase 2 semantic composition preserving the Phase 1 contract (design §4).
+
+    Combines the embedding-based similarity component (from the injected
+    :class:`~matchlayer_api.scoring.semantic.Semantic_Scorer`) and the
+    spaCy-based skill-coverage component (from the injected
+    :class:`~matchlayer_api.scoring.skills.Skill_Extractor`) into the same
+    0..100 integer score, breakdown, matched/missing partition, and rule-based
+    suggestions as Phase 1 (Requirements 3.2, 3.3). No LLM or paid third-party
+    AI API participates: the only models executed are the committed
+    Embedding_Model (whose vectors arrive pre-computed as arguments) and the
+    injected spaCy pipeline (Requirement 3.8).
+
+    Everything is injected by the ML_Adapter — the lexicon, the extractor, the
+    semantic scorer, the weights, the suggestion cap, and the composed v2
+    ``scorer_version`` string — so this class reads no configuration and no
+    environment (Requirements 3.7, 12.1). Construct once and reuse across
+    requests; instances are immutable.
+    """
+
+    def __init__(
+        self,
+        lexicon: Skill_Lexicon,
+        skill_extractor: Skill_Extractor,
+        semantic_scorer: Semantic_Scorer,
+        *,
+        w_similarity: float,
+        w_keyword: float,
+        max_suggestions: int,
+        scorer_version: str,
+    ) -> None:
+        self._skill_extractor: Final[Skill_Extractor] = skill_extractor
+        self._semantic_scorer: Final[Semantic_Scorer] = semantic_scorer
+        self._w_similarity: Final[float] = w_similarity
+        self._w_keyword: Final[float] = w_keyword
+        # The Phase 1 Suggestion_Generator is reused unchanged over the Phase 2
+        # missing set (Requirement 8.1): same lexicon metadata, same fixed
+        # templates, same cap and ordering contract.
+        self._generator: Final[Suggestion_Generator] = Suggestion_Generator(
+            lexicon, max_suggestions=max_suggestions
+        )
+        # The composed v2 string (algorithm + lexicon + embedding model +
+        # spaCy pipeline identifiers) is injected by the adapter rather than
+        # derived here, keeping artifact identity out of the Scoring_Core.
+        self._scorer_version: Final[str] = scorer_version
+
+    @property
+    def scorer_version(self) -> str:
+        """The composed v2 ``Scorer_Version`` every produced result is stamped with."""
+        return self._scorer_version
+
+    def score(
+        self,
+        resume_text: str,
+        job_description: str,
+        resume_embedding: Sequence[float],
+        jd_embedding: Sequence[float],
+    ) -> ScoreResult:
+        """Score ``resume_text`` against ``job_description`` semantically.
+
+        Order of operations (design §4):
+
+        1. **Empty-after-normalization check first** (the Phase 1
+           :func:`_normalize`): when either text is empty, the result is a
+           score of 0 with both breakdown components 0, and the call never
+           raises — the embeddings are not consulted, so a degenerate
+           embedding for empty text cannot surface an error (Requirement 3.5).
+        2. **Similarity** — ``semantic_scorer.similarity_component(...)``;
+           an :class:`~matchlayer_api.scoring.semantic.EmbeddingGeometryError`
+           propagates to the caller, which applies the per-request Phase 1
+           fallback (Requirement 3.10).
+        3. **Analysis** — ``skill_extractor.analyze(...)``;
+           ``coverage = |matched| / |analyzed|``, defined as 0 when the
+           analyzed set is empty (Requirement 4.6). When the JD is non-empty
+           but the analyzed set is empty, :class:`EmptyAnalyzedSetError` is
+           raised so the service can apply the Requirement 4.10 fallback.
+        4. **Combine** — ``max(0, min(100, round(100 * (w_sim * similarity +
+           w_kw * coverage))))``, the same documented rounding rule as Phase 1;
+           a zero similarity component never suppresses a non-zero coverage
+           component (Requirements 3.2, 3.6).
+
+        Deterministic for identical inputs under an identical
+        ``Scorer_Version``; the breakdown carries
+        ``similarity_method="semantic-embedding"`` (Requirement 3.3).
+        """
+        resume_norm = _normalize(resume_text)
+        jd_norm = _normalize(job_description)
+        both_non_empty = bool(resume_norm) and bool(jd_norm)
+
+        # Similarity half. Skipped entirely (forced to 0) in the empty case so
+        # the empty-input contract never depends on embedding geometry and
+        # never raises (Requirement 3.5); otherwise EmbeddingGeometryError from
+        # the Semantic_Scorer propagates (Requirement 3.10).
+        similarity = (
+            self._semantic_scorer.similarity_component(resume_embedding, jd_embedding)
+            if both_non_empty
+            else 0.0
+        )
+
+        # Coverage half. The extractor is empty-input safe: an empty JD yields
+        # an empty analysis and an empty resume yields an empty matched set,
+        # so both components are naturally 0 whenever either text is empty.
+        analysis = self._skill_extractor.analyze(resume_text, job_description)
+        if both_non_empty and not analysis.analyzed:
+            msg = (
+                "the Skill_Extractor derived an empty analyzed skill set from a "
+                "non-empty job description; the caller should fall back to the "
+                "Phase 1 keyword derivation (Requirement 4.10)"
+            )
+            raise EmptyAnalyzedSetError(msg)
+        coverage = _coverage(analysis)
+
+        final_score = self._combine(similarity, coverage)
+
+        breakdown = ScoreBreakdown(
+            similarity_component=similarity,
+            keyword_coverage_component=coverage,
+            weight_similarity=self._w_similarity,
+            weight_keyword=self._w_keyword,
+            final_score=final_score,
+            similarity_method="semantic-embedding",
+        )
+
+        return ScoreResult(
+            score=final_score,
+            breakdown=breakdown,
+            matched_keywords=list(analysis.matched),
+            missing_keywords=list(analysis.missing),
+            suggestions=self._generator.generate(analysis.missing),
+            scorer_version=self._scorer_version,
+        )
+
+    def _combine(self, similarity: float, coverage: float) -> int:
+        """The Phase 1 combine rule: weight, scale to 0..100, round, clamp.
+
+        ``final = max(0, min(100, round(100 * (w_sim * similarity +
+        w_kw * coverage))))`` — identical to :meth:`Match_Scorer._combine`
+        (Requirements 3.2, 3.6); duplicated rather than shared so the Phase 1
+        scorer's code path stays byte-for-byte untouched (design D8).
+        """
+        weighted = self._w_similarity * similarity + self._w_keyword * coverage
+        scaled = round(100 * weighted)
+        return max(0, min(100, scaled))

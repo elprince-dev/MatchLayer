@@ -262,8 +262,13 @@ def test_protected_set_cookie_calls_only_in_cookies_module() -> None:
 # The scoring subpackage, relative to the package root, POSIX-style.
 _SCORING_SUBDIR = "scoring"
 
-# The single permitted third-party top-level module inside scoring/ (scikit-learn
-# imports under the ``sklearn`` name). Requirement 5.8 / 10.1.
+# The permitted third-party top-level modules inside scoring/: ML libraries
+# only. Phase 1 permits scikit-learn (imports under the ``sklearn`` name,
+# Requirement 5.8 / 10.1); phase-2-nlp-embeddings task 4.1 adds spaCy for the
+# Skill_Extractor (Phase 2 Requirement 4.8 / 12.1 — the boundary bans
+# frameworks/storage/web modules, not ML libraries). The fuller Phase 2
+# boundary extension (pgvector, env reads, ml/ workspace) is task 12.1.
+_PERMITTED_ML_TOP_LEVEL = frozenset({"sklearn", "spacy"})
 _SKLEARN_TOP_LEVEL = "sklearn"
 
 # First-party roots. Inside scoring/, the ONLY first-party imports allowed are
@@ -342,7 +347,7 @@ def _scoring_import_is_violation(module: str | None, level: int) -> bool:
     if module == _FIRST_PARTY_TOP_LEVEL or module.startswith(f"{_FIRST_PARTY_TOP_LEVEL}."):
         return not (module == _SCORING_PACKAGE or module.startswith(f"{_SCORING_PACKAGE}."))
     top_level = module.split(".", 1)[0]
-    if top_level == _SKLEARN_TOP_LEVEL:
+    if top_level in _PERMITTED_ML_TOP_LEVEL:
         return False
     return top_level not in sys.stdlib_module_names
 
@@ -448,4 +453,166 @@ def test_scorer_adapter_contains_no_scoring_arithmetic() -> None:
         f"{_SCORER_ADAPTER} must perform no scoring arithmetic of its own "
         f"(Requirement 10.2); found arithmetic operator(s) at line(s): "
         f"{arithmetic_sites}"
+    )
+
+
+# ===========================================================================
+# phase-2-nlp-embeddings, task 12.1 — Phase 2 boundary extensions.
+#
+# The Phase 1 allowlist check above already rejects anything that is not
+# sklearn/spaCy/stdlib/scoring-sibling, which *implicitly* bans FastAPI,
+# SQLAlchemy, pgvector, ``matchlayer_api.config``, and every storage/web
+# module. The checks below make the phase-2 rules EXPLICIT and traceable:
+#
+#   * an explicit named-forbidden-modules assertion for ``scoring/`` — so a
+#     future loosening of the allowlist (adding a permitted top-level) can
+#     never silently re-admit a framework/storage/config import
+#     (phase-2 Requirements 12.1, 12.3, 3.7, 4.8);
+#   * ``scoring/`` reads no environment variables — the scoring core is
+#     configured exclusively through constructor injection, so ``os.environ``
+#     / ``os.getenv`` (and importing ``environ``/``getenv`` from ``os``)
+#     never appear (phase-2 Requirements 12.1, 12.6);
+#   * the repo-root ``ml/`` workspace guard is re-validated for Phase 2 —
+#     the Eval_Runner imports FROM ``matchlayer_api.scoring``, never the
+#     reverse (phase-2 Requirements 12.3, 11.4). The runtime check is
+#     ``test_api_never_imports_repo_root_ml_tree`` above; it is asserted
+#     here to hold over the Phase 2 module set too (same walk, one line).
+#
+# Validates: phase-2 Requirements 12.1, 12.3, 12.6, 3.7, 4.8, 11.4.
+# ===========================================================================
+
+# Frameworks, ORMs, storage, web, and config modules the scoring core must
+# never import (phase-2 Requirement 12.1 names FastAPI, SQLAlchemy, pgvector,
+# and matchlayer_api.config explicitly; the rest are the storage/web modules
+# the Phase 1 rule already listed).
+_EXPLICITLY_FORBIDDEN_SCORING_TOP_LEVEL = frozenset(
+    {
+        "fastapi",
+        "starlette",
+        "sqlalchemy",
+        "pgvector",
+        "alembic",
+        "asyncpg",
+        "psycopg",
+        "redis",
+        "boto3",
+        "botocore",
+        "httpx",
+        "structlog",
+    }
+)
+
+_CONFIG_MODULE = "matchlayer_api.config"
+
+# ``os`` members whose access constitutes an environment read. ``environ`` /
+# ``environb`` are the mapping objects; ``getenv`` is the accessor function.
+_ENV_READ_MEMBERS = frozenset({"environ", "environb", "getenv"})
+
+
+def test_scoring_package_never_imports_frameworks_storage_or_config() -> None:
+    """Explicit named ban: no FastAPI/SQLAlchemy/pgvector/config/storage in scoring/.
+
+    Redundant with the allowlist check above by construction — and that is
+    the point: if the allowlist is ever loosened, this named denylist still
+    fails loudly for the modules the phase-2 design bans by name.
+
+    Validates: phase-2 Requirements 12.1, 12.3, 3.7, 4.8.
+    """
+    offenders: dict[str, list[str]] = {}
+    for path in _iter_scoring_sources():
+        tree = _parse(path)
+        bad: set[str] = set()
+        for module, level in _imported_modules(tree):
+            if level > 0 or module is None:
+                continue
+            if module == _CONFIG_MODULE or module.startswith(f"{_CONFIG_MODULE}."):
+                bad.add(module)
+                continue
+            if module.split(".", 1)[0] in _EXPLICITLY_FORBIDDEN_SCORING_TOP_LEVEL:
+                bad.add(module)
+        if bad:
+            offenders[_relpath(path)] = sorted(bad)
+
+    assert not offenders, (
+        "matchlayer_api.scoring.* must never import FastAPI, SQLAlchemy, "
+        "pgvector, matchlayer_api.config, or any storage/web module "
+        "(phase-2 Requirements 12.1, 12.3); found: "
+        + "; ".join(f"{file}: {modules}" for file, modules in offenders.items())
+    )
+
+
+def _environment_read_sites(tree: ast.Module) -> list[int]:
+    """Line numbers of every environment-variable read in ``tree``.
+
+    Detects the three read shapes:
+
+    * ``os.environ[...]`` / ``os.environ.get(...)`` / ``os.environb`` —
+      an :class:`ast.Attribute` access of a banned member on the name ``os``
+      (subscripts and ``.get`` calls both contain that attribute node);
+    * ``os.getenv(...)`` — the same attribute shape;
+    * ``from os import environ`` / ``from os import getenv`` — an
+      :class:`ast.ImportFrom` of a banned member, which would let the module
+      read the environment without the ``os.`` prefix.
+
+    Prose in docstrings or comments that merely *mentions* ``os.environ``
+    cannot match: the walk inspects attribute and import nodes, not text.
+    """
+    sites: list[int] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in _ENV_READ_MEMBERS:
+            if isinstance(node.value, ast.Name) and node.value.id == "os":
+                sites.append(node.lineno)
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.level == 0
+            and node.module == "os"
+            and any(alias.name in _ENV_READ_MEMBERS for alias in node.names)
+        ):
+            sites.append(node.lineno)
+    return sorted(sites)
+
+
+def test_scoring_package_reads_no_environment_variables() -> None:
+    """No ``scoring/`` module reads environment variables.
+
+    The scoring core is configured exclusively through constructor
+    injection (weights, caps, lexicon, encoder — all explicit arguments):
+    an environment read would smuggle configuration past the injection
+    boundary and break isolated unit-testability.
+
+    Validates: phase-2 Requirements 12.1, 12.6.
+    """
+    offenders: dict[str, list[int]] = {}
+    for path in _iter_scoring_sources():
+        tree = _parse(path)
+        sites = _environment_read_sites(tree)
+        if sites:
+            offenders[_relpath(path)] = sites
+
+    assert not offenders, (
+        "matchlayer_api.scoring.* must read no environment variables "
+        "(phase-2 Requirements 12.1, 12.6); found os.environ/os.getenv "
+        f"access in: {offenders}"
+    )
+
+
+def test_phase2_modules_never_import_repo_root_ml_tree() -> None:
+    """The repo-root ``ml/`` guard holds across the Phase 2 module set.
+
+    Identical walk to ``test_api_never_imports_repo_root_ml_tree`` — kept
+    as a separate named test so the phase-2 requirement (the Eval_Runner
+    imports FROM ``matchlayer_api.scoring``, never the reverse) has its own
+    traceable assertion over the tree that now includes the Phase 2
+    modules (semantic adapter, vector store, skills, semantic, versioning).
+
+    Validates: phase-2 Requirements 12.3, 11.4.
+    """
+    offenders = [
+        _relpath(path)
+        for path in _iter_package_sources()
+        if _imports_module(_parse(path), _REPO_ROOT_ML_TOP_LEVEL)
+    ]
+    assert not offenders, (
+        "No matchlayer_api module may import the repo-root ml/ workspace "
+        f"(phase-2 Requirement 12.3); found: {offenders}"
     )

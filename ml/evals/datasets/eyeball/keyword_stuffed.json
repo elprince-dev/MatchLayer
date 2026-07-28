@@ -1,19 +1,23 @@
 {
-  "id": "keyword_stuffed_adversarial",
-  "kind": "keyword_stuffed",
-  "description": "An adversarial resume that just lists the JD's keywords twice with no real prose. Phase 1 is a deliberately naive TF-IDF + keyword scorer with no anti-stuffing defense, so the stuffed keywords DO count as matched and the resume DOES score higher than a clearly-unrelated one. This fixture documents that known, intended Phase 1 behavior rather than asserting a defense the scorer does not yet have.",
-  "jd_key_skills": [
-    "python",
-    "fastapi",
-    "postgresql",
-    "docker",
-    "aws",
-    "ci/cd",
-    "pytest",
-    "redis",
-    "kubernetes",
-    "rest"
-  ],
-  "job_description": "We are hiring a Senior Backend Engineer to design and build scalable REST APIs in Python using the FastAPI framework. You will model data in PostgreSQL, containerize services with Docker, and deploy to AWS. Strong experience with CI/CD pipelines and automated testing with pytest is required. Familiarity with Redis caching and Kubernetes is preferred.",
-  "resume": "Python FastAPI PostgreSQL Docker AWS REST CI/CD pytest Redis Kubernetes Python FastAPI PostgreSQL Docker AWS REST CI/CD pytest Redis Kubernetes"
+  "id": "eyeball-003",
+  "label": "Keyword-stuffed resume — adversarial",
+  "resume_text": "Python FastAPI PostgreSQL Docker AWS REST CI/CD pytest Redis Kubernetes Python FastAPI PostgreSQL Docker AWS REST CI/CD pytest Redis Kubernetes",
+  "jd_text": "We are hiring a Senior Backend Engineer to design and build scalable REST APIs in Python using the FastAPI framework. You will model data in PostgreSQL, containerize services with Docker, and deploy to AWS. Strong experience with CI/CD pipelines and automated testing with pytest is required. Familiarity with Redis caching and Kubernetes is preferred.",
+  "expected": {
+    "score_band": "high",
+    "must_match_skills": [
+      "python",
+      "fastapi",
+      "postgresql",
+      "docker",
+      "aws",
+      "ci/cd",
+      "pytest",
+      "redis",
+      "kubernetes",
+      "rest"
+    ],
+    "must_miss_skills": []
+  },
+  "notes": "Adversarial resume that lists the JD's keywords twice with no real prose. Neither Phase 1 nor Phase 2 has an anti-stuffing defense: the stuffed skill mentions are legitimate lexicon terms at token boundaries, so they count as matched and full skill coverage keeps the score high. This fixture documents that known, intended behavior rather than asserting a defense the scorer does not have. Fully synthetic text — no real personal data."
 }

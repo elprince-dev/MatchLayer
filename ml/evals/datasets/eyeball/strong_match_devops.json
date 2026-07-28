@@ -1,0 +1,24 @@
+{
+  "id": "eyeball-010",
+  "label": "DevOps engineer — strong match",
+  "resume_text": "DevOps Engineer with seven years of experience running production infrastructure. I operate Kubernetes clusters on AWS, define all infrastructure with Terraform, and build container images with Docker. I own the CI/CD platform on GitHub Actions, automate operational tasks in Bash and Python, tune Nginx as the edge proxy, and administer the underlying Linux hosts. I practice infrastructure code review through Git like any other codebase.",
+  "jd_text": "We are hiring a DevOps Engineer to operate our cloud platform. You will run workloads on Kubernetes in AWS, manage infrastructure as code with Terraform, build and ship Docker images, and maintain CI/CD pipelines in GitHub Actions. Day-to-day work involves Bash and Python automation, Nginx configuration, Linux administration, and Git-based collaboration.",
+  "expected": {
+    "score_band": "high",
+    "must_match_skills": [
+      "kubernetes",
+      "aws",
+      "terraform",
+      "docker",
+      "ci/cd",
+      "github actions",
+      "bash",
+      "python",
+      "nginx",
+      "linux",
+      "git"
+    ],
+    "must_miss_skills": []
+  },
+  "notes": "Third strong-match case in the DevOps domain, exercising devops-category lexicon terms (terraform, github actions, nginx) that the backend and frontend pairs never touch. Fully synthetic text — no real personal data."
+}

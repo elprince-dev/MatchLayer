@@ -33,7 +33,7 @@ to either return ``None`` (success path) or raise
 from __future__ import annotations
 
 from typing import Any, cast
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -210,7 +210,10 @@ def test_lifespan_awaits_verify_database_connection() -> None:
     the mock instead of touching real Postgres.
     """
     probe = AsyncMock(return_value=None)
-    with patch("matchlayer_api.main.verify_database_connection", probe):
+    with (
+        patch("matchlayer_api.main.verify_database_connection", probe),
+        patch("matchlayer_api.main.load_semantic_pipeline", return_value=None),
+    ):
         app = create_app(_build_settings())
         with TestClient(app):
             # Entering the TestClient context manager triggers the
@@ -232,8 +235,34 @@ def test_lifespan_propagates_database_failure() -> None:
     it exits non-zero in production.
     """
     probe = AsyncMock(side_effect=OperationalError("SELECT 1", {}, Exception("boom")))
-    with patch("matchlayer_api.main.verify_database_connection", probe):
+    with (
+        patch("matchlayer_api.main.verify_database_connection", probe),
+        patch("matchlayer_api.main.load_semantic_pipeline", return_value=None),
+    ):
         app = create_app(_build_settings())
         with pytest.raises(OperationalError), TestClient(app):
             pass  # pragma: no cover - lifespan startup raises before this runs
     probe.assert_awaited_once()
+
+
+def test_lifespan_loads_semantic_pipeline_once_and_none_means_degraded_startup() -> None:
+    """The lifespan calls ``load_semantic_pipeline()`` exactly once at startup.
+
+    Phase 2 wiring (phase-2-nlp-embeddings task 8.4, design §5): the semantic
+    pipeline is loaded once from the FastAPI lifespan, after the database
+    probe. A ``None`` return is Degraded_Mode (Requirement 7.1) — startup must
+    still complete and the app must serve, which entering the ``TestClient``
+    context without an exception proves. The loader is patched where
+    ``create_app`` looks it up so the test never touches the (typically
+    absent in dev/CI) model artifact.
+    """
+    probe = AsyncMock(return_value=None)
+    loader = Mock(return_value=None)
+    with (
+        patch("matchlayer_api.main.verify_database_connection", probe),
+        patch("matchlayer_api.main.load_semantic_pipeline", loader),
+    ):
+        app = create_app(_build_settings())
+        with TestClient(app):
+            pass
+    loader.assert_called_once_with()

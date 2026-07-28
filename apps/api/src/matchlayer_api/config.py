@@ -202,6 +202,36 @@ class Settings(BaseSettings):
     resume_daily_quota: int = 20
     match_daily_quota: int = 50
 
+    # ---- semantic pipeline (phase-2-nlp-embeddings §10) -------------------
+    # Pinned Sentence Transformers model identity (Requirement 2.2). The
+    # name+revision pair makes every stored Embedding reproducible and
+    # drives the reuse-versus-regenerate decision at match time
+    # (Requirement 2.7, 2.10). These values are read only by the
+    # ML_Adapter and injected into the Scoring_Core (Requirement 12.5).
+    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # Pinned Hugging Face commit SHA for ``embedding_model_name``. The
+    # container build stage snapshots exactly this revision into
+    # ``embedding_model_path`` so runtime never contacts the hub
+    # (Requirement 10.6).
+    embedding_model_revision: str = "c9745ed1d9f207416be6d2e6f8de32d1f16199bf"
+    # Local directory holding the baked model artifact inside the API
+    # image (design §10: "baked image path"; the image roots the app at
+    # ``/app`` — see infra/docker/api.Dockerfile). Local development
+    # overrides this to wherever the snapshot was downloaded.
+    embedding_model_path: str = "/app/models/all-MiniLM-L6-v2"
+    # Expected encoder output dimension. Must equal the ``vector(384)``
+    # DDL literal declared by the pgvector migration; the ML_Adapter's
+    # startup check fails fast on any mismatch (Requirement 1.6, 1.7).
+    embedding_dimension: int = 384
+    # Per-input wall-clock bound for embedding generation end-to-end,
+    # including chunking and aggregation (Requirement 2.8). Exceeding it
+    # triggers the per-request Phase 1 fallback, never a 5xx.
+    embedding_timeout_seconds: int = 20
+    # Pinned spaCy pipeline name for the Skill_Extractor (Requirement
+    # 10.2). The installed package version is read from package metadata
+    # at load time and stamped into the Scorer_Version.
+    spacy_pipeline: str = "en_core_web_sm"
+
     # ---- validators ------------------------------------------------------
 
     @field_validator("jwt_secret")
@@ -242,25 +272,41 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _score_weights_sum_to_one(self) -> Settings:
-        """Reject score weights that do not sum to 1.0 at startup.
+        """Reject invalid score weights at startup.
 
         The final score is a convex blend of the similarity and
-        keyword-coverage components (Requirement 5.3); weights that do not
-        sum to exactly 1.0 would silently distort every score and break the
-        ``0..100`` guarantee. Failing fast here mirrors the JWT-secret
-        length floor: a misconfiguration raises ``ValidationError`` before
-        the app accepts traffic rather than producing wrong scores in
-        production.
+        keyword-coverage components (phase-1-matching Requirement 5.3,
+        extended by phase-2-nlp-embeddings Requirement 3.9). Two
+        misconfigurations are rejected, in order:
 
-        ``math.isclose`` with a tight absolute tolerance accommodates IEEE
-        754 representation error (e.g. ``0.6 + 0.4`` is not bit-exactly
-        ``1.0``) without admitting weights that are meaningfully off.
+        1. Either weight outside the inclusive range ``[0, 1]`` — a
+           negative or >1 weight breaks the convex-blend contract even if
+           the pair happens to sum to 1.0 (e.g. ``1.5 + -0.5``).
+        2. The pair not summing to ``1.0`` within an absolute tolerance of
+           ``±0.001`` (Requirement 3.9's documented tolerance, replacing
+           the Phase 1 ``1e-9`` IEEE-754-only allowance).
+
+        Failing fast here mirrors the JWT-secret length floor: a
+        misconfiguration raises ``ValidationError`` before the app accepts
+        traffic rather than producing wrong scores in production.
         """
+        weights = (
+            ("MATCHLAYER_SCORE_WEIGHT_SIMILARITY", self.score_weight_similarity),
+            ("MATCHLAYER_SCORE_WEIGHT_KEYWORD", self.score_weight_keyword),
+        )
+        for env_name, value in weights:
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(
+                    "MATCHLAYER_SCORE_WEIGHT_SIMILARITY and "
+                    "MATCHLAYER_SCORE_WEIGHT_KEYWORD must each lie in the "
+                    f"inclusive range [0, 1]; {env_name} is {value}"
+                )
         total = self.score_weight_similarity + self.score_weight_keyword
-        if not math.isclose(total, 1.0, abs_tol=1e-9):
+        if not math.isclose(total, 1.0, abs_tol=1e-3):
             raise ValueError(
                 "MATCHLAYER_SCORE_WEIGHT_SIMILARITY + "
-                "MATCHLAYER_SCORE_WEIGHT_KEYWORD must sum to 1.0; "
+                "MATCHLAYER_SCORE_WEIGHT_KEYWORD must sum to 1.0 "
+                "within a tolerance of ±0.001; "
                 f"received {self.score_weight_similarity} + "
                 f"{self.score_weight_keyword} = {total}"
             )

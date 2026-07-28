@@ -92,9 +92,16 @@ def _load_example(name: str) -> dict[str, Any]:
     path = _eyeball_dir() / name
     data: Any = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(data, dict), f"{name} must be a JSON object"
-    for key in ("resume", "job_description", "jd_key_skills"):
+    for key in ("resume_text", "jd_text", "expected"):
         assert key in data, f"{name} is missing required key {key!r}"
     return data
+
+
+def _key_skills(example: dict[str, Any]) -> list[str]:
+    """The pair's key JD skills under the README schema (14.1 rewrite)."""
+    skills = example["expected"]["must_match_skills"]
+    assert isinstance(skills, list)
+    return list(skills)
 
 
 def _terms(keywords: list[Any]) -> set[str]:
@@ -119,7 +126,7 @@ def _recompute_score(result: ScoreResult) -> int:
 def test_strong_match_scores_high_and_matches_key_skills(scorer: Match_Scorer) -> None:
     """A resume that genuinely fits the JD scores highly and covers its key skills."""
     example = _load_example("strong_match.json")
-    result = scorer.score(example["resume"], example["job_description"])
+    result = scorer.score(example["resume_text"], example["jd_text"])
 
     # The score is a bounded integer (Requirement 5.1, 5.3).
     assert isinstance(result.score, int) and not isinstance(result.score, bool)
@@ -133,7 +140,7 @@ def test_strong_match_scores_high_and_matches_key_skills(scorer: Match_Scorer) -
 
     # Every key JD skill is reported as matched (Requirement 5.2 coverage half).
     matched_terms = _terms(result.matched_keywords)
-    for skill in example["jd_key_skills"]:
+    for skill in _key_skills(example):
         assert skill in matched_terms, f"expected key skill {skill!r} in matched_keywords"
 
     # Both scoring components carry real signal for a true match (Requirement
@@ -150,7 +157,7 @@ def test_strong_match_scores_high_and_matches_key_skills(scorer: Match_Scorer) -
 def test_clear_mismatch_scores_low_and_misses_key_skills(scorer: Match_Scorer) -> None:
     """An unrelated resume scores low and reports the JD's key skills as missing."""
     example = _load_example("clear_mismatch.json")
-    result = scorer.score(example["resume"], example["job_description"])
+    result = scorer.score(example["resume_text"], example["jd_text"])
 
     assert isinstance(result.score, int) and not isinstance(result.score, bool)
     assert 0 <= result.score <= 100
@@ -159,11 +166,11 @@ def test_clear_mismatch_scores_low_and_misses_key_skills(scorer: Match_Scorer) -
     # sits well below this ceiling; the margin avoids brittleness.
     assert result.score <= 30, f"clear mismatch scored unexpectedly high: {result.score}"
 
-    # None of the JD's key technical skills are present, so each is reported as
-    # missing (Requirement 5.2 coverage half).
-    missing_terms = _terms(result.missing_keywords)
-    for skill in example["jd_key_skills"]:
-        assert skill in missing_terms, f"expected key skill {skill!r} in missing_keywords"
+    # None of the JD's technical skills are present in the resume, so the
+    # matched set is empty and every analyzed JD skill lands in missing
+    # (Requirement 5.2 coverage half; the fixture's notes pin this shape).
+    assert result.matched_keywords == []
+    assert result.missing_keywords, "expected the JD's skills to be reported missing"
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +188,7 @@ def test_keyword_stuffing_raises_coverage_as_designed(scorer: Match_Scorer) -> N
     the scorer does not have; resistance to stuffing is a Phase 2+ concern.
     """
     example = _load_example("keyword_stuffed.json")
-    result = scorer.score(example["resume"], example["job_description"])
+    result = scorer.score(example["resume_text"], example["jd_text"])
 
     assert isinstance(result.score, int) and not isinstance(result.score, bool)
     assert 0 <= result.score <= 100
@@ -189,7 +196,7 @@ def test_keyword_stuffing_raises_coverage_as_designed(scorer: Match_Scorer) -> N
     # The stuffed lexicon skills ARE counted as matched (no anti-stuffing
     # defense in Phase 1).
     matched_terms = _terms(result.matched_keywords)
-    for skill in example["jd_key_skills"]:
+    for skill in _key_skills(example):
         assert skill in matched_terms, f"stuffed skill {skill!r} should count as matched"
 
     # Stuffing genuinely lifts the keyword-coverage component above zero
@@ -218,9 +225,9 @@ def test_relative_ordering_strong_beats_stuffed_beats_mismatch(scorer: Match_Sco
     stuffed = _load_example("keyword_stuffed.json")
     mismatch = _load_example("clear_mismatch.json")
 
-    strong_score = scorer.score(strong["resume"], strong["job_description"]).score
-    stuffed_score = scorer.score(stuffed["resume"], stuffed["job_description"]).score
-    mismatch_score = scorer.score(mismatch["resume"], mismatch["job_description"]).score
+    strong_score = scorer.score(strong["resume_text"], strong["jd_text"]).score
+    stuffed_score = scorer.score(stuffed["resume_text"], stuffed["jd_text"]).score
+    mismatch_score = scorer.score(mismatch["resume_text"], mismatch["jd_text"]).score
 
     assert strong_score > stuffed_score > mismatch_score, (
         f"unexpected ordering: strong={strong_score}, "
@@ -247,7 +254,7 @@ def test_breakdown_recomputes_to_the_reported_score(scorer: Match_Scorer, filena
     coverage equals the matched fraction of the analyzed set (Requirement 5.2).
     """
     example = _load_example(filename)
-    result = scorer.score(example["resume"], example["job_description"])
+    result = scorer.score(example["resume_text"], example["jd_text"])
 
     # Requirement 5.3: the breakdown re-derives the final score.
     assert _recompute_score(result) == result.score
