@@ -117,9 +117,19 @@ export function HowItWorks({ className }: HowItWorksProps): React.JSX.Element {
                 key={step.number}
                 className="flex flex-1 flex-col items-center md:flex-row md:items-stretch"
               >
-                <div className="flex h-full w-full flex-col items-center gap-4 rounded-hero border border-border bg-bg-elevated p-6 text-center shadow-resting md:flex-1">
+                <div className="group relative flex h-full w-full flex-col items-center gap-4 overflow-hidden rounded-hero border border-border bg-bg-elevated p-8 text-center shadow-resting transition-[box-shadow,border-color] duration-[var(--motion-micro)] ease-[var(--motion-ease)] hover:border-brand hover:shadow-elevated md:flex-1">
+                  {/* Faint per-card glow that brightens on hover (decorative,
+                      token-driven, low alpha). */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-60 transition-opacity duration-[var(--motion-micro)] ease-[var(--motion-ease)] group-hover:opacity-100"
+                    style={{
+                      backgroundImage:
+                        "radial-gradient(60% 100% at 50% 0%, rgb(var(--color-brand) / 0.1), transparent 75%)",
+                    }}
+                  />
                   <div className="relative">
-                    <span className="flex size-12 items-center justify-center rounded-hero border border-border-strong bg-bg text-brand">
+                    <span className="flex size-14 items-center justify-center rounded-hero border border-border-strong bg-bg text-brand shadow-resting">
                       <step.icon aria-hidden="true" className="size-6" />
                     </span>
                     <span className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full border border-brand bg-brand/15 text-xs font-semibold tabular-nums text-text">
@@ -129,7 +139,9 @@ export function HowItWorks({ className }: HowItWorksProps): React.JSX.Element {
                   <h3 className="text-lg font-semibold tracking-tight text-text">
                     {step.title}
                   </h3>
-                  <p className="text-sm text-text-muted">{step.description}</p>
+                  <p className="text-sm leading-relaxed text-text-muted">
+                    {step.description}
+                  </p>
                 </div>
 
                 <Connector isLast={index === STEPS.length - 1} />
@@ -145,7 +157,8 @@ export function HowItWorks({ className }: HowItWorksProps): React.JSX.Element {
 /**
  * Decorative connector between two steps (Req 4.2 "visual connectors").
  *
- * A thin `border-strong` line: **vertical** between stacked steps at ≤768px,
+ * A thin violet→cyan gradient line (the Signature_Gradient as punctuation —
+ * design Section 4.2): **vertical** between stacked steps at ≤768px,
  * **horizontal** between steps in the ≥768px row. The trailing connector after
  * the final step is removed on mobile (`hidden`) and kept space-preserving but
  * invisible on desktop (`md:invisible`) so every step card keeps an identical
@@ -162,7 +175,7 @@ function Connector({ isLast }: { isLast: boolean }): React.JSX.Element {
         isLast && "hidden md:invisible",
       )}
     >
-      <span className="block h-full w-px bg-border-strong md:h-px md:w-full" />
+      <span className="block h-full w-px bg-gradient-to-b from-brand/60 to-brand-2/60 md:h-px md:w-full md:bg-gradient-to-r" />
     </span>
   );
 }

@@ -199,31 +199,71 @@ export default function LandingPage(): React.JSX.Element {
         <FinalCTA />
       </main>
 
-      {/* contentinfo landmark — site footer. */}
+      {/* contentinfo landmark — site footer. Link groups reference only real
+          surfaces (in-page anchors + shipped public pages) — no dead links. */}
       <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-10 text-sm text-text-muted sm:flex-row">
-          <span className="bg-gradient-to-br from-brand to-brand-2 bg-clip-text font-sans text-base font-semibold tracking-tight text-transparent">
-            MatchLayer
-          </span>
+        <div className="mx-auto max-w-7xl px-6 py-14">
+          <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Brand column. */}
+            <div className="flex flex-col gap-3 lg:col-span-2">
+              <span className="bg-gradient-to-br from-brand to-brand-2 bg-clip-text font-sans text-lg font-semibold tracking-tight text-transparent">
+                MatchLayer
+              </span>
+              <p className="max-w-xs text-sm leading-relaxed text-text-muted">
+                Transparent, keyword-based ATS scoring for your resume — see
+                what matched, what is missing, and how the number is built.
+              </p>
+            </div>
 
-          <nav aria-label="Footer" className="flex items-center gap-6">
-            <Link
-              href="/privacy"
-              className="rounded-md outline-none transition-colors hover:text-text focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            {/* Link groups — one nav landmark wrapping both columns. */}
+            <nav
+              aria-label="Footer"
+              className="grid grid-cols-2 gap-10 sm:col-span-1 lg:col-span-2"
             >
-              Privacy
-            </Link>
-            <Link
-              href="/terms"
-              className="rounded-md outline-none transition-colors hover:text-text focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-            >
-              Terms
-            </Link>
-          </nav>
+              <div className="flex flex-col gap-3">
+                <span className="text-sm font-semibold text-text">Product</span>
+                {(
+                  [
+                    { href: "/#features", label: "Features" },
+                    { href: "/#how-it-works", label: "How It Works" },
+                    { href: "/about", label: "About" },
+                  ] as const
+                ).map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="w-fit rounded-md text-sm text-text-muted outline-none transition-colors hover:text-text focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+              <div className="flex flex-col gap-3">
+                <span className="text-sm font-semibold text-text">Legal</span>
+                {(
+                  [
+                    { href: "/privacy", label: "Privacy" },
+                    { href: "/terms", label: "Terms" },
+                  ] as const
+                ).map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="w-fit rounded-md text-sm text-text-muted outline-none transition-colors hover:text-text focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </nav>
+          </div>
 
-          <span className="text-text-subtle">
-            © {new Date().getFullYear()} MatchLayer
-          </span>
+          <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 text-sm text-text-subtle sm:flex-row">
+            <span>© {new Date().getFullYear()} MatchLayer</span>
+            <span className="font-mono text-xs">
+              Keyword + TF-IDF scoring — no black box
+            </span>
+          </div>
         </div>
       </footer>
     </>
