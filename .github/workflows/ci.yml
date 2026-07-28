@@ -294,9 +294,15 @@ jobs:
       # local labels carry no security meaning). Hashes must be dropped for the
       # rewritten line to resolve, and they add nothing here — this
       # requirements.txt exists only for the audit dry-run, never for install.
+      # `--no-emit-package en-core-web-sm`: the spaCy pipeline artifact is a
+      # pinned GitHub-release wheel (see apps/api/pyproject.toml), not a PyPI
+      # package — pip-audit hard-fails on any requirement it cannot find on
+      # PyPI. It is language *data* with a thin loader shim, has no advisory
+      # feed anywhere, and its executable dependency (spacy itself) remains
+      # fully audited, so excluding it removes no real audit surface.
       - name: Export production Python deps to requirements.txt
         run: |
-          uv export --project apps/api --no-dev --no-emit-project --no-hashes --format requirements-txt > requirements.txt
+          uv export --project apps/api --no-dev --no-emit-project --no-hashes --no-emit-package en-core-web-sm --format requirements-txt > requirements.txt
           sed -i -E 's/^torch==([0-9a-zA-Z.]+)\+cpu\b/torch==\1/' requirements.txt
 
       - name: pip-audit (Python production deps)
