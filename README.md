@@ -1,9 +1,9 @@
 # MatchLayer
 
-An AI-native ATS simulator and career intelligence platform. Upload a resume + job description, get a transparent match score, semantic skill-gap analysis, and AI-driven improvement suggestions.
+An AI-native ATS simulator and career intelligence platform. Upload a resume + job description, get a transparent match score built from semantic similarity (sentence embeddings) and keyword coverage, a skill-gap breakdown, and rule-based improvement suggestions. AI-powered coaching arrives in Phase 3.
 
 **Domain:** [matchlayer.net](https://matchlayer.net) (not yet live)
-**Status:** Phase 0 — planning and scaffolding.
+**Status:** Phase 2 complete — semantic scoring with embeddings + pgvector shipped. Phase 3 (LLM layer) is next.
 
 ## Why this exists
 
@@ -15,8 +15,8 @@ It's also a portfolio project, deliberately built as a 7-phase progression from 
 
 | Phase | Focus                                                                 | Status      |
 | ----- | --------------------------------------------------------------------- | ----------- |
-| 1     | MVP foundation — Next.js + FastAPI + Postgres + S3, naive ATS scoring | Not started |
-| 2     | NLP & embeddings — sentence-transformers + pgvector                   | Not started |
+| 1     | MVP foundation — Next.js + FastAPI + Postgres + S3, naive ATS scoring | ✅ Complete |
+| 2     | NLP & embeddings — sentence-transformers + pgvector, skill extraction | ✅ Complete |
 | 3     | LLM layer — resume coach, interview question generator                | Not started |
 | 4     | Agentic AI — LangGraph multi-agent workflows                          | Not started |
 | 5     | AI testing & evaluation — DeepEval, prompt versioning                 | Not started |
@@ -124,25 +124,47 @@ After the prerequisites are installed:
    uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
    ```
 
-   `alembic.ini` lives inside `apps/api/`, so the explicit `-c` flag is required when running from the repo root — without it Alembic can't find `script_location`. Phase 1 ships migration `0001_users_and_auth` which creates `users`, `refresh_tokens`, `password_reset_tokens`, and the append-only `audit_events` table (with role-scoped grants — see [Audit log notes](#audit-log) below). `phase-1-matching` adds `0002_resumes_and_matches`, which creates the `resumes` and `match_results` tables; `upgrade head` applies both.
+   `alembic.ini` lives inside `apps/api/`, so the explicit `-c` flag is required when running from the repo root — without it Alembic can't find `script_location`. Phase 1 ships migration `0001_users_and_auth` which creates `users`, `refresh_tokens`, `password_reset_tokens`, and the append-only `audit_events` table (with role-scoped grants — see [Audit log notes](#audit-log) below), and `0002_resumes_and_matches`, which creates the `resumes` and `match_results` tables. Phase 2 adds `0003_pgvector_embeddings`, which enables the `vector` extension and creates the `resume_embeddings` and `match_embeddings` tables (the docker-compose Postgres runs the `pgvector/pgvector:pg16` image, so the extension is available out of the box). `upgrade head` applies all three.
 
-8. **Install pre-commit hooks.**
+8. **Download the embedding model (Phase 2 semantic scoring).**
+
+   The production image bakes the model at build time, but a local `uvicorn` process loads it from `MATCHLAYER_EMBEDDING_MODEL_PATH`. Without it the API still runs — in Degraded_Mode, scoring every match with the Phase 1 TF-IDF engine and reporting `"semantic_scoring": "unavailable"` on `/healthz`. To enable the Phase 2 pipeline locally, download the pinned snapshot once (~91 MB) and point `.env` at it:
+
+   ```bash
+   uv run --project apps/api python -c "
+   from huggingface_hub import snapshot_download
+   snapshot_download(
+       repo_id='sentence-transformers/all-MiniLM-L6-v2',
+       revision='c9745ed1d9f207416be6d2e6f8de32d1f16199bf',
+       local_dir='$HOME/.cache/matchlayer/models/all-MiniLM-L6-v2',
+       allow_patterns=['config.json', 'config_sentence_transformers.json',
+                       'sentence_bert_config.json', 'modules.json',
+                       'model.safetensors', 'tokenizer.json', 'tokenizer_config.json',
+                       'special_tokens_map.json', 'vocab.txt',
+                       '1_Pooling/config.json', '2_Normalize/*'])
+   "
+   echo "MATCHLAYER_EMBEDDING_MODEL_PATH=$HOME/.cache/matchlayer/models/all-MiniLM-L6-v2" >> .env
+   ```
+
+   The `allow_patterns` list mirrors the production image's filtered bake (see `infra/docker/api.Dockerfile`) — only the files sentence-transformers actually loads. Verify after starting the API: `curl http://localhost:8000/healthz` should report `"semantic_scoring": "available"`.
+
+9. **Install pre-commit hooks.**
 
    ```bash
    pre-commit install
    ```
 
-9. **Start the apps** (in two terminals):
+10. **Start the apps** (in two terminals):
 
-   ```bash
-   # API — http://localhost:8000
-   uv run --project apps/api uvicorn matchlayer_api.main:app --reload
-   ```
+```bash
+# API — http://localhost:8000
+uv run --project apps/api uvicorn matchlayer_api.main:app --reload
+```
 
-   ```bash
-   # Web — http://localhost:3000
-   pnpm --filter @matchlayer/web dev
-   ```
+```bash
+# Web — http://localhost:3000
+pnpm --filter @matchlayer/web dev
+```
 
 ## Phase 1 auth — local development helpers
 
@@ -194,11 +216,11 @@ Integration tests under `apps/api/tests/integration/` and infra-dependent proper
 
 ## Phase 1 matching — upload and match a resume
 
-The `phase-1-matching` surface adds resume upload (PDF/DOCX → MinIO), bounded server-side text extraction, a deterministic TF-IDF-plus-keyword score against a pasted job description, and the results UI. The endpoints are authenticated with the access token from `phase-1-auth`, rate-limited, and quota-bounded.
+The `phase-1-matching` surface adds resume upload (PDF/DOCX → MinIO), bounded server-side text extraction, deterministic scoring against a pasted job description, and the results UI. The endpoints are authenticated with the access token from `phase-1-auth`, rate-limited, and quota-bounded. Since Phase 2, the score's similarity component comes from sentence embeddings rather than TF-IDF whenever the semantic pipeline is available (see the [Phase 2 runbook](#phase-2-semantic-scoring--runbook) below) — the endpoints, request/response shapes, and this walkthrough are unchanged.
 
 ### End-to-end upload-and-match walkthrough
 
-Prerequisite: the stack is up (`docker compose up -d --wait`), the resume bucket exists (setup step 6), migrations are applied (step 7), and both apps are running (step 9).
+Prerequisite: the stack is up (`docker compose up -d --wait`), the resume bucket exists (setup step 6), migrations are applied (step 7), and both apps are running (step 10).
 
 **Via the web UI:**
 
@@ -359,10 +381,9 @@ Some setup can't be done from code: branch protection on `main`, secret scanning
 
 ## What's next
 
-This spec is the scaffold. Two sibling specs build the actual Phase 1 product on top:
+Phases 1 and 2 are complete: auth, resume upload and matching, the results UI, and semantic scoring with embeddings + pgvector are all shipped (specs in [`.kiro/specs/`](./.kiro/specs/)). Next up:
 
-- **`phase-1-auth`** — JWT auth (PyJWT, Argon2id passwords), register / login / refresh / logout / password-reset endpoints, rate limiting on auth routes, and the audit log baseline.
-- **`phase-1-matching`** — resume upload (PDF/DOCX), server-side parsing, TF-IDF scoring against a job description, and the results UI that renders the score and skill breakdown.
+- **Phase 3 — LLM layer**: resume coach, bullet rewriting, and interview question generation behind a provider abstraction (OpenAI initially), with versioned prompts, structured outputs, and per-user token quotas.
 
 ## Documentation
 
