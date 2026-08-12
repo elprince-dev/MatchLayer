@@ -234,14 +234,22 @@ def _problem_response(
 def _quota_exceeded_response(exc: DailyQuotaExceededError) -> JSONResponse:
     """The 429 Daily_Quota rejection (Requirements 13.2, 13.5, 16.5).
 
-    ``detail`` states the configured daily limit and the UTC reset instant
-    (both carried by the exception — fixed, PII-free copy); the response
-    carries the requester's remaining count in ``X-LLM-Quota-Remaining``.
+    ``detail`` states the configured daily limit and the UTC reset instant,
+    rebuilt here from the exception's structured fields (``limit`` /
+    ``resets_at``) rather than ``str(exc)`` so no exception text — however
+    fixed — ever flows into a response body (security.md: no exception
+    details in error responses; CodeQL py/stack-trace-exposure). The
+    response carries the requester's remaining count in
+    ``X-LLM-Quota-Remaining``.
     """
+    detail = (
+        f"Daily LLM quota of {exc.limit} requests reached. "
+        f"Quota resets at {exc.resets_at.isoformat()}."
+    )
     return _problem_response(
         type_="llm_quota_exceeded",
         title="LLM Daily Quota Exceeded",
-        detail=str(exc),
+        detail=detail,
         status_code=429,
         headers={_QUOTA_HEADER: str(exc.remaining)},
     )
