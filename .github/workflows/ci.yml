@@ -379,8 +379,18 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "apps/api/uv.lock"
 
-      - name: Install Python deps (frozen)
-        run: uv sync --frozen --project apps/api
+      # Retried because the spaCy model wheel downloads from GitHub releases,
+      # which intermittently refuses streams from Actions runners ("stream
+      # error received: refused stream"); a short backoff clears it.
+      - name: Install Python deps (frozen, retried for transient downloads)
+        run: |
+          for attempt in 1 2 3; do
+            uv sync --frozen --project apps/api && exit 0
+            echo "uv sync failed (attempt ${attempt}); retrying in 30s..."
+            sleep 30
+          done
+          echo "::error::uv sync failed after 3 attempts."
+          exit 1
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
