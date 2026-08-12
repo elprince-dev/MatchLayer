@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import math
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
@@ -232,6 +233,51 @@ class Settings(BaseSettings):
     # at load time and stamped into the Scorer_Version.
     spacy_pipeline: str = "en_core_web_sm"
 
+    # ---- LLM layer (phase-3-llm-layer §"Configuration") -------------------
+    # Provider base URL for the LLM_Client's OpenAI-compatible API. Only
+    # the single provider adapter module reads this (Requirement 1.4);
+    # swapping providers in Phase 6 means a new adapter + this URL.
+    llm_base_url: str = "https://openrouter.ai/api/v1"
+    # App-owned provider API key. Intentionally optional: absent/empty
+    # means the app starts normally with LLM_Features in the
+    # LLM_Unavailable state serving fallbacks (Requirement 1.8).
+    # ``SecretStr`` keeps the key out of ``repr()``, logs, and error
+    # messages (Requirement 1.9).
+    llm_api_key: SecretStr | None = None
+    # Model identifier sent to the provider. The one designated source
+    # for the model — no other source file hardcodes one (Requirement 1.3).
+    llm_model: str = "anthropic/claude-haiku-4.5"
+    # Per-request wall-clock timeout covering the full provider call,
+    # streaming included (Requirement 1.6). Expiry aborts the call and
+    # takes the Fallback_Response path, never a 5xx.
+    llm_timeout_seconds: int = 60
+    # Per-request maximum output tokens, always set on every provider
+    # call (Requirement 1.4).
+    llm_max_output_tokens: int = 4096
+    # Per-user daily LLM-call quota (UTC calendar day) enforced on Redis
+    # as the cost-as-DoS control (Requirement 13.1 → 429).
+    llm_daily_quota: int = 25
+    # Global monthly spend ceiling backing the Spend_Circuit_Breaker
+    # (Requirement 14.1 → 503 while open). Derived from persisted
+    # invocation-log costs, fail-safe open on tracking failure.
+    llm_monthly_spend_limit_usd: Decimal = Decimal("10")
+    # Bullet_Rewriter request bounds: max bullets per request and max
+    # characters per bullet (Requirement 6.3 → 422 pre-LLM).
+    llm_max_bullets: int = 5
+    llm_max_bullet_chars: int = 500
+    # Interview_Question_Generator upper bound on questions per set. The
+    # schema floor is 5; a configured value below 5 fails startup via the
+    # ``_llm_numeric_settings_positive`` validator (Requirement 7.8).
+    llm_max_questions: int = 15
+    # TTL for the per-user LLM_Cache entries on Redis (Requirement 15.6).
+    # Default 24 hours.
+    llm_cache_ttl_seconds: int = 86400
+    # Computed-cost fallback pricing (USD per million tokens) used when
+    # the provider's usage payload carries no reported cost
+    # (Requirement 12.2, ``cost_basis="computed"``).
+    llm_price_input_usd_per_mtok: Decimal = Decimal("1.00")
+    llm_price_output_usd_per_mtok: Decimal = Decimal("5.00")
+
     # ---- validators ------------------------------------------------------
 
     @field_validator("jwt_secret")
@@ -309,6 +355,47 @@ class Settings(BaseSettings):
                 "within a tolerance of ±0.001; "
                 f"received {self.score_weight_similarity} + "
                 f"{self.score_weight_keyword} = {total}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _llm_numeric_settings_positive(self) -> Settings:
+        """Reject invalid LLM cost-control and bounds settings at startup.
+
+        Every numeric setting in the Phase 3 LLM block must be strictly
+        positive (phase-3-llm-layer Requirement 18.2): a non-positive
+        timeout, quota, spend limit, or bound would silently disable a
+        cost control or produce a nonsensical request shape. Additionally
+        ``llm_max_questions`` must be at least 5 because the
+        Interview_Question_Set schema enforces a floor of 5 questions
+        (Requirement 7.8) — an upper bound below the floor would make
+        every LLM response an automatic validation failure.
+
+        Failing fast here mirrors the JWT-secret length floor and the
+        score-weight validator above: the error message names the
+        offending setting so an operator can fix the misconfiguration
+        before the app accepts traffic.
+        """
+        numeric_settings: tuple[tuple[str, int | Decimal], ...] = (
+            ("MATCHLAYER_LLM_TIMEOUT_SECONDS", self.llm_timeout_seconds),
+            ("MATCHLAYER_LLM_MAX_OUTPUT_TOKENS", self.llm_max_output_tokens),
+            ("MATCHLAYER_LLM_DAILY_QUOTA", self.llm_daily_quota),
+            ("MATCHLAYER_LLM_MONTHLY_SPEND_LIMIT_USD", self.llm_monthly_spend_limit_usd),
+            ("MATCHLAYER_LLM_MAX_BULLETS", self.llm_max_bullets),
+            ("MATCHLAYER_LLM_MAX_BULLET_CHARS", self.llm_max_bullet_chars),
+            ("MATCHLAYER_LLM_MAX_QUESTIONS", self.llm_max_questions),
+            ("MATCHLAYER_LLM_CACHE_TTL_SECONDS", self.llm_cache_ttl_seconds),
+            ("MATCHLAYER_LLM_PRICE_INPUT_USD_PER_MTOK", self.llm_price_input_usd_per_mtok),
+            ("MATCHLAYER_LLM_PRICE_OUTPUT_USD_PER_MTOK", self.llm_price_output_usd_per_mtok),
+        )
+        for env_name, value in numeric_settings:
+            if value <= 0:
+                raise ValueError(f"{env_name} must be a positive value; received {value}")
+        if self.llm_max_questions < 5:
+            raise ValueError(
+                "MATCHLAYER_LLM_MAX_QUESTIONS must be at least 5 — the "
+                "Interview_Question_Set schema enforces a floor of 5 "
+                f"questions; received {self.llm_max_questions}"
             )
         return self
 

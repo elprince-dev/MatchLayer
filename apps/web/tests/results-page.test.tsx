@@ -209,11 +209,15 @@ describe("ResultsView — score render (Requirement 11.8)", () => {
       HTMLElement,
     );
 
-    // apiFetch was called against the match-by-id endpoint with the route id.
-    expect(apiFetchMock).toHaveBeenCalledTimes(1);
-    expect(apiFetchMock.mock.calls[0]![0]).toContain(
-      `/api/v1/matches/${MATCH_ID}`,
+    // apiFetch was called against the match-by-id endpoint exactly once with
+    // the route id. Counted by exact path rather than total call count: the
+    // success content also mounts the LLM tabs (phase-3-llm-layer Req 17.8),
+    // whose persisted-result GETs hit the `/matches/{id}/…` sub-resources —
+    // never the match endpoint itself, and never a POST.
+    const matchCalls = apiFetchMock.mock.calls.filter(
+      ([requestPath]) => requestPath === `/api/v1/matches/${MATCH_ID}`,
     );
+    expect(matchCalls).toHaveLength(1);
   });
 });
 
@@ -544,7 +548,16 @@ describe("ResultsView — 5xx error (Requirements 13.5, 17.6)", () => {
         HTMLElement,
       );
     });
-    expect(apiFetchMock).toHaveBeenCalledTimes(2);
+    // Exactly two match-endpoint attempts: the failed load + the user Retry.
+    // Counted by exact path — the success content mounts the LLM tabs
+    // (phase-3-llm-layer Req 17.8), whose persisted-result GETs target the
+    // `/matches/{id}/…` sub-resources, not the match endpoint.
+    const matchCalls = apiFetchMock.mock.calls.filter(
+      ([requestPath]) =>
+        requestPath.startsWith("/api/v1/matches/") &&
+        !requestPath.includes("?"),
+    );
+    expect(matchCalls).toHaveLength(2);
   });
 });
 

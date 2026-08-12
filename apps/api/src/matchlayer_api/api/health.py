@@ -14,12 +14,25 @@ Behaviour follows Design §6.5 / Requirements 4.7-4.9:
   ``pool_pre_ping``, asyncpg socket — not a parallel codepath that
   could pass while real requests fail.
 * On success the response is
-  ``200 {"status": "ok", "semantic_scoring": "available" | "unavailable"}``.
+  ``200 {"status": "ok", "semantic_scoring": ..., "llm": ...}`` where
+  both subsystem fields carry ``"available" | "unavailable"``.
   The ``semantic_scoring`` field (Phase 2, Requirement 7.5) reports
   semantic-pipeline availability via
   :func:`~matchlayer_api.ml.semantic_adapter.semantic_available` and
   never changes the status code — a Degraded_Mode instance still
   reports serving.
+* The ``llm`` field (Phase 3, Requirements 10.1, 10.2, 10.5, 10.6)
+  follows the same additive pattern: ``unavailable`` iff the provider
+  API key was absent at startup
+  (:func:`~matchlayer_api.ml.llm.availability.llm_key_present`) or the
+  Spend_Circuit_Breaker is open (the memoized
+  :attr:`~matchlayer_api.services.llm.spend.SpendCircuitBreaker.state`
+  — no storage query per probe, design decision D5). The value never
+  changes the 200 status and never exposes the key, spend figures, or
+  provider account details. Recovery — a valid key at the next
+  startup, a UTC month rollover, or a raised spend limit — flips it
+  back to ``available`` without a code change (Requirement 10.4),
+  because both sources are re-read on every probe.
 * On any :class:`SQLAlchemyError` the response is
   ``503 {"status": "unhealthy", "reason": "database_unreachable"}``
   and a structured warning log line is emitted carrying ONLY the
@@ -61,7 +74,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from matchlayer_api.core.db import get_session
+from matchlayer_api.ml.llm.availability import llm_key_present
 from matchlayer_api.ml.semantic_adapter import semantic_available
+from matchlayer_api.services.llm.spend import get_spend_circuit_breaker
 
 # Module-level logger. The request-id middleware (§6.4) binds
 # ``request_id`` / ``route`` / ``method`` to a structlog contextvar at
@@ -98,6 +113,17 @@ class HealthResponse(BaseModel):
             "machine-readable values — a degraded instance still returns 200 "
             "so orchestration never restart-loops it; operators detect "
             "Degraded_Mode from this field without reading logs."
+        ),
+    )
+    llm: Literal["available", "unavailable"] = Field(
+        description=(
+            "Phase 3 LLM-subsystem availability (Requirement 10.1). "
+            "'unavailable' iff the provider API key was absent at startup "
+            "or the Spend_Circuit_Breaker is open (LLM_Unavailable, "
+            "Requirement 10.2); 'available' otherwise (Requirement 10.6). "
+            "Exactly these two machine-readable values — the field never "
+            "changes the HTTP status code and never exposes the API key, "
+            "spend figures, or provider account details (Requirement 10.5)."
         ),
     )
 
@@ -197,9 +223,23 @@ async def healthz(
         "available" if semantic_available() else "unavailable"
     )
 
+    # Phase 3 (Requirements 10.1, 10.2, 10.5, 10.6): report LLM-subsystem
+    # availability the same way. LLM_Unavailable has exactly two causes —
+    # the provider API key was absent at startup, or the app-wide
+    # Spend_Circuit_Breaker is open — and the field composes both. The
+    # breaker read is the memoized process-local snapshot (design decision
+    # D5): no storage query per probe. Both sources are re-read on every
+    # request, so recovery (key at next startup, UTC month rollover, or a
+    # raised limit closing the breaker at its next evaluation) flips the
+    # value back without a code change (Requirement 10.4). Like
+    # ``semantic_scoring``, the value never affects the 200 status, and it
+    # carries no key material, spend figures, or provider account details.
+    llm_available = llm_key_present() and not get_spend_circuit_breaker().state.is_open
+    llm: Literal["available", "unavailable"] = "available" if llm_available else "unavailable"
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"status": "ok", "semantic_scoring": semantic_scoring},
+        content={"status": "ok", "semantic_scoring": semantic_scoring, "llm": llm},
     )
 
 

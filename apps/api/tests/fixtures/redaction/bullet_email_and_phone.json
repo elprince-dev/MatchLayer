@@ -1,0 +1,6 @@
+{
+  "description": "Bullets get whole-text email/phone redaction; ordinary numbers are untouched and no name heuristic runs.",
+  "kind": "bullet",
+  "input": "Handled 40,000 support tickets and managed the escalation line 555-321-7654, reachable via ops.desk@example.com",
+  "expected": "Handled 40,000 support tickets and managed the escalation line [PHONE_1], reachable via [EMAIL_1]"
+}

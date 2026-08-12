@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import * as React from "react";
 
 import { ErrorState } from "@/components/error-state";
+import { LlmTabs } from "@/components/llm/LlmTabs";
 import { MotionSafe } from "@/components/motion-safe";
 import { SkeletonLoader } from "@/components/skeleton-loader";
 import { Button } from "@/components/ui/button";
@@ -226,7 +227,17 @@ export function ResultsView({ id }: ResultsViewProps): React.JSX.Element {
       );
     } else {
       liveMessage = "Your match results are ready.";
-      body = <ResultsContent match={query.data} />;
+      // The LLM tabs (Coach / Bullet Rewrites / Interview Prep,
+      // phase-3-llm-layer Req 17.1) are passed as the `llmTools` slot so
+      // they render anchored to this match, between the suggestions and
+      // the page footer — while the visual-harness route, which renders
+      // `ResultsContent` directly from a fixture, stays network-free.
+      body = (
+        <ResultsContent
+          match={query.data}
+          llmTools={<LlmTabs matchId={id} />}
+        />
+      );
     }
   }
 
@@ -287,8 +298,16 @@ function NotFoundErrorState(): React.JSX.Element {
  */
 export function ResultsContent({
   match,
+  llmTools,
 }: {
   match: MatchResponse;
+  /**
+   * Optional slot for the LLM feature tabs (phase-3-llm-layer Req 17.1),
+   * rendered between the suggestions and the footer. A *slot* rather than
+   * a direct import so the visual-harness fixture route, which renders
+   * this component without a network, never mounts the data-fetching tabs.
+   */
+  llmTools?: React.ReactNode;
 }): React.JSX.Element {
   const {
     score,
@@ -339,6 +358,8 @@ export function ResultsContent({
           </div>
         </section>
       )}
+
+      {llmTools}
 
       <footer className="space-y-6 pb-4">
         {/* Attribution footnote (Req 11.8). `job_description_text` is never

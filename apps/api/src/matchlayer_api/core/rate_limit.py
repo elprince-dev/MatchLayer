@@ -1,7 +1,10 @@
 """Sliding-window rate limiter backed by Redis SORTED SETs.
 
-This is the ONLY module in the API that imports ``redis``.
-Import-boundary enforced by ``tests/unit/test_import_boundaries.py``.
+The ``redis`` import boundary lives in ``core/redis.py`` (the single
+module allowed to import ``redis`` — phase-3-llm-layer design decision
+D6, enforced by ``tests/unit/test_import_boundaries.py``). This module
+receives an *injected* client and annotates it via the ``core/redis.py``
+re-exports.
 
 Design reference: Rate Limiting §10.1-§10.4.
 """
@@ -10,14 +13,13 @@ from __future__ import annotations
 
 import secrets
 import time
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from typing import Annotated
 
-import redis.asyncio as aioredis
 import structlog
-from redis.commands.core import AsyncScript
+from fastapi import Depends
 
-from matchlayer_api.config import get_settings
+from matchlayer_api.core.redis import AsyncScript, Redis, get_redis_client
 
 _log = structlog.get_logger(__name__)
 
@@ -74,7 +76,7 @@ class RateLimiter:
     strategy.
     """
 
-    def __init__(self, redis_client: aioredis.Redis) -> None:
+    def __init__(self, redis_client: Redis) -> None:
         self._redis = redis_client
         self._script: AsyncScript | None = None
 
@@ -109,63 +111,25 @@ class RateLimiter:
 # ---------------------------------------------------------------------------
 # Per-request limiter factory.
 #
-# ``redis.asyncio.Redis`` builds a connection pool whose ``Future``
-# objects bind to the running event loop on first ``await``. A
-# module-scope singleton client therefore "captures" the first loop it
-# sees, and any later use from a different loop raises
-# ``RuntimeError: ... attached to a different loop`` — which the
-# wrapper's ``except Exception`` clause converts into the fail-closed
-# ``redis_unavailable=True`` decision.
-#
-# pytest-asyncio's default function-scoped event loop turns this into
-# a silent failure mode: every test after the first sees 503
-# ``rate_limiter_unavailable`` instead of the real route response.
-#
-# The fix is to scope the client to the *request*. FastAPI's
-# dependency-injection system supports async-generator dependencies —
-# yielding the limiter, then closing the underlying client (and
-# draining its connection pool) when the request finishes. Each
-# request gets a client bound to the loop that served the request,
-# never reused on another. Production opens at most one TCP
-# connection per request (redis-py pools lazily — no command means no
-# connection); the EVALSHA fast path still hits Redis's server-side
-# script cache because the SHA is computed client-side from
-# ``_LUA_SCRIPT`` and is identical across :class:`RateLimiter`
-# instances.
+# The client lifecycle (per-request construction, teardown, and the
+# event-loop-affinity rationale) lives in ``core/redis.py``'s
+# ``get_redis_client`` — see the commentary there. This factory only
+# composes that dependency: FastAPI resolves ``get_redis_client`` once
+# per request, hands the loop-bound client here, and runs the
+# generator's teardown when the request finishes.
 # ---------------------------------------------------------------------------
 
 
-async def get_rate_limiter() -> AsyncIterator[RateLimiter]:
-    """Yield a per-request :class:`RateLimiter`; close it on teardown.
+async def get_rate_limiter(
+    client: Annotated[Redis, Depends(get_redis_client)],
+) -> RateLimiter:
+    """Build a per-request :class:`RateLimiter` around the injected client.
 
-    Built per request so the underlying ``redis.asyncio.Redis``
-    client's asyncio resources never outlive the event loop that
-    allocates them. The FastAPI dependency layer resolves this once
-    per request, drains the pool's connections back through redis-py
-    on teardown, and never shares the client across requests (or
-    across the function-scoped event loops pytest-asyncio creates per
-    test).
-
-    Tests that drive :class:`RateLimiter` directly construct fake
-    clients and override this dependency in
-    ``app.dependency_overrides`` — they skip this factory entirely
-    and so do not need to engage with the close path.
+    The client is created and closed by
+    :func:`matchlayer_api.core.redis.get_redis_client`; this factory
+    never owns the connection lifecycle (design decision D6). Tests
+    that drive :class:`RateLimiter` directly construct fake clients
+    and override this dependency in ``app.dependency_overrides`` —
+    they skip both factories entirely.
     """
-    settings = get_settings()
-    client = aioredis.from_url(str(settings.redis_url), decode_responses=False)  # type: ignore[no-untyped-call]
-    try:
-        yield RateLimiter(client)
-    finally:
-        # ``aclose()`` releases the client's state; an explicit
-        # ``connection_pool.disconnect()`` then drains any idle
-        # ``Connection`` objects whose ``StreamReader``/``StreamWriter``
-        # are bound to the loop. Without the disconnect, redis-py
-        # delays the close to ``__del__``, which on a closed loop
-        # raises a ``ResourceWarning`` — and the API test suite's
-        # ``filterwarnings = ["error"]`` config escalates that into
-        # a teardown failure.
-        try:
-            await client.aclose(close_connection_pool=True)
-            await client.connection_pool.disconnect()
-        except Exception:  # pragma: no cover - defensive
-            _log.warning("rate_limiter_client_close_failed")
+    return RateLimiter(client)

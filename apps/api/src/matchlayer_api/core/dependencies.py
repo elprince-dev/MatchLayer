@@ -29,12 +29,11 @@ from __future__ import annotations
 
 import json
 import secrets
-from collections.abc import AsyncIterator, Callable, Coroutine
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from typing import Annotated, Any, Final, Literal
 from uuid import UUID
 
-import redis.asyncio as aioredis
 import structlog
 from fastapi import Depends, Request, Response
 from sqlalchemy import insert, select
@@ -43,6 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from matchlayer_api.config import Settings, get_settings
 from matchlayer_api.core.db import get_session
 from matchlayer_api.core.rate_limit import RateLimitDecision, RateLimiter, get_rate_limiter
+from matchlayer_api.core.redis import Redis, get_redis_client
 from matchlayer_api.core.security.jwt import InvalidTokenError, verify_token
 from matchlayer_api.db.models import AuditEvent, User
 
@@ -596,7 +596,7 @@ class IdempotencyStore:
     outage, so these soft paths only cover a mid-request blip.
     """
 
-    def __init__(self, redis_client: aioredis.Redis) -> None:
+    def __init__(self, redis_client: Redis) -> None:
         self._redis = redis_client
 
     async def get(self, *, user_id: UUID, route: str, key: str) -> IdempotencyRecord | None:
@@ -649,28 +649,20 @@ class IdempotencyStore:
             _log.warning("idempotency_store_failed", route=route)
 
 
-async def get_idempotency_store() -> AsyncIterator[IdempotencyStore]:
-    """Yield a per-request :class:`IdempotencyStore`; close it on teardown.
+async def get_idempotency_store(
+    client: Annotated[Redis, Depends(get_redis_client)],
+) -> IdempotencyStore:
+    """Build a per-request :class:`IdempotencyStore` around the injected client.
 
-    Built per request for the same reason as :func:`get_rate_limiter`: the
-    underlying ``redis.asyncio.Redis`` client's asyncio resources must not
-    outlive the event loop that allocates them (pytest-asyncio creates one
-    loop per test). redis-py pools connections lazily, so a request that
-    carries no ``Idempotency-Key`` (and therefore never touches the store)
-    opens no TCP connection. The teardown drains the pool to avoid the
-    ``ResourceWarning`` the API test suite's ``filterwarnings = ["error"]``
-    would otherwise escalate to a failure.
+    The client lifecycle (per-request construction, teardown, and the
+    event-loop-affinity rationale) is owned by
+    :func:`matchlayer_api.core.redis.get_redis_client` (design decision
+    D6) — this factory never constructs or closes a connection itself.
+    redis-py pools connections lazily, so a request that carries no
+    ``Idempotency-Key`` (and therefore never touches the store) opens
+    no TCP connection.
     """
-    settings = get_settings()
-    client = aioredis.from_url(str(settings.redis_url), decode_responses=False)  # type: ignore[no-untyped-call]
-    try:
-        yield IdempotencyStore(client)
-    finally:
-        try:
-            await client.aclose(close_connection_pool=True)
-            await client.connection_pool.disconnect()
-        except Exception:  # pragma: no cover - defensive
-            _log.warning("idempotency_client_close_failed")
+    return IdempotencyStore(client)
 
 
 # Annotated alias for routers wiring the store via ``Depends`` (parallel to

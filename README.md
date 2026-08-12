@@ -369,6 +369,125 @@ measured peak RSS exceeds the 1GB machine, the documented remediation is to
 move scoring to a worker or downsize the model — decision recorded in
 `docs/costs.md` when taken).
 
+## Phase 3 LLM layer — runbook
+
+Phase 3 (`phase-3-llm-layer`) adds three LLM features to the results page —
+resume coach, bullet rewriting, and interview question generation — behind a
+provider-neutral abstraction, with PII redaction, per-user quotas, and a
+global spend circuit breaker. The provider is **OpenRouter** (OpenAI-compatible
+API); the adapter lives in `apps/api/src/matchlayer_api/ml/llm/openrouter.py`
+and is the only module that knows the provider exists.
+
+### Obtaining and configuring the OpenRouter key
+
+1. Create an account at [openrouter.ai](https://openrouter.ai/) and generate
+   an API key at [openrouter.ai/keys](https://openrouter.ai/keys). Add a few
+   dollars of prepaid credit (usage-priced, no subscription).
+2. Set the key in your local `.env` (never in `.env.example`, never
+   committed — `.env` is gitignored):
+
+   ```bash
+   MATCHLAYER_LLM_API_KEY=sk-or-v1-...your-key...
+   ```
+
+3. Restart the API. With a key present, the adapter validates it against the
+   provider (`GET /key`) during startup:
+   - **Valid key** → `/healthz` reports `"llm": "available"` and the LLM
+     features go live.
+   - **Invalid key / provider unreachable / timeout** → startup **aborts**
+     with an error naming the failure category (`invalid_key` /
+     `unreachable` / `timeout`) — never the key value.
+
+**Running without a key is fully supported.** Leave
+`MATCHLAYER_LLM_API_KEY` blank and the API starts normally with the LLM
+features in the LLM-unavailable state: every request is served by a
+deterministic fallback built from stored match data, and `/healthz` reports
+`"llm": "unavailable"` (still HTTP 200 — a keyless instance is healthy by
+design). The only way to enable LLM features is a restart with the key
+configured. There is deliberately **no** endpoint or per-user configuration
+path for user-supplied provider keys — the app-owned key is the only one.
+
+### Default model and `MATCHLAYER_LLM_MODEL`
+
+The default model is **`anthropic/claude-haiku-4.5`**. The
+`MATCHLAYER_LLM_MODEL` setting is the single designated source for the model
+identifier — no other source file hardcodes one — so swapping models is a
+config change plus restart, no code change:
+
+```bash
+MATCHLAYER_LLM_MODEL=anthropic/claude-haiku-4.5
+```
+
+Every provider call sends `max_tokens` from
+`MATCHLAYER_LLM_MAX_OUTPUT_TOKENS` (default 4096) and runs under a
+wall-clock timeout of `MATCHLAYER_LLM_TIMEOUT_SECONDS` (default 60s),
+streaming included. Exactly one attempt per request — no retries; any
+failure serves the fallback, never a 5xx. Per-call cost is taken from the
+provider's reported usage when present, otherwise computed from
+`MATCHLAYER_LLM_PRICE_INPUT_USD_PER_MTOK` / `MATCHLAYER_LLM_PRICE_OUTPUT_USD_PER_MTOK`
+(defaults $1.00 / $5.00 per million tokens, matching Claude Haiku 4.5's
+OpenRouter pricing — keep these in sync when changing the model).
+
+### Daily_Quota — per-user daily call cap
+
+- **Default:** 25 LLM calls per user per **UTC calendar day**
+  (`MATCHLAYER_LLM_DAILY_QUOTA`).
+- **Mechanics:** fixed-window Redis counter keyed
+  `llm:quota:{user_id}:{YYYYMMDD}`. Only _initiated provider calls_ count —
+  cache hits, reused persisted results, 429 rejections, and fallbacks that
+  never reach the provider consume nothing. The reserve step is an atomic
+  Lua check-and-increment, so concurrent requests can't overshoot the limit.
+  A reserved call stays counted even if the provider call then fails.
+- **Exceeding the quota:** the endpoint returns **429** with the limit and
+  the UTC reset time in the error detail. Every LLM feature response —
+  429s included — carries the `X-LLM-Quota-Remaining` header.
+- **Reset:** automatic at **UTC midnight** — a new day means a new Redis key
+  with a fresh count. Keys expire after 48 hours, so they self-clean without
+  a sweeper. No manual reset exists or is needed.
+- **Redis failure:** quota accounting errors serve the request via the
+  fallback path with **no provider call** — an accounting outage can never
+  cause unbounded spend.
+
+### Spend_Circuit_Breaker — global monthly spend cap
+
+- **Default:** **$10/month** (`MATCHLAYER_LLM_MONTHLY_SPEND_LIMIT_USD`),
+  app-wide across all users.
+- **Mechanics:** the tracked spend is derived, not stored — every evaluation
+  recomputes `SUM(cost_usd)` over the current UTC month's
+  `llm_invocation_logs` rows. The breaker is **open** iff that sum reaches
+  or exceeds the limit; while open, LLM endpoints return **503** (the error
+  names the spend-limit cause, no figures) and `/healthz` reports
+  `"llm": "unavailable"`. In-flight calls complete and are logged.
+- **Fail-safe open:** if the spend sum cannot be read, or an invocation-log
+  write fails (a completed call's cost is unaccounted), the breaker forces
+  open with cause `tracking_failure` — unaccounted cost never allows
+  unbounded spend.
+- **Reset conditions** (all automatic at the next evaluation, no restart, no
+  manual step): **UTC month rollover** (the new month's sum starts from
+  zero), **raising the configured limit** above the tracked spend, or a
+  successful below-limit read after a transient tracking failure. Each
+  open↔closed flip emits exactly one structured
+  `llm_spend_breaker_transition` event.
+
+### PII redaction and the Redaction_Exception
+
+Before any text reaches the provider, the `PII_Redactor` replaces emails,
+phone numbers, and header-detected names with indexed typed placeholders
+(`[EMAIL_n]`, `[PHONE_n]`, `[NAME_n]`). **Employment-history sections of a
+resume are deliberately transmitted unredacted** — employer names, role
+titles, and entry content are the raw material of useful coaching, while
+direct contact identifiers carry no coaching signal. The full policy — the
+exception's rationale, the committed section-boundary rule that makes the
+exempt/redactable decision decidable, and the failure behavior — is
+documented in [`docs/redaction-policy.md`](./docs/redaction-policy.md).
+
+### Cost tracking
+
+Every provider call (success or failure) writes one row to
+`llm_invocation_logs` with token usage, cost, and cost basis. The monthly
+cost story — pricing, quota math, and the projection under the $20/month
+ceiling — lives in [`docs/costs.md`](./docs/costs.md).
+
 ## Branch & PR conventions
 
 The Phase 1 foundation lands on the branch **`phase-1/foundation`**. All subsequent feature work follows the `phase-N/short-description` pattern, with PRs merged into `main` (never pushed directly).

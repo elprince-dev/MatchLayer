@@ -1,0 +1,6 @@
+{
+  "description": "Repeated occurrences of the same email receive the same placeholder index (Req 3.1, 3.5).",
+  "kind": "resume",
+  "input": "Jordan Ellery\njordan.ellery@example.com | 555-123-4567\n\nSummary\nContact jordan.ellery@example.com for references.\n\nSkills\nPython, SQL\n",
+  "expected": "[NAME_1]\n[EMAIL_1] | [PHONE_1]\n\nSummary\nContact [EMAIL_1] for references.\n\nSkills\nPython, SQL\n"
+}

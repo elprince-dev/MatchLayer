@@ -87,7 +87,7 @@ from uuid_utils.compat import uuid7
 from matchlayer_api.config import get_settings
 from matchlayer_api.core.db import get_session
 from matchlayer_api.core.security.passwords import hash_password
-from matchlayer_api.db.models import RefreshToken, User
+from matchlayer_api.db.models import LLMResult, MatchResult, RefreshToken, Resume, User
 from matchlayer_api.main import create_app
 
 
@@ -425,6 +425,116 @@ async def factory_user(db_session: AsyncSession) -> UserFactory:
         db_session.add(user)
         await db_session.flush()
         return user
+
+    return _build
+
+
+# ---------------------------------------------------------------------------
+# LLM-surface row factories (phase-3-llm-layer tasks 10.1 / 10.9).
+#
+# Shared by test_llm_api.py and test_llm_streaming_availability.py: both
+# suites exercise the LLM sub-resource routers against real Postgres rows,
+# so the owned Resume + MatchResult pair and the persisted llm_results row
+# are built here once. Direct inserts — the router surface is what those
+# tests target, not the matching pipeline.
+# ---------------------------------------------------------------------------
+
+LLM_TEST_RESUME_TEXT: Final[str] = (
+    "Backend engineer with production Python and FastAPI services, "
+    "PostgreSQL data modeling, and Docker-based deployments on AWS."
+)
+LLM_TEST_JOB_DESCRIPTION: Final[str] = (
+    "Hiring a backend engineer for Python REST APIs with FastAPI, "
+    "PostgreSQL, Docker, and Kubernetes on AWS."
+)
+
+# A minimal schema-valid CoachingReport payload for persisted rows.
+LLM_TEST_COACH_PAYLOAD: Final[dict[str, Any]] = {
+    "summary": "Solid overlap with the role's core stack.",
+    "strengths": ["Python and FastAPI experience"],
+    "gaps": ["No Kubernetes experience listed"],
+    "improvements": [
+        {"priority": 1, "action": "Add concrete Kubernetes experience."},
+        {"priority": 2, "action": "Quantify the impact of each project."},
+        {"priority": 3, "action": "Mirror the job description's wording."},
+    ],
+}
+
+MatchFactory = Callable[..., Awaitable[MatchResult]]
+LLMResultFactory = Callable[..., Awaitable[LLMResult]]
+
+
+@pytest_asyncio.fixture
+async def factory_match(db_session: AsyncSession) -> MatchFactory:
+    """Insert an owned Resume + MatchResult pair and return the match."""
+
+    async def _build(*, user_id: Any) -> MatchResult:
+        resume = Resume(
+            id=uuid7(),
+            user_id=user_id,
+            original_filename="resume.pdf",
+            storage_key=f"{uuid7()}.pdf",
+            content_type="application/pdf",
+            byte_size=2048,
+            extracted_text=LLM_TEST_RESUME_TEXT,
+            extraction_status="succeeded",
+            extraction_char_count=len(LLM_TEST_RESUME_TEXT),
+            deleted_at=None,
+        )
+        db_session.add(resume)
+        await db_session.flush()
+        match = MatchResult(
+            id=uuid7(),
+            user_id=user_id,
+            resume_id=resume.id,
+            job_description_text=LLM_TEST_JOB_DESCRIPTION,
+            score=72,
+            score_breakdown={
+                "similarity_component": 0.7,
+                "keyword_coverage_component": 0.75,
+                "weight_similarity": 0.6,
+                "weight_keyword": 0.4,
+                "final_score": 72,
+            },
+            matched_keywords=[{"term": "python", "weight": 1.0}],
+            missing_keywords=[{"term": "kubernetes", "weight": 0.8}],
+            suggestions=["Add Kubernetes experience to your resume."],
+            scorer_version="test-scorer",
+        )
+        db_session.add(match)
+        await db_session.flush()
+        return match
+
+    return _build
+
+
+@pytest_asyncio.fixture
+async def factory_llm_result(db_session: AsyncSession) -> LLMResultFactory:
+    """Insert one persisted, schema-valid ``llm_results`` row."""
+
+    async def _build(
+        *,
+        user_id: Any,
+        match_result_id: Any,
+        feature: str = "resume_coach",
+        payload: dict[str, Any] | None = None,
+        created_at: datetime | None = None,
+        prompt_template_version: int = 1,
+        llm_model: str = "test-model",
+    ) -> LLMResult:
+        row = LLMResult(
+            id=uuid7(),
+            user_id=user_id,
+            match_result_id=match_result_id,
+            feature=feature,
+            prompt_template_version=prompt_template_version,
+            llm_model=llm_model,
+            payload=payload if payload is not None else dict(LLM_TEST_COACH_PAYLOAD),
+            created_at=created_at or datetime.now(UTC),
+        )
+        db_session.add(row)
+        await db_session.flush()
+        return row
 
     return _build
 

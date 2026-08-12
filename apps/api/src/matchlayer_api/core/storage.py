@@ -2,7 +2,7 @@
 
 This is the ONLY module in the API that reads or writes resume file bytes,
 and the ONLY module that imports ``boto3``. The import-boundary intent
-mirrors the ``redis``-only-in-``rate_limit.py`` and ``jwt``-only-in-
+mirrors the ``redis``-only-in-``core/redis.py`` and ``jwt``-only-in-
 ``security/jwt.py`` rules already enforced by
 ``tests/unit/test_import_boundaries.py``.
 

@@ -31,6 +31,7 @@ Validates: Requirements 7.1, 1.10.
 from __future__ import annotations
 
 import ast
+import re
 import sys
 from pathlib import Path
 
@@ -615,4 +616,348 @@ def test_phase2_modules_never_import_repo_root_ml_tree() -> None:
     assert not offenders, (
         "No matchlayer_api module may import the repo-root ml/ workspace "
         f"(phase-2 Requirement 12.3); found: {offenders}"
+    )
+
+
+# ===========================================================================
+# phase-3-llm-layer, task 1.3 — the redis import boundary.
+#
+# Design decision D6: Redis client construction moves to ``core/redis.py``,
+# the single module allowed to import ``redis``. Every consumer
+# (``core/rate_limit.py``'s RateLimiter, the idempotency store in
+# ``core/dependencies.py``, and the Phase 3 DailyQuota / LLMCache) receives
+# an injected client and annotates it via the ``core/redis.py`` re-exports
+# (``Redis``, ``AsyncScript``) — never by importing ``redis`` itself.
+#
+# ``from matchlayer_api.core.redis import ...`` does NOT trip this check:
+# its module string is ``matchlayer_api.core.redis``, which neither equals
+# ``redis`` nor starts with ``redis.`` — the same distinction
+# ``test_api_never_imports_repo_root_ml_tree`` relies on for the in-package
+# ``matchlayer_api.ml`` adapter.
+#
+# Design reference: phase-3-llm-layer design.md, decision D6.
+# Validates: Requirement 13.1 (Rate_Limiter reuse), design decision D6.
+# ===========================================================================
+
+_REDIS_ALLOWED = "core/redis.py"
+
+
+def test_redis_imported_only_in_core_redis_module() -> None:
+    """``import redis`` / ``from redis import`` must appear only in core/redis.py.
+
+    Validates: phase-3 Requirement 13.1, design decision D6.
+    """
+    offenders: list[str] = []
+    for path in _iter_package_sources():
+        rel = _relpath(path)
+        if rel == _REDIS_ALLOWED:
+            continue
+        tree = _parse(path)
+        if _imports_module(tree, "redis"):
+            offenders.append(rel)
+    assert not offenders, (
+        f"redis must only be imported by {_REDIS_ALLOWED}; found imports in: {offenders}"
+    )
+
+
+# ===========================================================================
+# phase-3-llm-layer, task 3.5 — OpenRouter confinement, hardcoded-model
+# guard, and the prompt-instruction-literal ban.
+#
+# Three static rules locked down by the phase-3-llm-layer design ("Testing
+# Strategy" → boundary/static tests):
+#
+#   * 1.1 — all OpenRouter-specific code is confined to the single provider
+#     adapter module ``ml/llm/openrouter.py``. Two named allowances exist by
+#     design: ``ml/llm/availability.py`` is the composition root that
+#     constructs the adapter at startup (it may import the adapter module
+#     and name ``OpenRouterClient``, but carries no wire-format code), and
+#     ``config.py`` holds the provider base-URL *default*
+#     (``https://openrouter.ai/api/v1``) — a configuration value, exactly
+#     like the model default of Requirement 1.3. Nothing else — no service,
+#     router, schema, or the provider-neutral ``ml/llm/client.py`` protocol
+#     itself — may reference OpenRouter by literal or identifier.
+#   * 1.3 — the LLM model identifier is configuration. No source file
+#     outside ``config.py`` may contain a hardcoded ``vendor/model`` string
+#     (e.g. ``anthropic/claude-haiku-4.5``) usable for LLM calls.
+#   * 2.1 — every prompt instruction text sent to the provider is loaded
+#     from a versioned template file under ``ml/prompts/``; no prompt
+#     instruction text is assembled from string literals embedded in
+#     service or router code. Statically enforced with a sentinel-phrase
+#     scan: the instruction phrases the committed templates use (and the
+#     generic markers of system-prompt authorship) must never appear in a
+#     string literal under ``services/``, ``api/``, ``auth/``, or ``dev/``.
+#
+# Like every check in this file, these walk the AST rather than grepping
+# text: docstrings and comments that merely *describe* the rules (this
+# comment block names the adapter, the base URL, and the model default)
+# can never produce a false positive, because docstring constants are
+# excluded and comments do not exist in the AST at all.
+#
+# The redis half of task 3.5 ("only core/redis.py imports redis") is
+# already enforced above by ``test_redis_imported_only_in_core_redis_module``
+# (task 1.3).
+#
+# Design reference: phase-3-llm-layer design.md "Testing Strategy".
+# Validates: phase-3 Requirements 1.1, 1.3, 2.1.
+# ===========================================================================
+
+# The single provider adapter module and its one sanctioned constructor site.
+_OPENROUTER_ADAPTER = "ml/llm/openrouter.py"
+_OPENROUTER_COMPOSITION_ROOT = "ml/llm/availability.py"
+_OPENROUTER_ADAPTER_MODULE = "matchlayer_api.ml.llm.openrouter"
+
+# The configuration module and the one provider-URL literal it may carry.
+_CONFIG_FILE = "config.py"
+_OPENROUTER_BASE_URL_DEFAULT = "https://openrouter.ai/api/v1"
+
+# Case-insensitive marker for any OpenRouter reference.
+_OPENROUTER_MARKER = "openrouter"
+
+# Hardcoded-model guard (Requirement 1.3): a string literal shaped like an
+# OpenRouter ``vendor/model`` identifier. The vendor list covers the model
+# families plausibly reachable through OpenRouter; a new vendor added here
+# widens the guard, never the allowance (config.py stays the only allowed
+# location). ``sentence-transformers/...`` (the Phase 2 embedding model) is
+# deliberately NOT in this list — it is not an LLM identifier.
+_MODEL_ID_PATTERN = re.compile(
+    r"^(anthropic|openai|google|meta-llama|mistralai|qwen|deepseek"
+    r"|cohere|amazon|x-ai|microsoft|nvidia|perplexity)/[A-Za-z0-9][\w.:-]*$",
+    re.IGNORECASE,
+)
+
+# The service/router surface Requirement 2.1 bans instruction literals from:
+# every module under these top-level package directories.
+_SERVICE_AND_ROUTER_DIRS = ("services", "api", "auth", "dev")
+
+# Sentinel instruction phrases (lowercase). Drawn from the committed
+# templates' own wording plus the generic markers of system-prompt
+# authorship — a prompt instruction pasted into a service or router would
+# almost certainly carry at least one of these.
+_PROMPT_INSTRUCTION_SENTINELS = (
+    "you are matchlayer",
+    "you are a resume",
+    "you are an ai",
+    "your task is to",
+    "never reveal",
+    "ignore previous instructions",
+    "data to analyze, never instructions",
+    "instructions to follow",
+    "never instructions to follow",
+    "do not invent",
+    "these system instructions",
+    "respond with a single json object",
+)
+
+
+def _docstring_constant_ids(tree: ast.Module) -> set[int]:
+    """Return ``id()``s of every docstring constant node in ``tree``.
+
+    A docstring is the leading ``ast.Expr``-wrapped string constant of a
+    module, class, or (async) function body. Collecting their node ids
+    lets the literal scans below skip prose that merely *describes* a
+    forbidden pattern.
+    """
+    ids: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            body = node.body
+            if (
+                body
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                ids.add(id(body[0].value))
+    return ids
+
+
+def _non_docstring_string_literals(tree: ast.Module) -> list[tuple[int, str]]:
+    """Return ``(lineno, value)`` for every non-docstring string literal.
+
+    Covers plain literals and the constant fragments of f-strings (both
+    surface as ``ast.Constant`` under :func:`ast.walk`). Docstrings are
+    excluded via :func:`_docstring_constant_ids`; comments never appear
+    in the AST.
+    """
+    doc_ids = _docstring_constant_ids(tree)
+    return [
+        (node.lineno, node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in doc_ids
+    ]
+
+
+def _identifier_names(tree: ast.Module) -> list[tuple[int, str]]:
+    """Return ``(lineno, name)`` for every identifier used in ``tree``.
+
+    Collects variable/parameter names, attribute accesses, class and
+    function definition names, and import aliases — the shapes through
+    which provider-specific code (``OpenRouterClient``, an
+    ``openrouter``-named helper) could leak outside the adapter.
+    """
+    names: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            names.append((node.lineno, node.id))
+        elif isinstance(node, ast.Attribute):
+            names.append((node.lineno, node.attr))
+        elif isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            names.append((node.lineno, node.name))
+        elif isinstance(node, ast.arg):
+            names.append((node.lineno, node.arg))
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                names.append((node.lineno, alias.asname or alias.name))
+    return names
+
+
+def test_openrouter_referenced_only_in_adapter_module() -> None:
+    """OpenRouter literals and identifiers stay inside the sanctioned files.
+
+    * String literals containing ``openrouter`` (case-insensitive, outside
+      docstrings) may appear only in ``ml/llm/openrouter.py`` — with the
+      single exception of the exact base-URL default literal in
+      ``config.py`` (a configuration value, not provider code).
+    * Identifiers containing ``openrouter`` (``OpenRouterClient``, etc.)
+      may appear only in the adapter itself and in the
+      ``ml/llm/availability.py`` composition root that constructs it.
+
+    Validates: phase-3 Requirement 1.1.
+    """
+    literal_offenders: dict[str, list[int]] = {}
+    identifier_offenders: dict[str, list[int]] = {}
+
+    for path in _iter_package_sources():
+        rel = _relpath(path)
+        if rel == _OPENROUTER_ADAPTER:
+            continue
+        tree = _parse(path)
+
+        bad_literal_lines = [
+            lineno
+            for lineno, value in _non_docstring_string_literals(tree)
+            if _OPENROUTER_MARKER in value.lower()
+            and not (rel == _CONFIG_FILE and value == _OPENROUTER_BASE_URL_DEFAULT)
+        ]
+        if bad_literal_lines:
+            literal_offenders[rel] = sorted(set(bad_literal_lines))
+
+        if rel != _OPENROUTER_COMPOSITION_ROOT:
+            bad_name_lines = [
+                lineno
+                for lineno, name in _identifier_names(tree)
+                if _OPENROUTER_MARKER in name.lower()
+            ]
+            if bad_name_lines:
+                identifier_offenders[rel] = sorted(set(bad_name_lines))
+
+    assert not literal_offenders, (
+        f"OpenRouter string literals must live only in {_OPENROUTER_ADAPTER} "
+        f"(plus the base-URL default in {_CONFIG_FILE}); found (file: lines): "
+        f"{literal_offenders}"
+    )
+    assert not identifier_offenders, (
+        f"OpenRouter-named identifiers must live only in {_OPENROUTER_ADAPTER} "
+        f"and the {_OPENROUTER_COMPOSITION_ROOT} composition root "
+        f"(Requirement 1.1); found (file: lines): {identifier_offenders}"
+    )
+
+
+def test_openrouter_adapter_imported_only_by_composition_root() -> None:
+    """Only ``ml/llm/availability.py`` may import the OpenRouter adapter.
+
+    Feature services, routers, and the provider-neutral protocol module
+    depend on the ``LLMClient`` protocol, never on the concrete adapter —
+    that single import site is what makes the Phase 6 Bedrock swap a
+    configuration change plus one new adapter.
+
+    Validates: phase-3 Requirement 1.1.
+    """
+    offenders: list[str] = []
+    for path in _iter_package_sources():
+        rel = _relpath(path)
+        if rel in (_OPENROUTER_ADAPTER, _OPENROUTER_COMPOSITION_ROOT):
+            continue
+        tree = _parse(path)
+        if _imports_module(tree, _OPENROUTER_ADAPTER_MODULE):
+            offenders.append(rel)
+    assert not offenders, (
+        f"{_OPENROUTER_ADAPTER_MODULE} may be imported only by "
+        f"{_OPENROUTER_COMPOSITION_ROOT} (Requirement 1.1); found imports in: "
+        f"{offenders}"
+    )
+
+
+def test_no_hardcoded_model_identifier_outside_config_defaults() -> None:
+    """No source file outside ``config.py`` hardcodes an LLM model identifier.
+
+    The model is configuration (``MATCHLAYER_LLM_MODEL``, default
+    ``anthropic/claude-haiku-4.5``): changing it between deployments must
+    require no code change, so a ``vendor/model``-shaped string literal
+    anywhere outside the config defaults is a boundary violation.
+
+    Validates: phase-3 Requirement 1.3.
+    """
+    offenders: dict[str, list[tuple[int, str]]] = {}
+    for path in _iter_package_sources():
+        rel = _relpath(path)
+        if rel == _CONFIG_FILE:
+            continue
+        tree = _parse(path)
+        bad = [
+            (lineno, value)
+            for lineno, value in _non_docstring_string_literals(tree)
+            if _MODEL_ID_PATTERN.match(value)
+        ]
+        if bad:
+            offenders[rel] = bad
+    assert not offenders, (
+        f"LLM model identifiers are configuration ({_CONFIG_FILE} defaults "
+        f"only, Requirement 1.3); found hardcoded model-identifier literals: "
+        f"{offenders}"
+    )
+
+
+def test_no_prompt_instruction_literals_in_services_or_routers() -> None:
+    """No prompt instruction text is embedded in service or router code.
+
+    Every instruction sent to the provider must come from a versioned
+    template file under ``ml/prompts/`` — that is what makes the recorded
+    prompt version plus input hash fully determine the transmitted prompt
+    for Phase 5 replay. A string literal in ``services/``, ``api/``,
+    ``auth/``, or ``dev/`` carrying a sentinel instruction phrase means
+    instruction text has leaked out of the template files.
+
+    Validates: phase-3 Requirement 2.1.
+    """
+    scanned = [
+        path
+        for path in _iter_package_sources()
+        if _relpath(path).split("/", 1)[0] in _SERVICE_AND_ROUTER_DIRS
+    ]
+    assert scanned, (
+        "No service/router sources found to scan; expected modules under "
+        f"{_SERVICE_AND_ROUTER_DIRS} relative to {_PACKAGE_ROOT}."
+    )
+
+    offenders: dict[str, list[tuple[int, str]]] = {}
+    for path in scanned:
+        tree = _parse(path)
+        bad = [
+            (lineno, sentinel)
+            for lineno, value in _non_docstring_string_literals(tree)
+            for sentinel in _PROMPT_INSTRUCTION_SENTINELS
+            if sentinel in value.lower()
+        ]
+        if bad:
+            offenders[_relpath(path)] = sorted(set(bad))
+
+    assert not offenders, (
+        "Prompt instruction text must live only in versioned template files "
+        "under ml/prompts/, never in service or router string literals "
+        f"(Requirement 2.1); found sentinel phrases (file: (line, phrase)): "
+        f"{offenders}"
     )

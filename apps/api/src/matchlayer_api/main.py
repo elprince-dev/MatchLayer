@@ -83,6 +83,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from matchlayer_api.api.health import router as health_router
+from matchlayer_api.api.matches.llm.router import router as matches_llm_router
 from matchlayer_api.api.matches.router import router as matches_router
 from matchlayer_api.api.resumes.router import router as resumes_router
 from matchlayer_api.auth.router import router as auth_router
@@ -91,6 +92,7 @@ from matchlayer_api.core.db import verify_database_connection
 from matchlayer_api.core.errors import register_exception_handlers
 from matchlayer_api.core.logging import configure_logging
 from matchlayer_api.core.middleware import ApiNoIndexMiddleware, RequestIdMiddleware
+from matchlayer_api.ml.llm.availability import initialize_llm_availability
 from matchlayer_api.ml.semantic_adapter import load_semantic_pipeline
 
 # Module-level logger. The startup probe runs *before* any HTTP
@@ -171,6 +173,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # port — a dimension mismatch is a deployment bug, not a runtime
         # condition to degrade around (Requirements 1.6, 1.7).
         load_semantic_pipeline()
+        # Phase 3 — record LLM availability (phase-3-llm-layer task 3.3).
+        # Key absent/empty → the call returns normally with LLM_Features in
+        # LLM_Unavailable and the app starts fine (Requirement 1.8). Key
+        # present → the provider credential check runs here; a failure
+        # raises LLMStartupValidationError naming the cause category (never
+        # the key value), which propagates out of this lifespan so uvicorn
+        # exits non-zero before binding a port (Requirement 1.10) — the
+        # same fail-fast pattern as the database probe above.
+        await initialize_llm_availability(cfg)
         _log.info(
             "application_started",
             environment=cfg.environment,
@@ -258,6 +269,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # is applied here (Requirements 2.1, 8.1).
     app.include_router(resumes_router)
     app.include_router(matches_router)
+
+    # LLM feature sub-resources beneath /api/v1/matches/{match_id}/
+    # (phase-3-llm-layer Requirement 16.1). The aggregate router carries
+    # the full path prefixes for coaching-reports, bullet-rewrites, and
+    # interview-question-sets.
+    app.include_router(matches_llm_router)
 
     # Dev router — only in development (Design §12.3, Requirement 13.4).
     if cfg.environment == "development":

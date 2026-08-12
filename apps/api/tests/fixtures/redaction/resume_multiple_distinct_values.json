@@ -1,0 +1,6 @@
+{
+  "description": "Multiple distinct emails and phones each get their own index, in first-occurrence order (Req 3.1, 3.5).",
+  "kind": "resume",
+  "input": "Avery Quill\navery.quill@example.com\nbackup.contact@example.org\n555-000-1111 or (555) 222-3333\n\nEducation\nExample University\n",
+  "expected": "[NAME_1]\n[EMAIL_1]\n[EMAIL_2]\n[PHONE_1] or [PHONE_2]\n\nEducation\nExample University\n"
+}
