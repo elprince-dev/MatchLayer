@@ -38,3 +38,9 @@ secret:
       # Used by test_passwords.py. Deliberately shaped to look unlike the
       # SecLists corpus so it is not on the blocklist.
       match: "Smoke-Test-Pw!42"
+
+    - name: "Synthetic API-key leak-detection sentinel (SSE terminal-event property test)"
+      # Planted by test_sse_terminal_events.py (Property 19, Req 11.6) so the
+      # test can assert the sentinel NEVER appears in any SSE event. It exists
+      # to be found if the stream leaked it — it is not a credential.
+      match: "SENTINEL-API-KEY-MATERIAL-4242"

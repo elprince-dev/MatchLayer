@@ -1,0 +1,6 @@
+{
+  "description": "Header-detected name/email/phone are redacted in the header and Summary but preserved verbatim inside the Work Experience section (Req 3.2, 3.3).",
+  "kind": "resume",
+  "input": "Riley Voss\nSenior Software Engineer\nriley.voss@example.com | 555-987-6543\n\nSummary\nRiley Voss is a backend developer. Reach out at riley.voss@example.com.\n\nWork Experience\nRiley Voss Consulting — Founder\nManaged the riley.voss@example.com support inbox and the 555-987-6543 hotline.\n\nSkills\nGo, Kubernetes\n",
+  "expected": "[NAME_1]\nSenior Software Engineer\n[EMAIL_1] | [PHONE_1]\n\nSummary\n[NAME_1] is a backend developer. Reach out at [EMAIL_1].\n\nWork Experience\nRiley Voss Consulting — Founder\nManaged the riley.voss@example.com support inbox and the 555-987-6543 hotline.\n\nSkills\nGo, Kubernetes\n"
+}

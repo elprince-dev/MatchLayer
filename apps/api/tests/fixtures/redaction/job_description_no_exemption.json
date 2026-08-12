@@ -1,0 +1,6 @@
+{
+  "description": "Job descriptions get whole-text email/phone redaction with no employment exemption and no name heuristic: the Experience section is NOT exempt and a name-like string is preserved.",
+  "kind": "job_description",
+  "input": "Senior Backend Engineer — Example Corp\n\nExperience\n5+ years building distributed systems.\nQuestions? Email talent@example.com.\n\nContact\nSend applications to Morgan Reyes at hiring@example.com or call 555-444-8899.\n",
+  "expected": "Senior Backend Engineer — Example Corp\n\nExperience\n5+ years building distributed systems.\nQuestions? Email [EMAIL_1].\n\nContact\nSend applications to Morgan Reyes at [EMAIL_2] or call [PHONE_1].\n"
+}

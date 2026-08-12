@@ -5,6 +5,7 @@ const HealthResponse = z
   .object({
     status: z.string().optional().default("ok"),
     semantic_scoring: z.enum(["available", "unavailable"]),
+    llm: z.enum(["available", "unavailable"]),
   })
   .passthrough();
 const HealthUnhealthyResponse = z
@@ -130,6 +131,87 @@ const MatchListResponse = z.object({
   items: z.array(MatchListItem),
   next_cursor: z.union([z.string(), z.null()]).optional(),
 });
+const FailureReason = z.enum([
+  "provider_error",
+  "timeout",
+  "schema_validation_failed",
+  "redaction_failed",
+  "prompt_template_missing",
+  "quota_accounting_unavailable",
+  "llm_unavailable",
+]);
+const ImprovementAction = z.object({
+  priority: z.number().int().gte(1),
+  action: z.string().min(1),
+});
+const CoachingReport = z.object({
+  summary: z.string().min(1),
+  strengths: z.array(z.string()),
+  gaps: z.array(z.string()),
+  improvements: z.array(ImprovementAction).min(3).max(10),
+});
+const LLMResultEnvelope_CoachingReport_ = z.object({
+  id: z.union([z.string(), z.null()]).optional(),
+  is_fallback: z.boolean(),
+  fallback_reason: z.union([FailureReason, z.null()]).optional(),
+  prompt_template_version: z.union([z.number(), z.null()]).optional(),
+  created_at: z.union([z.string(), z.null()]).optional(),
+  result: CoachingReport,
+});
+const CoachingReportListResponse = z
+  .object({
+    items: z.array(LLMResultEnvelope_CoachingReport_),
+    next_cursor: z.union([z.string(), z.null()]).optional(),
+  })
+  .passthrough();
+const BulletRewriteRequest = z.object({ bullets: z.array(z.string()).min(1) });
+const BulletRewriteEntry = z.object({
+  original: z.string(),
+  alternatives: z.array(z.string().min(1)).min(1).max(3),
+  rationale: z.string().min(1),
+});
+const BulletRewrite = z.object({ entries: z.array(BulletRewriteEntry).min(1) });
+const LLMResultEnvelope_BulletRewrite_ = z.object({
+  id: z.union([z.string(), z.null()]).optional(),
+  is_fallback: z.boolean(),
+  fallback_reason: z.union([FailureReason, z.null()]).optional(),
+  prompt_template_version: z.union([z.number(), z.null()]).optional(),
+  created_at: z.union([z.string(), z.null()]).optional(),
+  result: BulletRewrite,
+});
+const BulletRewriteListResponse = z
+  .object({
+    items: z.array(LLMResultEnvelope_BulletRewrite_),
+    next_cursor: z.union([z.string(), z.null()]).optional(),
+  })
+  .passthrough();
+const InterviewQuestionCategory = z.enum([
+  "technical",
+  "behavioral",
+  "experience-gap",
+]);
+const InterviewQuestion = z.object({
+  question: z.string().min(1).max(300),
+  category: InterviewQuestionCategory,
+  reason: z.string().min(1).max(500),
+});
+const InterviewQuestionSet = z.object({
+  questions: z.array(InterviewQuestion).min(5),
+});
+const LLMResultEnvelope_InterviewQuestionSet_ = z.object({
+  id: z.union([z.string(), z.null()]).optional(),
+  is_fallback: z.boolean(),
+  fallback_reason: z.union([FailureReason, z.null()]).optional(),
+  prompt_template_version: z.union([z.number(), z.null()]).optional(),
+  created_at: z.union([z.string(), z.null()]).optional(),
+  result: InterviewQuestionSet,
+});
+const InterviewQuestionSetListResponse = z
+  .object({
+    items: z.array(LLMResultEnvelope_InterviewQuestionSet_),
+    next_cursor: z.union([z.string(), z.null()]).optional(),
+  })
+  .passthrough();
 const LastResetLinkResponse = z
   .object({
     link: z.union([z.string(), z.null()]),
@@ -161,6 +243,21 @@ export const schemas = {
   MatchResponse,
   MatchListItem,
   MatchListResponse,
+  FailureReason,
+  ImprovementAction,
+  CoachingReport,
+  LLMResultEnvelope_CoachingReport_,
+  CoachingReportListResponse,
+  BulletRewriteRequest,
+  BulletRewriteEntry,
+  BulletRewrite,
+  LLMResultEnvelope_BulletRewrite_,
+  BulletRewriteListResponse,
+  InterviewQuestionCategory,
+  InterviewQuestion,
+  InterviewQuestionSet,
+  LLMResultEnvelope_InterviewQuestionSet_,
+  InterviewQuestionSetListResponse,
   LastResetLinkResponse,
 };
 
@@ -431,6 +528,293 @@ nothing about another account&#x27;s data (Requirements 1.4, 9.5).`,
       },
     ],
     response: z.void(),
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "post",
+    path: "/api/v1/matches/:match_id/bullet-rewrites",
+    alias:
+      "create_bullet_rewrite_api_v1_matches__match_id__bullet_rewrites_post",
+    description: `Rewrite the submitted bullets against an owned match (Req 6.1).
+
+&#x60;&#x60;BulletRewriteRequest&#x60;&#x60; validation (count 1..&#x60;&#x60;llm_max_bullets&#x60;&#x60;, no
+empty/whitespace bullet, each ≤ &#x60;&#x60;llm_max_bullet_chars&#x60;&#x60;) runs before
+this handler; a violation is a 422 RFC 7807 response before any
+redaction, quota accounting, or LLM work — and before any stream
+opens (Req 6.3, 11.4). Bullets are Restricted PII and travel only
+into the pipeline, which redacts them. &#x60;&#x60;stream&#x3D;true&#x60;&#x60; delivers the
+outcome over SSE (Req 11.1).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "body",
+        type: "Body",
+        schema: BulletRewriteRequest,
+      },
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+      {
+        name: "stream",
+        type: "Query",
+        schema: z.boolean().optional().default(false),
+      },
+    ],
+    response: LLMResultEnvelope_BulletRewrite_,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "get",
+    path: "/api/v1/matches/:match_id/bullet-rewrites",
+    alias: "list_bullet_rewrites_api_v1_matches__match_id__bullet_rewrites_get",
+    description: `One newest-first page of the match&#x27;s Bullet_Rewrites (Req 16.4).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+      {
+        name: "limit",
+        type: "Query",
+        schema: z.number().int().gte(1).lte(100).optional().default(20),
+      },
+      {
+        name: "cursor",
+        type: "Query",
+        schema: Idempotency_Key,
+      },
+    ],
+    response: BulletRewriteListResponse,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "get",
+    path: "/api/v1/matches/:match_id/bullet-rewrites/:result_id",
+    alias:
+      "get_bullet_rewrite_api_v1_matches__match_id__bullet_rewrites__result_id__get",
+    description: `One persisted Bullet_Rewrite by id (Req 6.5, 16.3, 16.9).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+      {
+        name: "result_id",
+        type: "Path",
+        schema: z.string(),
+      },
+    ],
+    response: LLMResultEnvelope_BulletRewrite_,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "post",
+    path: "/api/v1/matches/:match_id/coaching-reports",
+    alias:
+      "create_coaching_report_api_v1_matches__match_id__coaching_reports_post",
+    description: `Generate (or reuse) a Coaching_Report for an owned match (Req 5.1).
+
+Runs the shared pipeline with the Resume_Coach spec: persisted-result
+reuse under the same active prompt version + model serves the stored
+report with no provider call and no quota consumption (Req 5.4); any
+LLM failure lands on the locally-derived fallback with 200 (Req 5.5,
+9.1). &#x60;&#x60;stream&#x3D;true&#x60;&#x60; delivers the same outcome over SSE (Req 11.1).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+      {
+        name: "stream",
+        type: "Query",
+        schema: z.boolean().optional().default(false),
+      },
+    ],
+    response: LLMResultEnvelope_CoachingReport_,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "get",
+    path: "/api/v1/matches/:match_id/coaching-reports",
+    alias:
+      "list_coaching_reports_api_v1_matches__match_id__coaching_reports_get",
+    description: `One newest-first page of the match&#x27;s Coaching_Reports (Req 16.4).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+      {
+        name: "limit",
+        type: "Query",
+        schema: z.number().int().gte(1).lte(100).optional().default(20),
+      },
+      {
+        name: "cursor",
+        type: "Query",
+        schema: Idempotency_Key,
+      },
+    ],
+    response: CoachingReportListResponse,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "get",
+    path: "/api/v1/matches/:match_id/coaching-reports/:result_id",
+    alias:
+      "get_coaching_report_api_v1_matches__match_id__coaching_reports__result_id__get",
+    description: `One persisted Coaching_Report by id (Req 16.3, 16.9).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+      {
+        name: "result_id",
+        type: "Path",
+        schema: z.string(),
+      },
+    ],
+    response: LLMResultEnvelope_CoachingReport_,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "post",
+    path: "/api/v1/matches/:match_id/interview-question-sets",
+    alias:
+      "create_interview_question_set_api_v1_matches__match_id__interview_question_sets_post",
+    description: `Generate an Interview_Question_Set for an owned match (Req 7.1).
+
+&#x60;&#x60;stream&#x3D;true&#x60;&#x60; delivers the outcome over SSE (Req 11.1).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+      {
+        name: "stream",
+        type: "Query",
+        schema: z.boolean().optional().default(false),
+      },
+    ],
+    response: LLMResultEnvelope_InterviewQuestionSet_,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "get",
+    path: "/api/v1/matches/:match_id/interview-question-sets",
+    alias:
+      "list_interview_question_sets_api_v1_matches__match_id__interview_question_sets_get",
+    description: `One newest-first page of the match&#x27;s Interview_Question_Sets (Req 16.4).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+      {
+        name: "limit",
+        type: "Query",
+        schema: z.number().int().gte(1).lte(100).optional().default(20),
+      },
+      {
+        name: "cursor",
+        type: "Query",
+        schema: Idempotency_Key,
+      },
+    ],
+    response: InterviewQuestionSetListResponse,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "get",
+    path: "/api/v1/matches/:match_id/interview-question-sets/:result_id",
+    alias:
+      "get_interview_question_set_api_v1_matches__match_id__interview_question_sets__result_id__get",
+    description: `One persisted Interview_Question_Set by id (Req 7.4, 16.3, 16.9).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+      {
+        name: "result_id",
+        type: "Path",
+        schema: z.string(),
+      },
+    ],
+    response: LLMResultEnvelope_InterviewQuestionSet_,
     errors: [
       {
         status: 422,

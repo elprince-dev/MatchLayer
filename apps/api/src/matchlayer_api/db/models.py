@@ -1,18 +1,21 @@
 """SQLAlchemy 2.x declarative models for the MatchLayer tables.
 
 Auth tables (``users``, ``refresh_tokens``, ``password_reset_tokens``,
-``audit_events``), matching tables (``resumes``, ``match_results``), and
+``audit_events``), matching tables (``resumes``, ``match_results``),
 the Phase 2 Vector_Store tables (``resume_embeddings``,
-``match_embeddings``). UUIDv7 primary keys via ``uuid_utils``. All
+``match_embeddings``), and the Phase 3 LLM tables (``llm_results``,
+``llm_invocation_logs``). UUIDv7 primary keys via ``uuid_utils``. All
 timestamps are ``TIMESTAMP WITH TIME ZONE`` (Postgres ``timestamptz``).
 
 Design reference: Data Models 4.1-4.4 (phase-1-auth); Data Models
-(phase-1-matching); Data Models / New tables (phase-2-nlp-embeddings).
+(phase-1-matching); Data Models / New tables (phase-2-nlp-embeddings);
+Data Models / New tables (phase-3-llm-layer).
 """
 
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
@@ -22,6 +25,7 @@ from sqlalchemy import (
     Index,
     Integer,
     LargeBinary,
+    Numeric,
     Text,
     UniqueConstraint,
     text,
@@ -294,6 +298,133 @@ class MatchEmbedding(Base):
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSION), nullable=False)
     model_name: Mapped[str] = mapped_column(Text, nullable=False)
     model_revision: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class LLMResult(Base):
+    """The ``llm_results`` table.
+
+    One persisted, schema-validated LLM_Feature output (Coaching_Report,
+    Bullet_Rewrite, or Interview_Question_Set) owned by a ``users`` row and
+    anchored to a ``match_results`` row. ``payload`` is derived from
+    Restricted PII (redacted before the provider call, but the validated
+    output is user-facing content): access is scoped to the owning user and
+    payload content is never logged. Fallback_Responses are never persisted
+    here (Requirement 9.5) — every row is a validated LLM output.
+
+    No soft delete (no ``deleted_at``): rows cascade with their match, which
+    itself soft-deletes; a hard delete of the match removes its LLM results.
+
+    Design reference: Data Models / New tables (phase-3-llm-layer);
+    Requirements 16.3, 5.4, 16.4.
+    """
+
+    __tablename__ = "llm_results"
+    __table_args__ = (
+        # Newest-first list reads and the coach persisted-result reuse
+        # lookup both filter on (match_result_id, feature) and order by
+        # created_at DESC (Requirements 16.4, 5.4).
+        Index(
+            "llm_results_match_feature_created_idx",
+            "match_result_id",
+            "feature",
+            text("created_at DESC"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=_uuid7)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    match_result_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("match_results.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # 'resume_coach' | 'bullet_rewrite' | 'interview_questions'
+    feature: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_template_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    llm_model: Mapped[str] = mapped_column(Text, nullable=False)
+    # Validated CoachingReport / BulletRewrite / InterviewQuestionSet.
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class LLMInvocationLog(Base):
+    """The ``llm_invocation_logs`` table.
+
+    Exactly one row per LLM_Provider call (streaming or not, success or
+    failure). Never contains raw PII: the prompt input is represented only
+    by ``input_hash`` (sha256 over the redacted input, same digest as the
+    LLM_Cache key, Requirements 12.3, 12.6). ``output`` holds the validated
+    structured output XOR ``failure_category`` holds a FailureReason value.
+
+    Token counts and cost are nullable — NULL means "unavailable", which is
+    deliberately distinct from a recorded value of zero (Requirement 12.2).
+    ``cost_basis`` records how cost was resolved:
+    'provider_reported' | 'computed' | 'unavailable'.
+
+    No soft delete: append-only operational records retained for Phase 5
+    evaluation replay; the API never deletes, expires, or overwrites them
+    (Requirement 12.4).
+
+    Design reference: Data Models / New tables (phase-3-llm-layer);
+    Requirements 12.1, 12.2, 12.3, 12.4, 14.1.
+    """
+
+    __tablename__ = "llm_invocation_logs"
+    __table_args__ = (
+        # Phase 5 evaluation replay selects comparable invocation sets by
+        # feature + prompt version + model over a time range (Req 12.4).
+        Index(
+            "llm_invocation_logs_replay_idx",
+            "feature",
+            "prompt_template_version",
+            "llm_model",
+            "created_at",
+        ),
+        # The Spend_Circuit_Breaker sums cost_usd over the current UTC
+        # calendar month — a created_at range scan (Requirement 14.1).
+        Index("llm_invocation_logs_created_at_idx", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=_uuid7)
+    # No ON DELETE CASCADE: invocation logs are append-only records that
+    # must not be silently removed by a parent-row delete (Req 12.4).
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+    match_result_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("match_results.id"),
+        nullable=False,
+    )
+    feature: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_template_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    llm_model: Mapped[str] = mapped_column(Text, nullable=False)
+    redactor_version: Mapped[str] = mapped_column(Text, nullable=False)
+    # sha256 over the redacted prompt input — same digest as the LLM_Cache
+    # key (Requirement 12.6). Never the raw input (Requirement 12.3).
+    input_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # Validated structured output; NULL on failure.
+    output: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    # FailureReason enum value; NULL on success.
+    failure_category: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    # NULL = unavailable, distinct from a recorded 0 (Requirement 12.2).
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True, default=None)
+    # 'provider_reported' | 'computed' | 'unavailable' (Requirement 12.2).
+    cost_basis: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

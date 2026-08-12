@@ -13,6 +13,12 @@ Covers Task 3.11 (Requirements 4.7, 4.8, 4.9, 4.14 / Design §6.5):
   :func:`~matchlayer_api.ml.semantic_adapter.semantic_available` to
   exactly ``"available"`` / ``"unavailable"`` without changing the
   status-code semantics.
+* **LLM availability (Phase 3, Requirements 10.1, 10.2, 10.4, 10.5,
+  10.6)** — the additive ``llm`` field reports ``"unavailable"`` iff
+  the provider API key was absent at startup or the
+  Spend_Circuit_Breaker is open, ``"available"`` otherwise; the value
+  never changes the 200 status and never exposes the key or spend
+  figures.
 * **Failure path** — when the probe raises any subclass of
   :class:`sqlalchemy.exc.SQLAlchemyError`, the endpoint returns
   ``503`` with body
@@ -41,6 +47,8 @@ from collections.abc import Callable
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
+
+from matchlayer_api.services.llm.spend import BreakerCause, BreakerState
 
 # Type alias mirroring :data:`tests.conftest.OverrideGetSession`. The
 # ``tests/`` directory is not a Python package (no ``__init__.py``,
@@ -83,7 +91,11 @@ async def test_healthz_returns_200_ok_when_db_probe_succeeds(
     response = await client.get("/healthz")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "semantic_scoring": "unavailable"}
+    assert response.json() == {
+        "status": "ok",
+        "semantic_scoring": "unavailable",
+        "llm": "unavailable",
+    }
 
 
 async def test_healthz_semantic_scoring_reports_available_when_pipeline_loaded(
@@ -105,7 +117,110 @@ async def test_healthz_semantic_scoring_reports_available_when_pipeline_loaded(
     response = await client.get("/healthz")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "semantic_scoring": "available"}
+    assert response.json()["status"] == "ok"
+    assert response.json()["semantic_scoring"] == "available"
+
+
+class _StubBreaker:
+    """Minimal stand-in for the process-wide SpendCircuitBreaker.
+
+    The health handler only reads the memoized ``.state`` snapshot
+    (design decision D5), so a frozen :class:`BreakerState` is the
+    entire surface these tests need to control.
+    """
+
+    def __init__(self, *, is_open: bool, cause: BreakerCause | None = None) -> None:
+        self.state = BreakerState(
+            is_open=is_open,
+            tracked_spend=None,
+            limit=None,
+            cause=cause,
+        )
+
+
+async def test_healthz_llm_reports_available_when_key_present_and_breaker_closed(
+    client: AsyncClient,
+    override_get_session: OverrideGetSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Requirement 10.6: not LLM_Unavailable → ``llm: "available"``.
+
+    Patches both availability sources at the names the health router
+    imported: a validated key recorded at startup and a closed
+    Spend_Circuit_Breaker. This is also the Requirement 10.4 recovery
+    shape — both sources are re-read per probe, so a breaker that
+    closes (month rollover / raised limit) flips the field back with
+    no code change.
+    """
+    monkeypatch.setattr("matchlayer_api.api.health.llm_key_present", lambda: True)
+    monkeypatch.setattr(
+        "matchlayer_api.api.health.get_spend_circuit_breaker",
+        lambda: _StubBreaker(is_open=False),
+    )
+    override_get_session(None)
+
+    response = await client.get("/healthz")
+
+    assert response.status_code == 200
+    assert response.json()["llm"] == "available"
+
+
+async def test_healthz_llm_reports_unavailable_when_key_absent(
+    client: AsyncClient,
+    override_get_session: OverrideGetSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Requirement 10.2: key absent at startup → ``llm: "unavailable"``.
+
+    A closed breaker does not rescue an absent key — either cause of
+    LLM_Unavailable is sufficient. The status code stays 200: an
+    instance without LLM features is still serving (Requirement 10.1).
+    """
+    monkeypatch.setattr("matchlayer_api.api.health.llm_key_present", lambda: False)
+    monkeypatch.setattr(
+        "matchlayer_api.api.health.get_spend_circuit_breaker",
+        lambda: _StubBreaker(is_open=False),
+    )
+    override_get_session(None)
+
+    response = await client.get("/healthz")
+
+    assert response.status_code == 200
+    assert response.json()["llm"] == "unavailable"
+
+
+async def test_healthz_llm_reports_unavailable_when_breaker_open(
+    client: AsyncClient,
+    override_get_session: OverrideGetSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Requirement 10.2: Spend_Circuit_Breaker open → ``llm: "unavailable"``.
+
+    Key present, breaker open — the second cause of LLM_Unavailable.
+    The 200 status is unchanged (Requirement 10.1) and the body carries
+    no spend figures or breaker internals (Requirement 10.5): only the
+    two-value ``llm`` field distinguishes the states.
+    """
+    monkeypatch.setattr("matchlayer_api.api.health.llm_key_present", lambda: True)
+    monkeypatch.setattr(
+        "matchlayer_api.api.health.get_spend_circuit_breaker",
+        lambda: _StubBreaker(is_open=True, cause=BreakerCause.LIMIT_REACHED),
+    )
+    override_get_session(None)
+
+    response = await client.get("/healthz")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["llm"] == "unavailable"
+    # Requirement 10.5: no key material, spend figures, or provider
+    # account details — the body is exactly the three known fields.
+    assert set(body) == {"status", "semantic_scoring", "llm"}
+    raw_body = response.text
+    for needle in ("spend", "limit", "cost", "sk-", "openrouter"):
+        assert needle not in raw_body.lower(), (
+            f"healthz body must not contain {needle!r}; got body={raw_body!r}"
+        )
 
 
 async def test_healthz_returns_503_unhealthy_when_db_probe_raises(

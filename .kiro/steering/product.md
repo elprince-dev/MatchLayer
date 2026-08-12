@@ -46,7 +46,16 @@ Real ATS systems are opaque. Candidates optimize blindly. MatchLayer makes the m
 
 All six Phase 1 specs (`phase-1-foundation`, `phase-1-auth`, `phase-1-matching`, `frontend-redesign`, `phase-1-learning-docs`, `seo-foundation`) are complete and merged.
 
-Current focus: **Phase 2 — NLP & Embeddings** (pgvector, Sentence Transformers, skill extraction). Not yet started — spec work is the next step.
+**Phase 2 — NLP & Embeddings: complete.** The `phase-2-nlp-embeddings` spec is fully implemented and merged to `main`:
+
+- **pgvector storage** — pgvector-enabled Postgres locally and in prod image, resume/JD embedding tables, user-scoped `Vector_Store` access layer (SQLAlchemy 2.x, no raw SQL).
+- **Semantic scoring** — `Embedding_Service` around Sentence Transformers (`all-MiniLM-L6-v2`, pinned HF revision, baked into the API image and run offline), chunk + weighted-mean + L2-normalize for long texts, `Semantic_Scorer` cosine similarity.
+- **Skill extraction** — spaCy `PhraseMatcher`-based `Skill_Extractor` over Skill_Lexicon v2 (ESCO + curated v1 seed, deterministic build pipeline).
+- **Composition** — `Semantic_Match_Scorer` blending semantic and keyword signals, Scorer_Version v2 scheme (`2.0.0+lex...+emb...+spacy...`), embedding reuse when model name+revision match.
+- **Degraded_Mode** — fallback ladder to the Phase 1 TF-IDF scorer when semantic scoring is unavailable; `/healthz` reports `semantic_scoring: available|unavailable`; embedding persistence is best-effort and never fails a match request.
+- **Evaluation & UI** — eyeball eval dataset grown to 10+ pairs (adversarial, paraphrase, generic-term-leak cases); results UI and marketing copy surface semantic scoring.
+
+Current focus: **Phase 3 — LLM Layer** (resume coach, bullet rewriting, interview question generator via OpenAI behind a provider abstraction). Not yet started — spec work is the next step.
 
 ## Out of scope (for now)
 

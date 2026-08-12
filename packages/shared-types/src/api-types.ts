@@ -385,6 +385,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matches/{match_id}/coaching-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Coaching Reports
+         * @description One newest-first page of the match's Coaching_Reports (Req 16.4).
+         */
+        get: operations["list_coaching_reports_api_v1_matches__match_id__coaching_reports_get"];
+        put?: never;
+        /**
+         * Create Coaching Report
+         * @description Generate (or reuse) a Coaching_Report for an owned match (Req 5.1).
+         *
+         *     Runs the shared pipeline with the Resume_Coach spec: persisted-result
+         *     reuse under the same active prompt version + model serves the stored
+         *     report with no provider call and no quota consumption (Req 5.4); any
+         *     LLM failure lands on the locally-derived fallback with 200 (Req 5.5,
+         *     9.1). ``stream=true`` delivers the same outcome over SSE (Req 11.1).
+         */
+        post: operations["create_coaching_report_api_v1_matches__match_id__coaching_reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches/{match_id}/coaching-reports/{result_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Coaching Report
+         * @description One persisted Coaching_Report by id (Req 16.3, 16.9).
+         */
+        get: operations["get_coaching_report_api_v1_matches__match_id__coaching_reports__result_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches/{match_id}/bullet-rewrites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Bullet Rewrites
+         * @description One newest-first page of the match's Bullet_Rewrites (Req 16.4).
+         */
+        get: operations["list_bullet_rewrites_api_v1_matches__match_id__bullet_rewrites_get"];
+        put?: never;
+        /**
+         * Create Bullet Rewrite
+         * @description Rewrite the submitted bullets against an owned match (Req 6.1).
+         *
+         *     ``BulletRewriteRequest`` validation (count 1..``llm_max_bullets``, no
+         *     empty/whitespace bullet, each ≤ ``llm_max_bullet_chars``) runs before
+         *     this handler; a violation is a 422 RFC 7807 response before any
+         *     redaction, quota accounting, or LLM work — and before any stream
+         *     opens (Req 6.3, 11.4). Bullets are Restricted PII and travel only
+         *     into the pipeline, which redacts them. ``stream=true`` delivers the
+         *     outcome over SSE (Req 11.1).
+         */
+        post: operations["create_bullet_rewrite_api_v1_matches__match_id__bullet_rewrites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches/{match_id}/bullet-rewrites/{result_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Bullet Rewrite
+         * @description One persisted Bullet_Rewrite by id (Req 6.5, 16.3, 16.9).
+         */
+        get: operations["get_bullet_rewrite_api_v1_matches__match_id__bullet_rewrites__result_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches/{match_id}/interview-question-sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Interview Question Sets
+         * @description One newest-first page of the match's Interview_Question_Sets (Req 16.4).
+         */
+        get: operations["list_interview_question_sets_api_v1_matches__match_id__interview_question_sets_get"];
+        put?: never;
+        /**
+         * Create Interview Question Set
+         * @description Generate an Interview_Question_Set for an owned match (Req 7.1).
+         *
+         *     ``stream=true`` delivers the outcome over SSE (Req 11.1).
+         */
+        post: operations["create_interview_question_set_api_v1_matches__match_id__interview_question_sets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches/{match_id}/interview-question-sets/{result_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Interview Question Set
+         * @description One persisted Interview_Question_Set by id (Req 7.4, 16.3, 16.9).
+         */
+        get: operations["get_interview_question_set_api_v1_matches__match_id__interview_question_sets__result_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dev/last-reset-link": {
         parameters: {
             query?: never;
@@ -413,6 +561,137 @@ export interface components {
              * @description The resume file (PDF or DOCX).
              */
             file: string;
+        };
+        /**
+         * BulletRewrite
+         * @description The Bullet_Rewriter structured output (Requirement 6.2).
+         *
+         *     Exactly one entry per submitted bullet, in submission order. The
+         *     count/order/original-text alignment against the actual submission is
+         *     enforced by the feature service (Requirement 6.7) because the
+         *     submitted bullets are request state this schema cannot see; the
+         *     schema itself guarantees at least one entry and each entry's bounds.
+         */
+        BulletRewrite: {
+            /**
+             * Entries
+             * @description One entry per submitted bullet, in submission order.
+             */
+            entries: components["schemas"]["BulletRewriteEntry"][];
+        };
+        /**
+         * BulletRewriteEntry
+         * @description One submitted bullet paired with its rewritten alternatives.
+         *
+         *     ``original`` must byte-for-byte match a submitted bullet text — the
+         *     post-validation alignment check in the Bullet_Rewriter feature
+         *     service compares it exactly (Requirement 6.7), so no whitespace
+         *     normalization is applied here.
+         */
+        BulletRewriteEntry: {
+            /**
+             * Original
+             * @description The submitted bullet text, exactly as submitted.
+             */
+            original: string;
+            /**
+             * Alternatives
+             * @description 1 to 3 rewritten alternatives targeting the job description.
+             */
+            alternatives: string[];
+            /**
+             * Rationale
+             * @description Non-empty explanation of how the rewrite better targets the job description.
+             */
+            rationale: string;
+        };
+        /**
+         * BulletRewriteListResponse
+         * @description One newest-first page of a match's persisted Bullet_Rewrites.
+         */
+        BulletRewriteListResponse: {
+            /**
+             * Items
+             * @description Persisted Bullet_Rewrites in descending created_at order.
+             */
+            items: components["schemas"]["LLMResultEnvelope_BulletRewrite_"][];
+            /**
+             * Next Cursor
+             * @description Opaque cursor for the next page; null on the last page. Clients pass it back unmodified.
+             */
+            next_cursor?: string | null;
+        };
+        /**
+         * BulletRewriteRequest
+         * @description Body of ``POST /api/v1/matches/{matchId}/bullet-rewrites`` (Req 6.3).
+         *
+         *     Validation failures surface as FastAPI's 422 RFC 7807 response before
+         *     the router touches the orchestrator, so no redaction, quota, cache, or
+         *     LLM_Provider work happens for an invalid submission. Bullet text is
+         *     accepted exactly as submitted — no stripping — because the
+         *     Requirement 6.7 alignment check compares ``original`` byte-for-byte
+         *     against the submitted text.
+         *
+         *     The count ceiling and per-bullet length ceiling are configuration
+         *     (``MATCHLAYER_LLM_MAX_BULLETS`` / ``MATCHLAYER_LLM_MAX_BULLET_CHARS``)
+         *     and therefore checked by the validator below at validation time,
+         *     mirroring the settings-reading validator precedent in
+         *     ``services/llm/schemas.py`` (InterviewQuestionSet's ceiling).
+         */
+        BulletRewriteRequest: {
+            /**
+             * Bullets
+             * @description 1 to MATCHLAYER_LLM_MAX_BULLETS resume bullet texts to rewrite, in the order they should be rewritten. None may be empty or whitespace-only; each is at most MATCHLAYER_LLM_MAX_BULLET_CHARS characters.
+             */
+            bullets: string[];
+        };
+        /**
+         * CoachingReport
+         * @description The Resume_Coach structured output (Requirement 5.2).
+         *
+         *     Overall feedback on a resume against a specific job description:
+         *     a summary, strengths, gaps, and 3..10 prioritized improvement
+         *     actions ordered from highest to lowest priority. A response
+         *     violating the bounds or the ordering fails schema validation and
+         *     takes the Fallback_Response path (Requirement 8.3).
+         */
+        CoachingReport: {
+            /**
+             * Summary
+             * @description Overall summary of how the resume matches the job description.
+             */
+            summary: string;
+            /**
+             * Strengths
+             * @description Strengths of the resume relative to the job description.
+             */
+            strengths: string[];
+            /**
+             * Gaps
+             * @description Gaps or weaknesses of the resume relative to the job description.
+             */
+            gaps: string[];
+            /**
+             * Improvements
+             * @description 3 to 10 concrete improvement actions, ordered from highest priority (rank 1) to lowest priority.
+             */
+            improvements: components["schemas"]["ImprovementAction"][];
+        };
+        /**
+         * CoachingReportListResponse
+         * @description One newest-first page of a match's persisted Coaching_Reports.
+         */
+        CoachingReportListResponse: {
+            /**
+             * Items
+             * @description Persisted Coaching_Reports in descending created_at order.
+             */
+            items: components["schemas"]["LLMResultEnvelope_CoachingReport_"][];
+            /**
+             * Next Cursor
+             * @description Opaque cursor for the next page; null on the last page. Clients pass it back unmodified.
+             */
+            next_cursor?: string | null;
         };
         /**
          * CreateMatchRequest
@@ -447,6 +726,18 @@ export interface components {
              */
             job_description: string;
         };
+        /**
+         * FailureReason
+         * @description Closed set of LLM failure categories (Requirement 9.2).
+         *
+         *     Every fallback-producing failure in the pipeline maps to exactly one
+         *     of these values (design §"Orchestrator" failure taxonomy). The same
+         *     values are recorded as ``llm_invocation_logs.failure_category`` and
+         *     exposed to the frontend via :class:`LLMResultEnvelope.fallback_reason`
+         *     so the Web_App can label degraded content honestly (Requirement 17.4).
+         * @enum {string}
+         */
+        FailureReason: "provider_error" | "timeout" | "schema_validation_failed" | "redaction_failed" | "prompt_template_missing" | "quota_accounting_unavailable" | "llm_unavailable";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -475,6 +766,12 @@ export interface components {
              * @enum {string}
              */
             semantic_scoring: "available" | "unavailable";
+            /**
+             * Llm
+             * @description Phase 3 LLM-subsystem availability (Requirement 10.1). 'unavailable' iff the provider API key was absent at startup or the Spend_Circuit_Breaker is open (LLM_Unavailable, Requirement 10.2); 'available' otherwise (Requirement 10.6). Exactly these two machine-readable values — the field never changes the HTTP status code and never exposes the API key, spend figures, or provider account details (Requirement 10.5).
+             * @enum {string}
+             */
+            llm: "available" | "unavailable";
         };
         /**
          * HealthUnhealthyResponse
@@ -500,6 +797,86 @@ export interface components {
             reason: "database_unreachable";
         };
         /**
+         * ImprovementAction
+         * @description One concrete improvement action with its explicit priority rank.
+         *
+         *     ``priority`` is a rank: 1 is the highest-priority action, larger
+         *     values are progressively lower priority (Requirement 5.2 — "each
+         *     action carries an explicit priority rank").
+         */
+        ImprovementAction: {
+            /**
+             * Priority
+             * @description Explicit priority rank: 1 is the highest-priority action; larger values are lower priority.
+             */
+            priority: number;
+            /**
+             * Action
+             * @description Concrete, user-actionable improvement instruction.
+             */
+            action: string;
+        };
+        /**
+         * InterviewQuestion
+         * @description One likely interview question (Requirement 7.2).
+         */
+        InterviewQuestion: {
+            /**
+             * Question
+             * @description The question text: non-empty, at most 300 characters.
+             */
+            question: string;
+            /** @description Exactly one of 'technical', 'behavioral', or 'experience-gap'. */
+            category: components["schemas"]["InterviewQuestionCategory"];
+            /**
+             * Reason
+             * @description Non-empty grounding (at most 500 characters) for why this resume + job-description pair makes the question likely.
+             */
+            reason: string;
+        };
+        /**
+         * InterviewQuestionCategory
+         * @description Closed category set for interview questions (Requirement 7.2).
+         * @enum {string}
+         */
+        InterviewQuestionCategory: "technical" | "behavioral" | "experience-gap";
+        /**
+         * InterviewQuestionSet
+         * @description The Interview_Question_Generator structured output (Requirement 7.3).
+         *
+         *     Between 5 and ``MATCHLAYER_LLM_MAX_QUESTIONS`` (default 15) questions.
+         *     An out-of-bounds count is a validation failure — never truncated or
+         *     padded (Requirement 7.7). The floor is a schema constant; the ceiling
+         *     is read from settings by the validator below (design: "5..
+         *     llm_max_questions (validator reads settings)"), mirroring the
+         *     settings-reading validator precedent in ``api/matches/schemas.py``.
+         *     Startup validation guarantees the ceiling is >= the floor
+         *     (Requirement 7.8).
+         */
+        InterviewQuestionSet: {
+            /**
+             * Questions
+             * @description 5 to MATCHLAYER_LLM_MAX_QUESTIONS likely interview questions.
+             */
+            questions: components["schemas"]["InterviewQuestion"][];
+        };
+        /**
+         * InterviewQuestionSetListResponse
+         * @description One newest-first page of a match's persisted Interview_Question_Sets.
+         */
+        InterviewQuestionSetListResponse: {
+            /**
+             * Items
+             * @description Persisted Interview_Question_Sets in descending created_at order.
+             */
+            items: components["schemas"]["LLMResultEnvelope_InterviewQuestionSet_"][];
+            /**
+             * Next Cursor
+             * @description Opaque cursor for the next page; null on the last page. Clients pass it back unmodified.
+             */
+            next_cursor?: string | null;
+        };
+        /**
          * KeywordOut
          * @description One analyzed keyword and its weight (``{term, weight}``).
          *
@@ -523,6 +900,87 @@ export interface components {
              * @description Relative importance of the term (lexicon weight for a known skill, otherwise the term's TF-IDF score).
              */
             weight: number;
+        };
+        /** LLMResultEnvelope[BulletRewrite] */
+        LLMResultEnvelope_BulletRewrite_: {
+            /**
+             * Id
+             * @description UUIDv7 (string) of the persisted LLM_Result; null for fallbacks, which are never persisted.
+             */
+            id?: string | null;
+            /**
+             * Is Fallback
+             * @description True when the result is a Fallback_Response built without the LLM; false for validated LLM output.
+             */
+            is_fallback: boolean;
+            /** @description The failure category that triggered the fallback; null for LLM-produced results. */
+            fallback_reason?: components["schemas"]["FailureReason"] | null;
+            /**
+             * Prompt Template Version
+             * @description The active Prompt_Template version the result was produced under; null for fallbacks.
+             */
+            prompt_template_version?: number | null;
+            /**
+             * Created At
+             * @description Persistence timestamp (timezone-aware) of the LLM_Result; null for fallbacks.
+             */
+            created_at?: string | null;
+            /** @description The feature payload (CoachingReport, BulletRewrite, or InterviewQuestionSet). Fallback content conforms to the same schema. */
+            result: components["schemas"]["BulletRewrite"];
+        };
+        /** LLMResultEnvelope[CoachingReport] */
+        LLMResultEnvelope_CoachingReport_: {
+            /**
+             * Id
+             * @description UUIDv7 (string) of the persisted LLM_Result; null for fallbacks, which are never persisted.
+             */
+            id?: string | null;
+            /**
+             * Is Fallback
+             * @description True when the result is a Fallback_Response built without the LLM; false for validated LLM output.
+             */
+            is_fallback: boolean;
+            /** @description The failure category that triggered the fallback; null for LLM-produced results. */
+            fallback_reason?: components["schemas"]["FailureReason"] | null;
+            /**
+             * Prompt Template Version
+             * @description The active Prompt_Template version the result was produced under; null for fallbacks.
+             */
+            prompt_template_version?: number | null;
+            /**
+             * Created At
+             * @description Persistence timestamp (timezone-aware) of the LLM_Result; null for fallbacks.
+             */
+            created_at?: string | null;
+            /** @description The feature payload (CoachingReport, BulletRewrite, or InterviewQuestionSet). Fallback content conforms to the same schema. */
+            result: components["schemas"]["CoachingReport"];
+        };
+        /** LLMResultEnvelope[InterviewQuestionSet] */
+        LLMResultEnvelope_InterviewQuestionSet_: {
+            /**
+             * Id
+             * @description UUIDv7 (string) of the persisted LLM_Result; null for fallbacks, which are never persisted.
+             */
+            id?: string | null;
+            /**
+             * Is Fallback
+             * @description True when the result is a Fallback_Response built without the LLM; false for validated LLM output.
+             */
+            is_fallback: boolean;
+            /** @description The failure category that triggered the fallback; null for LLM-produced results. */
+            fallback_reason?: components["schemas"]["FailureReason"] | null;
+            /**
+             * Prompt Template Version
+             * @description The active Prompt_Template version the result was produced under; null for fallbacks.
+             */
+            prompt_template_version?: number | null;
+            /**
+             * Created At
+             * @description Persistence timestamp (timezone-aware) of the LLM_Result; null for fallbacks.
+             */
+            created_at?: string | null;
+            /** @description The feature payload (CoachingReport, BulletRewrite, or InterviewQuestionSet). Fallback content conforms to the same schema. */
+            result: components["schemas"]["InterviewQuestionSet"];
         };
         /**
          * LastResetLinkResponse
@@ -1599,6 +2057,328 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_coaching_reports_api_v1_matches__match_id__coaching_reports_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description The requesting user's remaining LLM Daily_Quota for the current UTC day. Present on every LLM feature response, including 429 rejections; omitted only when the quota counter is unreadable. */
+                    "X-LLM-Quota-Remaining"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachingReportListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coaching_report_api_v1_matches__match_id__coaching_reports_post: {
+        parameters: {
+            query?: {
+                /** @description When true, deliver the response as a Server-Sent Events stream (`text/event-stream`): zero or more `delta` events carrying incremental display text, then exactly one terminal event — `complete` (the validated result envelope), `degraded` (the fallback envelope), or `error` (an RFC 7807 body). Pre-stream gate rejections (401/404/422/429/503) return the same non-streaming RFC 7807 responses. When false or omitted, the documented JSON response body is returned. */
+                stream?: boolean;
+            };
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description The requesting user's remaining LLM Daily_Quota for the current UTC day. Present on every LLM feature response, including 429 rejections; omitted only when the quota counter is unreadable. */
+                    "X-LLM-Quota-Remaining"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMResultEnvelope_CoachingReport_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_coaching_report_api_v1_matches__match_id__coaching_reports__result_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description The requesting user's remaining LLM Daily_Quota for the current UTC day. Present on every LLM feature response, including 429 rejections; omitted only when the quota counter is unreadable. */
+                    "X-LLM-Quota-Remaining"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMResultEnvelope_CoachingReport_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bullet_rewrites_api_v1_matches__match_id__bullet_rewrites_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description The requesting user's remaining LLM Daily_Quota for the current UTC day. Present on every LLM feature response, including 429 rejections; omitted only when the quota counter is unreadable. */
+                    "X-LLM-Quota-Remaining"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulletRewriteListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_bullet_rewrite_api_v1_matches__match_id__bullet_rewrites_post: {
+        parameters: {
+            query?: {
+                /** @description When true, deliver the response as a Server-Sent Events stream (`text/event-stream`): zero or more `delta` events carrying incremental display text, then exactly one terminal event — `complete` (the validated result envelope), `degraded` (the fallback envelope), or `error` (an RFC 7807 body). Pre-stream gate rejections (401/404/422/429/503) return the same non-streaming RFC 7807 responses. When false or omitted, the documented JSON response body is returned. */
+                stream?: boolean;
+            };
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulletRewriteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description The requesting user's remaining LLM Daily_Quota for the current UTC day. Present on every LLM feature response, including 429 rejections; omitted only when the quota counter is unreadable. */
+                    "X-LLM-Quota-Remaining"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMResultEnvelope_BulletRewrite_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_bullet_rewrite_api_v1_matches__match_id__bullet_rewrites__result_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description The requesting user's remaining LLM Daily_Quota for the current UTC day. Present on every LLM feature response, including 429 rejections; omitted only when the quota counter is unreadable. */
+                    "X-LLM-Quota-Remaining"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMResultEnvelope_BulletRewrite_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_interview_question_sets_api_v1_matches__match_id__interview_question_sets_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description The requesting user's remaining LLM Daily_Quota for the current UTC day. Present on every LLM feature response, including 429 rejections; omitted only when the quota counter is unreadable. */
+                    "X-LLM-Quota-Remaining"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewQuestionSetListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_interview_question_set_api_v1_matches__match_id__interview_question_sets_post: {
+        parameters: {
+            query?: {
+                /** @description When true, deliver the response as a Server-Sent Events stream (`text/event-stream`): zero or more `delta` events carrying incremental display text, then exactly one terminal event — `complete` (the validated result envelope), `degraded` (the fallback envelope), or `error` (an RFC 7807 body). Pre-stream gate rejections (401/404/422/429/503) return the same non-streaming RFC 7807 responses. When false or omitted, the documented JSON response body is returned. */
+                stream?: boolean;
+            };
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description The requesting user's remaining LLM Daily_Quota for the current UTC day. Present on every LLM feature response, including 429 rejections; omitted only when the quota counter is unreadable. */
+                    "X-LLM-Quota-Remaining"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMResultEnvelope_InterviewQuestionSet_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_interview_question_set_api_v1_matches__match_id__interview_question_sets__result_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+                result_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description The requesting user's remaining LLM Daily_Quota for the current UTC day. Present on every LLM feature response, including 429 rejections; omitted only when the quota counter is unreadable. */
+                    "X-LLM-Quota-Remaining"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMResultEnvelope_InterviewQuestionSet_"];
+                };
             };
             /** @description Validation Error */
             422: {
