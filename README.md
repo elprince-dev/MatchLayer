@@ -1,9 +1,9 @@
 # MatchLayer
 
-An AI-native ATS simulator and career intelligence platform. Upload a resume + job description, get a transparent match score built from semantic similarity (sentence embeddings) and keyword coverage, a skill-gap breakdown, and rule-based improvement suggestions. AI-powered coaching arrives in Phase 3.
+An AI-native ATS simulator and career intelligence platform. Upload a resume + job description, get a transparent match score built from semantic similarity (sentence embeddings) and keyword coverage, a skill-gap breakdown, rule-based improvement suggestions, and AI-powered coaching — resume feedback, bullet rewrites, and interview questions, streamed as they generate.
 
 **Domain:** [matchlayer.net](https://matchlayer.net) (not yet live)
-**Status:** Phase 2 complete — semantic scoring with embeddings + pgvector shipped. Phase 3 (LLM layer) is next.
+**Status:** Phase 3 complete — the LLM layer (resume coach, bullet rewriting, interview questions) shipped. Phase 4 (agentic AI) is next.
 
 ## Why this exists
 
@@ -17,7 +17,7 @@ It's also a portfolio project, deliberately built as a 7-phase progression from 
 | ----- | --------------------------------------------------------------------- | ----------- |
 | 1     | MVP foundation — Next.js + FastAPI + Postgres + S3, naive ATS scoring | ✅ Complete |
 | 2     | NLP & embeddings — sentence-transformers + pgvector, skill extraction | ✅ Complete |
-| 3     | LLM layer — resume coach, interview question generator                | Not started |
+| 3     | LLM layer — resume coach, bullet rewrites, interview questions        | ✅ Complete |
 | 4     | Agentic AI — LangGraph multi-agent workflows                          | Not started |
 | 5     | AI testing & evaluation — DeepEval, prompt versioning                 | Not started |
 | 6     | AWS production architecture — ECS, CDK, CI/CD                         | Not started |
@@ -45,7 +45,7 @@ matchlayer/
 - **Frontend:** Next.js (App Router, TypeScript) · Tailwind · shadcn/ui · Zod
 - **Backend:** FastAPI · Pydantic · SQLAlchemy · Alembic · PyJWT · uv
 - **Data:** PostgreSQL 16 + pgvector · S3 · Redis
-- **ML/AI:** scikit-learn → sentence-transformers → OpenAI → LangGraph → DeepEval
+- **ML/AI:** scikit-learn → sentence-transformers → OpenRouter (Claude Haiku 4.5) → LangGraph → DeepEval
 - **Infra:** Vercel + Fly.io (Phases 1–5) → AWS ECS + CDK (TypeScript) (Phase 6)
 - **Dev:** Docker · pnpm · uv · pytest · vitest · playwright
 
@@ -255,6 +255,8 @@ curl -s http://localhost:8000/api/v1/matches/$MATCH_ID -H "Authorization: Bearer
 ```
 
 The same match is viewable in the browser at `http://localhost:3000/matches/$MATCH_ID`, and your resumes and recent matches are listed at [http://localhost:3000/library](http://localhost:3000/library).
+
+Since Phase 3, the results page also carries the **AI tools** tabs — Coach, Bullet Rewrites, and Interview Prep — anchored to that match. They render whatever result is already stored and only call the provider when you explicitly generate or regenerate. Without an LLM key configured they still work, serving deterministic fallbacks built from the stored match data. See the [Phase 3 runbook](#phase-3-llm-layer--runbook) below.
 
 ### Adjust the per-user daily quotas
 
@@ -500,15 +502,18 @@ Some setup can't be done from code: branch protection on `main`, secret scanning
 
 ## What's next
 
-Phases 1 and 2 are complete: auth, resume upload and matching, the results UI, and semantic scoring with embeddings + pgvector are all shipped (specs in [`.kiro/specs/`](./.kiro/specs/)). Next up:
+Phases 1 through 3 are complete: auth, resume upload and matching, the results UI, semantic scoring with embeddings + pgvector, and the LLM layer — resume coach, bullet rewriting, and interview question generation behind a provider abstraction, with versioned prompts, PII redaction, structured outputs, SSE streaming, per-user daily quotas, and a monthly spend circuit breaker (specs in [`.kiro/specs/`](./.kiro/specs/)). Next up:
 
-- **Phase 3 — LLM layer**: resume coach, bullet rewriting, and interview question generation behind a provider abstraction (OpenAI initially), with versioned prompts, structured outputs, and per-user token quotas.
+- **Phase 4 — Agentic AI**: LangGraph multi-agent workflows (analysis, ATS, skill-gap, and improvement agents) coordinating the existing scoring and LLM services, with SQS-backed async execution and OpenTelemetry tracing.
 
 ## Documentation
 
 - [`.kiro/steering/`](./.kiro/steering/) — always-loaded project context (product, tech, structure, conventions, security, per-phase docs).
 - [`docs/adr/`](./docs/adr/) — Architecture Decision Records.
-- [`docs/runbooks/`](./docs/runbooks/) — operational runbooks (Phase 6+).
+- [`docs/runbooks/`](./docs/runbooks/) — operational runbooks (repo setup, contributing flow, SEO release).
+- [`docs/redaction-policy.md`](./docs/redaction-policy.md) — the PII redaction policy and the employment-history Redaction_Exception.
+- [`docs/costs.md`](./docs/costs.md) — running cost log and the projection against the $20/month ceiling.
+- [`docs/learning/`](./docs/learning/) — long-form learning library covering the concepts behind each phase.
 
 ## License
 
