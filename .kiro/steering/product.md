@@ -55,7 +55,18 @@ All six Phase 1 specs (`phase-1-foundation`, `phase-1-auth`, `phase-1-matching`,
 - **Degraded_Mode** — fallback ladder to the Phase 1 TF-IDF scorer when semantic scoring is unavailable; `/healthz` reports `semantic_scoring: available|unavailable`; embedding persistence is best-effort and never fails a match request.
 - **Evaluation & UI** — eyeball eval dataset grown to 10+ pairs (adversarial, paraphrase, generic-term-leak cases); results UI and marketing copy surface semantic scoring.
 
-Current focus: **Phase 3 — LLM Layer** (resume coach, bullet rewriting, interview question generator via OpenAI behind a provider abstraction). Not yet started — spec work is the next step.
+**Phase 3 — LLM Layer: complete.** The `phase-3-llm-layer` spec is fully implemented and merged to `main`:
+
+- **Provider abstraction** — provider-neutral `LLMClient` protocol in `ml/llm/`; the OpenRouter adapter (default model `anthropic/claude-haiku-4.5`) is the only module that knows the provider exists. Startup key validation; keyless startup fully supported.
+- **Three LLM features** — resume coach, bullet rewriting, and interview question generation as sub-resources under `/api/v1/matches/{id}/`, with persisted results, cursor pagination, and SSE streaming (`stream=true`, exactly one terminal event).
+- **Prompts & redaction** — versioned prompt templates with injection hardening and an active-version registry; deterministic PII redaction with indexed typed placeholders and a documented employment-history exception (`docs/redaction-policy.md`).
+- **Cost controls** — per-user Daily_Quota (Redis atomic reserve, 429 with UTC reset), global $10/month Spend_Circuit_Breaker (derived from invocation logs, fail-safe open, 503), per-user LLM cache, append-only `llm_invocation_logs`.
+- **Universal fallbacks** — every LLM failure maps to one FailureReason and serves a schema-conformant, locally derived Fallback_Response; never a 5xx. `/healthz` reports `llm: available|unavailable`.
+- **Frontend** — AI tools tabs (Coach / Bullet Rewrites / Interview Prep) on the results page: SSE client with progressive rendering, persisted-result load without POSTing, explicit regenerate, client-side bullet validation, fallback badge, quota/unavailable/interrupted error states.
+
+Current focus: **Phase 4 — Agentic AI** (LangGraph multi-agent workflows: analysis, ATS, skill-gap, and improvement agents; async execution via SQS; OpenTelemetry tracing). Not yet started — spec work is the next step. See `phase-4-agentic.md`.
+
+Note: Phase 3 shipped on **OpenRouter**, not OpenAI as originally planned in `tech.md`'s Phase 3 line — the provider abstraction makes this a config-level choice.
 
 ## Out of scope (for now)
 

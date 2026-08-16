@@ -31,7 +31,7 @@
 
 - **Phase 1:** scikit-learn (TF-IDF), simple keyword matchers — no LLMs.
 - **Phase 2:** `sentence-transformers` (`all-MiniLM-L6-v2` or `bge-small-en-v1.5`), spaCy for skill extraction.
-- **Phase 3:** OpenAI API (GPT-4o-mini for cost) behind an abstraction layer so we can swap providers.
+- **Phase 3:** OpenRouter API (`anthropic/claude-haiku-4.5` for cost) behind a provider-neutral abstraction (`ml/llm/`) so we can swap providers via config. (Originally planned as OpenAI; the abstraction made the provider a config-level choice.)
 - **Phase 4:** LangGraph for agent orchestration.
 - **Phase 5:** DeepEval for LLM evaluation, MLflow or a lightweight equivalent for prompt versioning.
 
