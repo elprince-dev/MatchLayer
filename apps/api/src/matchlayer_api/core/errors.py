@@ -198,6 +198,22 @@ class QuotaExceededError(MatchLayerError):
     title = "Quota Exceeded"
 
 
+class JobQueueUnavailableError(MatchLayerError):
+    """The Job_Queue was unreachable when the API tried to enqueue.
+
+    Phase-4 Requirement 11.6 / design decision D6: the analyze endpoint
+    persists the Agent_Job, commits, then enqueues; when the enqueue
+    fails the job is transitioned to ``failed`` (no orphaned ``queued``
+    row) and this error surfaces as a 503 RFC 7807 envelope whose
+    ``detail`` is fixed, display-safe copy — never the queue URL,
+    endpoint address, or exception text.
+    """
+
+    status_code = 503
+    error_type = "job_queue_unavailable"
+    title = "Service Unavailable"
+
+
 def _current_request_id() -> str | None:
     """Return the request_id bound by :class:`RequestIdMiddleware`, or ``None``.
 
@@ -420,6 +436,7 @@ def register_exception_handlers(
 
 
 __all__ = [
+    "JobQueueUnavailableError",
     "MalformedUploadError",
     "MatchLayerError",
     "NotFoundError",

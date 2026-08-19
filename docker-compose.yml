@@ -1,11 +1,16 @@
 # MatchLayer — local development stack
 #
-# Three services on Docker's default bridge network:
-#   - postgres : primary datastore (pgvector-enabled image from Phase 2
-#                for embedding storage; plain PostgreSQL 16 otherwise)
-#   - redis    : Phase 4+ cache / rate-limit / agent state (kept here so
-#                local parity with prod is in place from day one)
-#   - minio    : S3-compatible object storage for resume uploads (Phase 1+)
+# Five services on Docker's default bridge network:
+#   - postgres   : primary datastore (pgvector-enabled image from Phase 2
+#                  for embedding storage; plain PostgreSQL 16 otherwise)
+#   - redis      : Phase 4+ cache / rate-limit / agent state (kept here so
+#                  local parity with prod is in place from day one)
+#   - minio      : S3-compatible object storage for resume uploads (Phase 1+)
+#   - localstack : SQS emulation for the Phase 4 agent Job_Queue, so the
+#                  full async path (enqueue → consume → execute) runs
+#                  locally without AWS credentials
+#   - worker     : the Phase 4 Agent_Worker (SQS consumer executing
+#                  Agent_Jobs; profile-gated — see the service comment)
 #
 # All images pinned by SHA256 digest so the stack is reproducible across
 # machines and protected against supply-chain mutation of mutable tags.
@@ -66,6 +71,89 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  localstack:
+    # Pinned to 4.4.0 deliberately: LocalStack ended its free Community
+    # edition on 2026-03-23. Every release from ``2026.03.0`` onward
+    # refuses to start without a paid ``LOCALSTACK_AUTH_TOKEN``, so the
+    # calendar-versioned tags cannot be used for local development here.
+    # 4.4.0 is the last license-free release and emulates all the SQS
+    # surface Phase 4 needs. Revisit if we ever buy a license or move to
+    # an alternative emulator.
+    image: localstack/localstack:4.4.0@sha256:b52c16663c70b7234f217cb993a339b46686e30a1a5d9279cb5feeb2202f837c
+    environment:
+      # SQS is the only emulated service Phase 4 needs; restricting the
+      # list keeps startup fast and memory low.
+      SERVICES: sqs
+      EAGER_SERVICE_LOADING: "1"
+    ports:
+      - "4566:4566"
+    volumes:
+      # LocalStack runs every script in this directory once the emulator
+      # reports ready. ``01-create-queues.sh`` provisions the
+      # ``matchlayer-agent-jobs`` queue so it exists on stack start —
+      # the API enqueues analyze jobs on it, the Agent_Worker consumes it.
+      - ./infra/docker/localstack-init:/etc/localstack/init/ready.d:ro
+    healthcheck:
+      # Healthy only once the init hook has created the Job_Queue, so
+      # `docker compose up --wait` guarantees the queue is resolvable.
+      test:
+        [
+          "CMD-SHELL",
+          "awslocal sqs get-queue-url --queue-name matchlayer-agent-jobs",
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  worker:
+    # The Phase 4 Agent_Worker: a separate process from the API consuming
+    # the Job_Queue and executing the Agent_Graph (Requirement 11.2). The
+    # image reuses the API codebase; entrypoint is the SQS consumer module
+    # (`python -m matchlayer_api.workers.agent_worker`), no HTTP server.
+    #
+    # Profile-gated so the plain `docker compose up -d --wait` backing-
+    # services workflow stays unchanged (the image build bakes the
+    # embedding model and is deliberately not part of the default stack).
+    # Start it explicitly when exercising the async path end to end:
+    #   docker compose --profile worker up -d --build worker
+    profiles: ["worker"]
+    build:
+      context: .
+      dockerfile: infra/docker/worker.Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      # Same values as .env.example, with container-network hostnames
+      # substituted for localhost (postgres/redis/minio/localstack are
+      # this service's peers on the compose network).
+      MATCHLAYER_DATABASE_URL: postgresql+asyncpg://matchlayer:dev_only_password@postgres:5432/matchlayer
+      MATCHLAYER_REDIS_URL: redis://redis:6379/0
+      MATCHLAYER_S3_ENDPOINT_URL: http://minio:9000
+      MATCHLAYER_S3_REGION: us-east-1
+      MATCHLAYER_S3_ACCESS_KEY_ID: matchlayer
+      MATCHLAYER_S3_SECRET_ACCESS_KEY: dev_only_password
+      MATCHLAYER_S3_BUCKET: matchlayer-dev
+      # Phase 4 SQS wiring (Requirement 11.3): LocalStack emulates SQS
+      # locally; production points these at real AWS SQS — the two
+      # environments differ only in these configuration values.
+      MATCHLAYER_SQS_QUEUE_URL: http://localstack:4566/000000000000/matchlayer-agent-jobs
+      MATCHLAYER_SQS_REGION: us-east-1
+      MATCHLAYER_SQS_ENDPOINT_URL: http://localstack:4566
+      # Span attribution: worker spans must never masquerade as API spans.
+      MATCHLAYER_OTEL_SERVICE_NAME: matchlayer-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      localstack:
+        # Healthy only once the init hook created the Job_Queue, so the
+        # worker's first receive long-polls a queue that exists.
+        condition: service_healthy
 
 volumes:
   matchlayer-postgres-data:

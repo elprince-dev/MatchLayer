@@ -346,6 +346,18 @@ class Semantic_Match_Scorer:  # noqa: N801 -- design uses the underscored compon
         """The composed v2 ``Scorer_Version`` every produced result is stamped with."""
         return self._scorer_version
 
+    @property
+    def skill_extractor(self) -> Skill_Extractor:
+        """The injected :class:`Skill_Extractor` this scorer analyzes with.
+
+        Exposed read-only so the Phase 4 Agent_Worker can run the exact
+        same extractor over a Job_Description when building the initial
+        Agent_State (phase-4-agentic design §6 step 4) without
+        constructing a second spaCy pipeline. Purely an accessor — no
+        scoring logic moves out of this class.
+        """
+        return self._skill_extractor
+
     def score(
         self,
         resume_text: str,

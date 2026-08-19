@@ -57,7 +57,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Final
+from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator
 
@@ -351,7 +351,36 @@ class MatchListResponse(BaseModel):
     )
 
 
+class AnalyzeAcceptedResponse(BaseModel):
+    """Body of the ``202 Accepted`` from ``POST /api/v1/matches/{id}/analyze``.
+
+    Phase-4-agentic Requirement 10.1: the Agent_Job id (UUIDv7 exposed as
+    a string), its Job_Status, and a pollable job URL referencing
+    ``GET /api/v1/jobs/{id}``. On the in-flight idempotent-reuse path
+    (Requirement 10.5) the body carries the *existing* non-terminal job,
+    whose status may already be ``running`` — hence the two-value
+    ``status`` literal rather than a bare ``"queued"`` constant.
+
+    No Restricted content: identifiers and a relative URL only.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(
+        description="UUIDv7 of the Agent_Job, encoded as a string.",
+    )
+    status: Literal["queued", "running"] = Field(
+        description="The Agent_Job's Job_Status at response time: 'queued' "
+        "for a freshly created job, or possibly 'running' when an in-flight "
+        "job for the same match was reused (Requirement 10.5).",
+    )
+    job_url: str = Field(
+        description="Relative URL to poll for job progress: /api/v1/jobs/{id}.",
+    )
+
+
 __all__ = [
+    "AnalyzeAcceptedResponse",
     "CreateMatchRequest",
     "KeywordOut",
     "MatchListItem",

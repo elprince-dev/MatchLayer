@@ -12,6 +12,7 @@ Running list of monthly recurring costs. Update when anything changes. Goal: sta
 | Fly Postgres (pgvector)   | $0                          | Free 3GB volume; `pgvector/pgvector:pg16`-equivalent extension enabled                                       |
 | AWS S3 (resume storage)   | $0                          | Free tier covers expected volume                                                                             |
 | OpenRouter LLM (Phase 3)  | ≤ $10/mo hard cap           | Spend circuit breaker at `MATCHLAYER_LLM_MONTHLY_SPEND_LIMIT_USD=10`; usage-priced, likely far below the cap |
+| AWS SQS (Phase 4)         | $0                          | Agent Job_Queue; free tier is 1M requests/month, expected volume is orders of magnitude below                |
 | **Total**                 | **≤ ~$17.25/mo worst case** | Under the $20 ceiling even with the LLM cap fully consumed (~$2.75 headroom); typical months ~$7.25–$9       |
 
 ### Phase 2 line-item detail
@@ -66,6 +67,34 @@ Running list of monthly recurring costs. Update when anything changes. Goal: sta
   Expected typical months: LLM spend in the cents-to-low-dollars range,
   total ~$7.25–$9/mo.
 
+### Phase 4 line-item detail (agentic AI)
+
+- **LLM calls per agent run: at most 2.** The Agent_Graph has exactly two
+  LLM_Agents (Resume_Analysis and Improvement); the other three agents are
+  deterministic by construction and can never call the provider. Both LLM
+  calls flow through the Phase 3 orchestrator, so every existing cost
+  control applies unchanged: the analyze endpoint pre-checks that the user
+  has ≥ 2 `MATCHLAYER_LLM_DAILY_QUOTA` units before accepting a job, each
+  call consumes one unit via the atomic reserve, and the $10/month
+  Spend_Circuit_Breaker counts agent calls in the same monthly spend
+  accounting as the Phase 3 features. Cache hits, degraded paths, and
+  breaker-open runs make **zero** provider calls. Worst-case marginal cost
+  per run ≈ 2 × $0.03 = **$0.06**, inside the existing $10/mo LLM cap —
+  Phase 4 adds no new LLM spend headroom, it spends from the same capped
+  budget.
+- **SQS: free tier.** The agent Job_Queue is the only new AWS service. The
+  SQS free tier is **1M requests/month**; one analyze run costs a handful
+  of requests (1 send + long-poll receives + 1 delete), so expected volume
+  (hundreds of runs/month) sits orders of magnitude below the cap.
+  LocalStack emulates SQS in local dev at $0.
+- **Redis and Postgres:** the Agent_Cache, rate limits, job rows, run rows,
+  and checkpointer tables all land on the existing Redis and Fly Postgres
+  footprint — no new instance, no size change, $0 marginal.
+- **Projection vs. the $20 ceiling: unchanged.** Phase 4 adds $0 of new
+  recurring line items; its LLM usage is bounded by the pre-existing $10
+  breaker. The Phases 1–5 worst case stays **≤ ~$17.25/mo** with the same
+  ~$2.75 headroom, typical months ~$7.25–$9.
+
 ## Approaching the ceiling
 
 Action thresholds:
@@ -75,6 +104,11 @@ Action thresholds:
 
 ## History
 
+- 2026-08-18 — Phase 4 (agentic AI): at most 2 LLM calls per agent run,
+  bounded by the existing per-user daily quota and the $10/month spend
+  circuit breaker (no new LLM budget); SQS job queue inside the AWS free
+  tier (1M requests/month). No new recurring line items — Phases 1–5
+  worst case unchanged at ≤ ~$17.25/mo.
 - 2026-08-10 — Phase 3 (LLM layer): OpenRouter with `anthropic/claude-haiku-4.5`
   ($1/$5 per 1M input/output tokens). Per-user daily quota of 25 calls plus a
   $10/month spend circuit breaker as the hard worst case. Projected total

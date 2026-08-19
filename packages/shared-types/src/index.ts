@@ -202,7 +202,12 @@ export type CoachingReportListResponse =
 export const CoachingReportEnvelopeSchema =
   schemas.LLMResultEnvelope_CoachingReport_;
 export const CoachingReportSchema = schemas.CoachingReport;
-export const ImprovementActionSchema = schemas.ImprovementAction;
+// Phase 4 introduced a second backend model also named `ImprovementAction`
+// (the agent-state one), so openapi-zod-client disambiguates both with
+// module-qualified names. The curated Phase 3 name is unchanged; only the
+// generated alias it points at moved.
+export const ImprovementActionSchema =
+  schemas.matchlayer_api__services__llm__schemas__ImprovementAction;
 export const CoachingReportListResponseSchema =
   schemas.CoachingReportListResponse;
 
@@ -251,3 +256,104 @@ export const InterviewQuestionCategorySchema =
   schemas.InterviewQuestionCategory;
 export const InterviewQuestionSetListResponseSchema =
   schemas.InterviewQuestionSetListResponse;
+
+// ---------------------------------------------------------------------------
+// Health — agents availability (Phase 4, additive `agents` field)
+// ---------------------------------------------------------------------------
+//
+// Follows the Phase 2 `semantic_scoring` / Phase 3 `llm` pattern: derived
+// from `HealthResponse` so it can never drift from the contract (Req 16.1).
+
+export type AgentsHealthStatus = HealthResponse["agents"];
+
+// ---------------------------------------------------------------------------
+// Agents — analyze (POST /api/v1/matches/{id}/analyze, Phase 4)
+// ---------------------------------------------------------------------------
+//
+// 202 Accepted body: the Agent_Job id, its Job_Status at response time
+// (`queued`, or `running` on the in-flight idempotent-reuse path of
+// Req 10.5), and the relative `job_url` to poll. No request body — the
+// match id lives in the path.
+
+export type AnalyzeAcceptedResponse =
+  paths["/api/v1/matches/{match_id}/analyze"]["post"]["responses"]["202"]["content"]["application/json"];
+
+export const AnalyzeAcceptedResponseSchema = schemas.AnalyzeAcceptedResponse;
+
+// ---------------------------------------------------------------------------
+// Agents — job polling (GET /api/v1/jobs/{id}, Phase 4)
+// ---------------------------------------------------------------------------
+//
+// The polled body (Req 10.2, 10.3): Job_Status, ISO 8601 UTC timestamps,
+// exactly five per-agent steps, `result` present iff `completed`, and a
+// structured display-safe `error` present iff `failed`. The frontend
+// Progress_UI Zod-parses every polled response with `JobResponseSchema`
+// (Req 15.5). Nested value objects get curated names below, all derived
+// from `JobResponse` so they stay in lockstep with the generated contract.
+// The generated `JobStepOut`/`JobErrorOut` shapes follow the Phase 1
+// `ScoreBreakdownOut` precedent: curated names drop the `Out` suffix.
+
+export type JobResponse =
+  paths["/api/v1/jobs/{job_id}"]["get"]["responses"]["200"]["content"]["application/json"];
+export type JobStatus = JobResponse["status"];
+export type JobStep = JobResponse["steps"][number];
+export type AgentName = JobStep["agent_name"];
+export type AgentStepStatus = JobStep["status"];
+export type JobError = NonNullable<JobResponse["error"]>;
+
+export const JobResponseSchema = schemas.JobResponse;
+export const JobStepSchema = schemas.JobStepOut;
+export const JobErrorSchema = schemas.JobErrorOut;
+
+// ---------------------------------------------------------------------------
+// Agents — AnalysisResult and per-agent outputs (Phase 4)
+// ---------------------------------------------------------------------------
+//
+// The Synthesizer's assembled result carried in a completed job's `result`
+// field: the four upstream agent outputs plus one trace summary per agent.
+// Each output carries a `degraded` marker (and, where applicable,
+// `derived_from_degraded_input`) that drives the visible degraded
+// indicators in the results UI (Req 15.2). `AgentTraceSummary` backs the
+// "Show reasoning" toggle (Req 15.3).
+//
+// Naming note: the Phase 4 agent-state `ImprovementAction` collides with
+// the Phase 3 coaching `ImprovementAction` already curated above, so the
+// agent one is exported as `AgentImprovementAction` (the generated alias
+// is module-qualified for the same reason).
+
+export type AnalysisResult = NonNullable<JobResponse["result"]>;
+export type ATSOutput = AnalysisResult["ats"];
+export type SkillGapReport = AnalysisResult["skill_gaps"];
+export type SkillGapEntry = NonNullable<SkillGapReport["gaps"]>[number];
+export type ImprovementReport = AnalysisResult["improvements"];
+export type AgentImprovementAction = NonNullable<
+  ImprovementReport["actions"]
+>[number];
+export type RewriteSuggestion = NonNullable<
+  ImprovementReport["rewrites"]
+>[number];
+export type CandidateProfile = AnalysisResult["profile"];
+export type ExperienceEntry = NonNullable<
+  CandidateProfile["experiences"]
+>[number];
+export type AgentTraceSummary = NonNullable<
+  AnalysisResult["agent_traces"]
+>[number];
+export type AgentCompletion = AgentTraceSummary["status"];
+export type AgentFailureDetail = NonNullable<
+  AgentTraceSummary["failure_reason"]
+>;
+
+export const AnalysisResultSchema = schemas.AnalysisResult;
+export const ATSOutputSchema = schemas.ATSOutput;
+export const SkillGapReportSchema = schemas.SkillGapReport;
+export const SkillGapEntrySchema = schemas.SkillGapEntry;
+export const ImprovementReportSchema = schemas.ImprovementReport;
+export const AgentImprovementActionSchema =
+  schemas.matchlayer_api__ml__agents__state__ImprovementAction;
+export const RewriteSuggestionSchema = schemas.RewriteSuggestion;
+export const CandidateProfileSchema = schemas.CandidateProfile;
+export const ExperienceEntrySchema = schemas.ExperienceEntry;
+export const AgentTraceSummarySchema = schemas.AgentTraceSummary;
+export const AgentCompletionSchema = schemas.AgentCompletion;
+export const AgentFailureDetailSchema = schemas.FailureDetail;

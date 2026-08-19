@@ -83,6 +83,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from matchlayer_api.api.health import router as health_router
+from matchlayer_api.api.jobs.router import router as jobs_router
 from matchlayer_api.api.matches.llm.router import router as matches_llm_router
 from matchlayer_api.api.matches.router import router as matches_router
 from matchlayer_api.api.resumes.router import router as resumes_router
@@ -275,6 +276,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # the full path prefixes for coaching-reports, bullet-rewrites, and
     # interview-question-sets.
     app.include_router(matches_llm_router)
+
+    # Agent_Job polling surface — GET /api/v1/jobs/{id} (phase-4-agentic
+    # Requirement 10.2). The router carries its own /api/v1/jobs prefix.
+    app.include_router(jobs_router)
 
     # Dev router — only in development (Design §12.3, Requirement 13.4).
     if cfg.environment == "development":
