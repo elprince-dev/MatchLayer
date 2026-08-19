@@ -56,13 +56,16 @@ Design reference: "Matches_Router", "Per-user rate limiting and idempotency",
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Final
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from matchlayer_api.api.matches.schemas import (
+    AnalyzeAcceptedResponse,
     CreateMatchRequest,
     MatchListItem,
     MatchListResponse,
@@ -75,9 +78,22 @@ from matchlayer_api.core.dependencies import (
     get_current_user,
     user_rate_limit,
 )
-from matchlayer_api.core.errors import NotFoundError, QuotaExceededError
-from matchlayer_api.db.models import MatchResult, User
+from matchlayer_api.core.errors import (
+    JobQueueUnavailableError,
+    NotFoundError,
+    QuotaExceededError,
+)
+from matchlayer_api.db.models import AgentJob, MatchResult, User
+from matchlayer_api.services.agent_jobs.queue import JobMessage, JobQueue, get_job_queue
+from matchlayer_api.services.agent_jobs.service import create_job, mark_failed
+from matchlayer_api.services.llm.quota import (
+    DailyQuota,
+    QuotaAccountingError,
+    get_daily_quota,
+)
 from matchlayer_api.services.matching import Scoring_Service
+
+_log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/matches", tags=["matches"])
 
@@ -94,6 +110,24 @@ _CurrentUser = Annotated[User, Depends(get_current_user)]
 # cache slot) is reused across every request; used as a route-level dependency
 # on all four endpoints (Requirements 11.2, 11.3).
 _MatchRateLimit = Depends(user_rate_limit("match"))
+
+# The async analyze endpoint carries its own (tighter) per-user budget —
+# MATCHLAYER_AGENT_ANALYZE_RATE_LIMIT_PER_MINUTE, default 10/min
+# (phase-4-agentic Requirement 10.7).
+_AnalyzeRateLimit = Depends(user_rate_limit("analyze"))
+
+# Dependency aliases for the analyze endpoint (phase-4-agentic). The
+# Daily_Quota handle backs the read-only precheck (Requirement 9.4); the
+# JobQueue handle is resolved via ``Depends`` (rather than called inline)
+# so tests can substitute a fake through ``app.dependency_overrides``.
+_DailyQuotaDep = Annotated[DailyQuota, Depends(get_daily_quota)]
+_JobQueueDep = Annotated[JobQueue, Depends(get_job_queue)]
+
+# Minimum remaining Daily_Quota units required to accept an analyze
+# request: the Agent_Graph makes up to two LLM calls (Resume_Analysis +
+# Improvement), each reserving one unit at call initiation (phase-4
+# Requirement 9.4; design §7 step 3).
+_ANALYZE_MIN_QUOTA_UNITS: Final[int] = 2
 
 # The route segment under which idempotency keys are namespaced in Redis
 # (``idem:{user_id}:matches:{key}``); distinct from the resume route so the
@@ -367,6 +401,165 @@ async def delete_match(
     # Commit the staged ``deleted_at`` + ``match_deleted`` audit row (a no-op
     # commit is harmless when the call was an already-deleted/missing no-op).
     await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/matches/{id}/analyze  (phase-4-agentic Requirements 9.4, 10.1,
+# 10.4, 10.5, 10.6, 10.7, 11.1, 11.6, 11.8; design §7, decisions D5, D6)
+# ---------------------------------------------------------------------------
+
+
+def _next_utc_midnight(moment: datetime) -> datetime:
+    """The next 00:00:00 UTC strictly after *moment*'s calendar day.
+
+    The instant the Daily_Quota resets, surfaced in the 429 ``detail``
+    so the caller knows when they may retry (Requirement 9.4's UTC reset
+    time). Mirrors the identically named helpers in
+    ``services/matching.py`` and ``services/llm/orchestrator.py``.
+    """
+    day_start = moment.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    return day_start + timedelta(days=1)
+
+
+def _analyze_response(job: AgentJob) -> AnalyzeAcceptedResponse:
+    """Project an Agent_Job onto the 202 body (Requirement 10.1).
+
+    Identifiers and a relative poll URL only — never match or resume
+    content. ``status`` is the job's current Job_Status: ``queued`` for
+    a fresh job, possibly ``running`` on the idempotent-reuse path.
+    """
+    return AnalyzeAcceptedResponse.model_validate(
+        {
+            "id": str(job.id),
+            "status": job.status,
+            "job_url": f"/api/v1/jobs/{job.id}",
+        }
+    )
+
+
+@router.post(
+    "/{match_id}/analyze",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=AnalyzeAcceptedResponse,
+    dependencies=[_AnalyzeRateLimit],
+)
+async def analyze_match(
+    match_id: str,
+    user: _CurrentUser,
+    session: _SessionDep,
+    quota: _DailyQuotaDep,
+    queue: _JobQueueDep,
+) -> AnalyzeAcceptedResponse:
+    """Accept an async multi-agent analysis of an owned Match_Result.
+
+    Executes the design §7 sequence exactly — no Agent runs synchronously
+    in this request path, and the handler never reads Resume
+    ``extracted_text`` or ``job_description_text`` (Requirement 11.8; all
+    resume-content processing happens in the Agent_Worker):
+
+    1. **Authn + ownership** — the route-level ``analyze`` rate limit
+       composes :func:`get_current_user` (401 first), and the owned
+       Match_Result is resolved through the same ``Scoring_Service``
+       lookup as ``GET /matches/{id}``, so missing, other-owner, and
+       malformed ids collapse to one indistinguishable 404 ``not_found``
+       envelope (Requirement 10.4).
+    2. **Rate limit** — ``MATCHLAYER_AGENT_ANALYZE_RATE_LIMIT_PER_MINUTE``
+       (default 10/min) per user; 429 ``rate_limited`` on breach
+       (Requirement 10.7).
+    3. **Quota precheck** — read-only Daily_Quota gate requiring at least
+       2 remaining units (the run's worst-case LLM call count). Fewer →
+       429 RFC 7807 with the UTC reset time; no job row is created and
+       no message is enqueued (Requirement 9.4). The gate never counts
+       the request — actual reservation happens per-call inside the
+       LLM agents. An unreadable quota counter is treated as
+       pass-through with one structured warning: the agents' atomic
+       reserve remains the authoritative spend control (Requirements
+       9.9, 13.8 fail-safe posture), so availability of the precheck
+       never blocks or double-counts anything.
+    4. **In-flight idempotency** — insert-first via the partial unique
+       index (D5); an existing non-terminal job is returned with 202
+       and NOT re-enqueued (Requirement 10.5).
+    5. **Persist → commit → enqueue** (D6) — the ``queued`` row is
+       committed before the SQS send so no message can ever reference an
+       uncommitted job (Requirement 11.1). On enqueue failure the job is
+       transitioned to ``failed`` and committed (no orphaned ``queued``
+       row) and a 503 ``job_queue_unavailable`` RFC 7807 envelope is
+       returned with fixed display-safe copy (Requirement 11.6). Trace
+       context is injected into the message attributes by
+       :meth:`JobQueue.enqueue` itself (Requirement 13.4).
+    6. **202 Accepted** — ``{id, status, job_url}`` (Requirement 10.1).
+
+    ``X-Robots-Tag: noindex, nofollow`` lands on every response via the
+    ``ApiNoIndexMiddleware`` covering ``/api/v1/*`` (Requirement 10.6).
+    """
+    # 1. Ownership: same lookup + envelope as GET /matches/{id} — the
+    # not-owned and not-found cases are byte-identical (Requirement 10.4).
+    parsed = _parse_match_id(match_id)
+    match = await Scoring_Service().get_match(session, user_id=user.id, match_id=parsed)
+
+    # 3. Read-only quota precheck (Requirement 9.4). Runs BEFORE any job
+    # row exists so a rejection provably creates nothing.
+    remaining: int | None
+    try:
+        remaining = (await quota.gate(str(user.id))).remaining
+    except QuotaAccountingError:
+        # Fail-safe pass-through: the per-call atomic reserve inside each
+        # LLM agent is the authoritative control (Requirement 9.9). One
+        # structured warning, no PII, identifiers only.
+        _log.warning("agent_analyze_quota_precheck_unavailable", match_id=str(match.id))
+        remaining = None
+    if remaining is not None and remaining < _ANALYZE_MIN_QUOTA_UNITS:
+        resets_at = _next_utc_midnight(datetime.now(UTC))
+        raise QuotaExceededError(
+            f"Running an analysis requires at least {_ANALYZE_MIN_QUOTA_UNITS} "
+            f"remaining daily LLM quota units; {remaining} remain. "
+            f"Quota resets at {resets_at.isoformat()}."
+        )
+
+    # 4. Create-with-idempotency (D5). An existing non-terminal job is
+    # returned as-is: 202 with its id, and — critically — no duplicate
+    # message is enqueued (Requirement 10.5).
+    creation = await create_job(session, user_id=user.id, match_id=match.id)
+    if not creation.created:
+        return _analyze_response(creation.job)
+
+    job = creation.job
+
+    # 5. Persist before enqueue (Requirement 11.1 / D6): commit the
+    # ``queued`` row so the message the worker receives always references
+    # a durable job.
+    await session.commit()
+
+    try:
+        await queue.enqueue(
+            JobMessage(job_id=str(job.id), match_id=str(match.id), user_id=str(user.id))
+        )
+    except Exception as exc:
+        # Enqueue-failure compensation (Requirement 11.6 / D6): transition
+        # the committed row to ``failed`` so no orphaned ``queued`` job
+        # remains and the partial unique index unblocks a retry. The log
+        # line carries the exception class only — the message could embed
+        # the queue URL or endpoint address, which must never leak.
+        _log.warning(
+            "agent_job_enqueue_failed",
+            job_id=str(job.id),
+            reason=type(exc).__name__,
+        )
+        await mark_failed(
+            session,
+            job_id=job.id,
+            error={
+                "type": "enqueue_failed",
+                "detail": "The analysis could not be queued. Please try again later.",
+            },
+        )
+        await session.commit()
+        raise JobQueueUnavailableError(
+            "The analysis service is temporarily unavailable. Please try again later."
+        ) from None
+
+    # 6. 202 Accepted with the pollable job URL (Requirement 10.1).
+    return _analyze_response(job)
 
 
 __all__ = ["router"]

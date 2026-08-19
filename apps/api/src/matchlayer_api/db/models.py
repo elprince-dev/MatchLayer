@@ -3,13 +3,15 @@
 Auth tables (``users``, ``refresh_tokens``, ``password_reset_tokens``,
 ``audit_events``), matching tables (``resumes``, ``match_results``),
 the Phase 2 Vector_Store tables (``resume_embeddings``,
-``match_embeddings``), and the Phase 3 LLM tables (``llm_results``,
-``llm_invocation_logs``). UUIDv7 primary keys via ``uuid_utils``. All
+``match_embeddings``), the Phase 3 LLM tables (``llm_results``,
+``llm_invocation_logs``), and the Phase 4 agent tables (``agent_jobs``,
+``agent_runs``). UUIDv7 primary keys via ``uuid_utils``. All
 timestamps are ``TIMESTAMP WITH TIME ZONE`` (Postgres ``timestamptz``).
 
 Design reference: Data Models 4.1-4.4 (phase-1-auth); Data Models
 (phase-1-matching); Data Models / New tables (phase-2-nlp-embeddings);
-Data Models / New tables (phase-3-llm-layer).
+Data Models / New tables (phase-3-llm-layer); Data Models /
+``agent_jobs`` and ``agent_runs`` (phase-4-agentic).
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -425,6 +428,143 @@ class LLMInvocationLog(Base):
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True, default=None)
     # 'provider_reported' | 'computed' | 'unavailable' (Requirement 12.2).
     cost_basis: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class AgentJob(Base):
+    """The ``agent_jobs`` table.
+
+    One asynchronous multi-agent analysis job per row, owned by a ``users``
+    row and anchored to a ``match_results`` row. Job_Status lifecycle is
+    ``queued → running → completed | failed`` (Requirement 12.1); the only
+    permitted mutations after creation are the status transitions and their
+    associated timestamp/error fields (Requirement 12.6) — enforced by the
+    single writer (``services/agent_jobs/service.py``), not the schema.
+
+    ``attempts`` is the SQS redelivery counter (Requirement 11.5).
+    ``result_json`` holds the AnalysisResult and is set iff ``completed``;
+    ``error_json`` holds a structured PII-free error and is null unless
+    ``failed``. No soft delete: jobs are operational records retained for
+    Phase 5 evaluation consumption — no Phase 4 code path deletes them.
+
+    FKs deliberately carry no cascade (Postgres ``NO ACTION``): a parent
+    hard-delete must not silently destroy retained job records.
+
+    Mirrors migration ``0005_agent_tables`` (index rationale documented
+    there per ``conventions.md``).
+    Design reference: Data Models / ``agent_jobs`` (phase-4-agentic);
+    Requirements 12.1, 10.5.
+    """
+
+    __tablename__ = "agent_jobs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('queued', 'running', 'completed', 'failed')",
+            name="agent_jobs_status_check",
+        ),
+        # Owner-scoped job reads (Requirements 10.4, 12.4).
+        Index("agent_jobs_user_id_idx", "user_id"),
+        # In-flight idempotency lookup path (Requirement 10.5, D5).
+        Index("agent_jobs_match_user_status_idx", "match_id", "user_id", "status"),
+        # Partial unique index: at most one non-terminal job per
+        # (match, user) pair, even under concurrency (Requirement 10.5, D5).
+        Index(
+            "agent_jobs_match_user_inflight_uniq",
+            "match_id",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=_uuid7)
+    # No ON DELETE CASCADE: retained operational records (Requirement 12.6).
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+    match_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("match_results.id"),
+        nullable=False,
+    )
+    # Job_Status: 'queued' | 'running' | 'completed' | 'failed'.
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    # SQS redelivery counter (Requirement 11.5).
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    # NULL until the worker records the corresponding transition (11.4).
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    # AnalysisResult; set iff status = 'completed'.
+    result_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    # Structured PII-free error; null unless status = 'failed'.
+    error_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+
+
+class AgentRun(Base):
+    """The ``agent_runs`` table.
+
+    Exactly one immutable row per Agent node invocation (Requirements 12.2,
+    12.6) — completed, degraded, or failed. ``input_state_json`` and
+    ``output_state_json`` hold the JSON-serialized agent input/output state,
+    which contains only redacted or derived content by construction — never
+    raw resume text (Requirement 12.3, Internal classification).
+
+    ``latency_ms`` is measured node-invocation-start → output-return — the
+    same boundary as the per-node timeout and the span duration
+    (Requirements 8.3, 12.2, 13.1). ``failure_reason_json`` is a structured
+    PII-free failure reason, null iff status is ``completed`` (enforced by
+    the single writer, ``services/agent_jobs/runs.py``).
+
+    No soft delete and no updated_at: rows are append-only and immutable
+    once written, retained for Phase 5 evaluation replay. The FK carries no
+    cascade for the same retention reason as ``agent_jobs``.
+
+    Mirrors migration ``0005_agent_tables``.
+    Design reference: Data Models / ``agent_runs`` (phase-4-agentic);
+    Requirement 12.1.
+    """
+
+    __tablename__ = "agent_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('completed', 'degraded', 'failed')",
+            name="agent_runs_status_check",
+        ),
+        # Per-agent step statuses for one job are derived by selecting all
+        # runs for that job_id (Requirements 10.2, 12.1).
+        Index("agent_runs_job_id_idx", "job_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=_uuid7)
+    # No ON DELETE CASCADE: immutable retained records (Requirement 12.6).
+    job_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("agent_jobs.id"),
+        nullable=False,
+    )
+    # One of the five node names: resume_analysis, ats, skill_gap,
+    # improvement, synthesizer.
+    agent_name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Redacted/derived content only — never raw resume text (12.3).
+    input_state_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    output_state_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    # Node-invocation-start → output-return (Requirement 12.2).
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 'completed' | 'degraded' | 'failed'.
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    # Structured failure reason; null iff status = 'completed' (12.1).
+    failure_reason_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

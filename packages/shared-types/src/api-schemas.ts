@@ -6,6 +6,7 @@ const HealthResponse = z
     status: z.string().optional().default("ok"),
     semantic_scoring: z.enum(["available", "unavailable"]),
     llm: z.enum(["available", "unavailable"]),
+    agents: z.enum(["available", "unavailable"]),
   })
   .passthrough();
 const HealthUnhealthyResponse = z
@@ -131,6 +132,11 @@ const MatchListResponse = z.object({
   items: z.array(MatchListItem),
   next_cursor: z.union([z.string(), z.null()]).optional(),
 });
+const AnalyzeAcceptedResponse = z.object({
+  id: z.string(),
+  status: z.enum(["queued", "running"]),
+  job_url: z.string(),
+});
 const FailureReason = z.enum([
   "provider_error",
   "timeout",
@@ -140,7 +146,7 @@ const FailureReason = z.enum([
   "quota_accounting_unavailable",
   "llm_unavailable",
 ]);
-const ImprovementAction = z.object({
+const matchlayer_api__services__llm__schemas__ImprovementAction = z.object({
   priority: z.number().int().gte(1),
   action: z.string().min(1),
 });
@@ -148,7 +154,10 @@ const CoachingReport = z.object({
   summary: z.string().min(1),
   strengths: z.array(z.string()),
   gaps: z.array(z.string()),
-  improvements: z.array(ImprovementAction).min(3).max(10),
+  improvements: z
+    .array(matchlayer_api__services__llm__schemas__ImprovementAction)
+    .min(3)
+    .max(10),
 });
 const LLMResultEnvelope_CoachingReport_ = z.object({
   id: z.union([z.string(), z.null()]).optional(),
@@ -212,6 +221,127 @@ const InterviewQuestionSetListResponse = z
     next_cursor: z.union([z.string(), z.null()]).optional(),
   })
   .passthrough();
+const JobStepOut = z.object({
+  agent_name: z.enum([
+    "resume_analysis",
+    "ats",
+    "skill_gap",
+    "improvement",
+    "synthesizer",
+  ]),
+  status: z.enum(["pending", "completed", "degraded", "failed"]),
+});
+const ATSOutput = z
+  .object({
+    score: z.number(),
+    breakdown: z.record(z.number()).optional(),
+    confidence: z.enum(["high", "medium", "low"]),
+    scorer_version: z.string(),
+    degraded: z.boolean().optional().default(false),
+  })
+  .passthrough();
+const SkillGapEntry = z
+  .object({
+    skill: z.string(),
+    classification: z.enum(["missing", "weak"]),
+    rank: z.number().int(),
+  })
+  .passthrough();
+const SkillGapReport = z
+  .object({
+    gaps: z.array(SkillGapEntry),
+    degraded: z.boolean().default(false),
+    derived_from_degraded_input: z.boolean().default(false),
+  })
+  .partial()
+  .passthrough();
+const matchlayer_api__ml__agents__state__ImprovementAction = z
+  .object({ rank: z.number().int(), text: z.string() })
+  .passthrough();
+const RewriteSuggestion = z
+  .object({
+    excerpt: z.string(),
+    replacement: z.string(),
+    rationale: z.string(),
+  })
+  .passthrough();
+const ImprovementReport = z
+  .object({
+    actions: z.array(matchlayer_api__ml__agents__state__ImprovementAction),
+    rewrites: z.array(RewriteSuggestion),
+    degraded: z.boolean().default(false),
+    derived_from_degraded_input: z.boolean().default(false),
+  })
+  .partial()
+  .passthrough();
+const ExperienceEntry = z
+  .object({
+    role: z.union([z.string(), z.null()]),
+    organization: z.union([z.string(), z.null()]),
+    duration: z.union([z.string(), z.null()]),
+  })
+  .partial()
+  .passthrough();
+const CandidateProfile = z
+  .object({
+    sections: z.array(z.string()),
+    skills: z.array(z.string()),
+    experiences: z.array(ExperienceEntry),
+    gaps: z.array(z.string()),
+    degraded: z.boolean().default(false),
+    derived_from_degraded_input: z.boolean().default(false),
+  })
+  .partial()
+  .passthrough();
+const AgentCompletion = z.enum(["completed", "degraded"]);
+const FailureDetail = z
+  .object({
+    trigger: z.enum([
+      "error",
+      "timeout",
+      "schema_validation",
+      "quota_exhausted",
+      "breaker_open",
+      "empty_input",
+      "degraded_construction_error",
+    ]),
+    detail: z.union([z.string(), z.null()]).optional(),
+  })
+  .passthrough();
+const AgentTraceSummary = z
+  .object({
+    agent_name: z.string(),
+    status: AgentCompletion,
+    latency_ms: z.number().int(),
+    failure_reason: z.union([FailureDetail, z.null()]).optional(),
+  })
+  .passthrough();
+const AnalysisResult = z
+  .object({
+    ats: ATSOutput,
+    skill_gaps: SkillGapReport,
+    improvements: ImprovementReport,
+    profile: CandidateProfile,
+    agent_traces: z.array(AgentTraceSummary).optional(),
+  })
+  .passthrough();
+const JobErrorOut = z
+  .object({
+    type: z.string().default("job_failed"),
+    detail: z.string().default("The analysis failed."),
+  })
+  .partial()
+  .passthrough();
+const JobResponse = z.object({
+  id: z.string(),
+  status: z.enum(["queued", "running", "completed", "failed"]),
+  created_at: z.string().datetime({ offset: true }),
+  started_at: z.union([z.string(), z.null()]).optional(),
+  completed_at: z.union([z.string(), z.null()]).optional(),
+  steps: z.array(JobStepOut),
+  result: z.union([AnalysisResult, z.null()]).optional(),
+  error: z.union([JobErrorOut, z.null()]).optional(),
+});
 const LastResetLinkResponse = z
   .object({
     link: z.union([z.string(), z.null()]),
@@ -243,8 +373,9 @@ export const schemas = {
   MatchResponse,
   MatchListItem,
   MatchListResponse,
+  AnalyzeAcceptedResponse,
   FailureReason,
-  ImprovementAction,
+  matchlayer_api__services__llm__schemas__ImprovementAction,
   CoachingReport,
   LLMResultEnvelope_CoachingReport_,
   CoachingReportListResponse,
@@ -258,6 +389,21 @@ export const schemas = {
   InterviewQuestionSet,
   LLMResultEnvelope_InterviewQuestionSet_,
   InterviewQuestionSetListResponse,
+  JobStepOut,
+  ATSOutput,
+  SkillGapEntry,
+  SkillGapReport,
+  matchlayer_api__ml__agents__state__ImprovementAction,
+  RewriteSuggestion,
+  ImprovementReport,
+  ExperienceEntry,
+  CandidateProfile,
+  AgentCompletion,
+  FailureDetail,
+  AgentTraceSummary,
+  AnalysisResult,
+  JobErrorOut,
+  JobResponse,
   LastResetLinkResponse,
 };
 
@@ -396,6 +542,33 @@ const endpoints = makeApi([
     response: LastResetLinkResponse,
   },
   {
+    method: "get",
+    path: "/api/v1/jobs/:job_id",
+    alias: "get_job_api_v1_jobs__job_id__get",
+    description: `Return one owned Agent_Job with per-agent step statuses.
+
+A missing job, a job owned by another User_Account, and a
+syntactically invalid id all yield the identical &#x60;&#x60;not_found&#x60;&#x60;
+envelope (Requirements 10.4, 12.4 — ownership indistinguishability;
+the same malformed-id-as-404 mapping the matches router applies).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "job_id",
+        type: "Path",
+        schema: z.string(),
+      },
+    ],
+    response: JobResponse,
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
     method: "post",
     path: "/api/v1/matches",
     alias: "create_match_api_v1_matches_post",
@@ -528,6 +701,68 @@ nothing about another account&#x27;s data (Requirements 1.4, 9.5).`,
       },
     ],
     response: z.void(),
+    errors: [
+      {
+        status: 422,
+        description: `Validation Error`,
+        schema: HTTPValidationError,
+      },
+    ],
+  },
+  {
+    method: "post",
+    path: "/api/v1/matches/:match_id/analyze",
+    alias: "analyze_match_api_v1_matches__match_id__analyze_post",
+    description: `Accept an async multi-agent analysis of an owned Match_Result.
+
+Executes the design §7 sequence exactly — no Agent runs synchronously
+in this request path, and the handler never reads Resume
+&#x60;&#x60;extracted_text&#x60;&#x60; or &#x60;&#x60;job_description_text&#x60;&#x60; (Requirement 11.8; all
+resume-content processing happens in the Agent_Worker):
+
+1. **Authn + ownership** — the route-level &#x60;&#x60;analyze&#x60;&#x60; rate limit
+   composes :func:&#x60;get_current_user&#x60; (401 first), and the owned
+   Match_Result is resolved through the same &#x60;&#x60;Scoring_Service&#x60;&#x60;
+   lookup as &#x60;&#x60;GET /matches/{id}&#x60;&#x60;, so missing, other-owner, and
+   malformed ids collapse to one indistinguishable 404 &#x60;&#x60;not_found&#x60;&#x60;
+   envelope (Requirement 10.4).
+2. **Rate limit** — &#x60;&#x60;MATCHLAYER_AGENT_ANALYZE_RATE_LIMIT_PER_MINUTE&#x60;&#x60;
+   (default 10/min) per user; 429 &#x60;&#x60;rate_limited&#x60;&#x60; on breach
+   (Requirement 10.7).
+3. **Quota precheck** — read-only Daily_Quota gate requiring at least
+   2 remaining units (the run&#x27;s worst-case LLM call count). Fewer →
+   429 RFC 7807 with the UTC reset time; no job row is created and
+   no message is enqueued (Requirement 9.4). The gate never counts
+   the request — actual reservation happens per-call inside the
+   LLM agents. An unreadable quota counter is treated as
+   pass-through with one structured warning: the agents&#x27; atomic
+   reserve remains the authoritative spend control (Requirements
+   9.9, 13.8 fail-safe posture), so availability of the precheck
+   never blocks or double-counts anything.
+4. **In-flight idempotency** — insert-first via the partial unique
+   index (D5); an existing non-terminal job is returned with 202
+   and NOT re-enqueued (Requirement 10.5).
+5. **Persist → commit → enqueue** (D6) — the &#x60;&#x60;queued&#x60;&#x60; row is
+   committed before the SQS send so no message can ever reference an
+   uncommitted job (Requirement 11.1). On enqueue failure the job is
+   transitioned to &#x60;&#x60;failed&#x60;&#x60; and committed (no orphaned &#x60;&#x60;queued&#x60;&#x60;
+   row) and a 503 &#x60;&#x60;job_queue_unavailable&#x60;&#x60; RFC 7807 envelope is
+   returned with fixed display-safe copy (Requirement 11.6). Trace
+   context is injected into the message attributes by
+   :meth:&#x60;JobQueue.enqueue&#x60; itself (Requirement 13.4).
+6. **202 Accepted** — &#x60;&#x60;{id, status, job_url}&#x60;&#x60; (Requirement 10.1).
+
+&#x60;&#x60;X-Robots-Tag: noindex, nofollow&#x60;&#x60; lands on every response via the
+&#x60;&#x60;ApiNoIndexMiddleware&#x60;&#x60; covering &#x60;&#x60;/api/v1/*&#x60;&#x60; (Requirement 10.6).`,
+    requestFormat: "json",
+    parameters: [
+      {
+        name: "match_id",
+        type: "Path",
+        schema: z.string(),
+      },
+    ],
+    response: AnalyzeAcceptedResponse,
     errors: [
       {
         status: 422,

@@ -510,7 +510,8 @@ Phases 1 through 3 are complete: auth, resume upload and matching, the results U
 
 - [`.kiro/steering/`](./.kiro/steering/) — always-loaded project context (product, tech, structure, conventions, security, per-phase docs).
 - [`docs/adr/`](./docs/adr/) — Architecture Decision Records.
-- [`docs/runbooks/`](./docs/runbooks/) — operational runbooks (repo setup, contributing flow, SEO release).
+- [`docs/runbooks/`](./docs/runbooks/) — operational runbooks (repo setup, contributing flow, SEO release, Phase 4 agents).
+- [`docs/runbooks/agents-local.md`](./docs/runbooks/agents-local.md) — the Phase 4 local async path: LocalStack up, Agent_Worker up, triggering and polling an analysis, inspecting Agent_Job/Agent_Run rows and OpenTelemetry traces, the worst-case job-duration formula, and the real-provider latency measurement procedure.
 - [`docs/redaction-policy.md`](./docs/redaction-policy.md) — the PII redaction policy and the employment-history Redaction_Exception.
 - [`docs/costs.md`](./docs/costs.md) — running cost log and the projection against the $20/month ceiling.
 - [`docs/learning/`](./docs/learning/) — long-form learning library covering the concepts behind each phase.

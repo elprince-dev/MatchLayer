@@ -385,6 +385,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matches/{match_id}/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyze Match
+         * @description Accept an async multi-agent analysis of an owned Match_Result.
+         *
+         *     Executes the design §7 sequence exactly — no Agent runs synchronously
+         *     in this request path, and the handler never reads Resume
+         *     ``extracted_text`` or ``job_description_text`` (Requirement 11.8; all
+         *     resume-content processing happens in the Agent_Worker):
+         *
+         *     1. **Authn + ownership** — the route-level ``analyze`` rate limit
+         *        composes :func:`get_current_user` (401 first), and the owned
+         *        Match_Result is resolved through the same ``Scoring_Service``
+         *        lookup as ``GET /matches/{id}``, so missing, other-owner, and
+         *        malformed ids collapse to one indistinguishable 404 ``not_found``
+         *        envelope (Requirement 10.4).
+         *     2. **Rate limit** — ``MATCHLAYER_AGENT_ANALYZE_RATE_LIMIT_PER_MINUTE``
+         *        (default 10/min) per user; 429 ``rate_limited`` on breach
+         *        (Requirement 10.7).
+         *     3. **Quota precheck** — read-only Daily_Quota gate requiring at least
+         *        2 remaining units (the run's worst-case LLM call count). Fewer →
+         *        429 RFC 7807 with the UTC reset time; no job row is created and
+         *        no message is enqueued (Requirement 9.4). The gate never counts
+         *        the request — actual reservation happens per-call inside the
+         *        LLM agents. An unreadable quota counter is treated as
+         *        pass-through with one structured warning: the agents' atomic
+         *        reserve remains the authoritative spend control (Requirements
+         *        9.9, 13.8 fail-safe posture), so availability of the precheck
+         *        never blocks or double-counts anything.
+         *     4. **In-flight idempotency** — insert-first via the partial unique
+         *        index (D5); an existing non-terminal job is returned with 202
+         *        and NOT re-enqueued (Requirement 10.5).
+         *     5. **Persist → commit → enqueue** (D6) — the ``queued`` row is
+         *        committed before the SQS send so no message can ever reference an
+         *        uncommitted job (Requirement 11.1). On enqueue failure the job is
+         *        transitioned to ``failed`` and committed (no orphaned ``queued``
+         *        row) and a 503 ``job_queue_unavailable`` RFC 7807 envelope is
+         *        returned with fixed display-safe copy (Requirement 11.6). Trace
+         *        context is injected into the message attributes by
+         *        :meth:`JobQueue.enqueue` itself (Requirement 13.4).
+         *     6. **202 Accepted** — ``{id, status, job_url}`` (Requirement 10.1).
+         *
+         *     ``X-Robots-Tag: noindex, nofollow`` lands on every response via the
+         *     ``ApiNoIndexMiddleware`` covering ``/api/v1/*`` (Requirement 10.6).
+         */
+        post: operations["analyze_match_api_v1_matches__match_id__analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/matches/{match_id}/coaching-reports": {
         parameters: {
             query?: never;
@@ -533,6 +593,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Job
+         * @description Return one owned Agent_Job with per-agent step statuses.
+         *
+         *     A missing job, a job owned by another User_Account, and a
+         *     syntactically invalid id all yield the identical ``not_found``
+         *     envelope (Requirements 10.4, 12.4 — ownership indistinguishability;
+         *     the same malformed-id-as-404 mapping the matches router applies).
+         */
+        get: operations["get_job_api_v1_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dev/last-reset-link": {
         parameters: {
             query?: never;
@@ -554,6 +639,94 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ATSOutput
+         * @description Score, breakdown, confidence, and scorer version from the ATS_Agent.
+         */
+        ATSOutput: {
+            /** Score */
+            score: number;
+            /** Breakdown */
+            breakdown?: {
+                [key: string]: number;
+            };
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Scorer Version */
+            scorer_version: string;
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded: boolean;
+        };
+        /**
+         * AgentCompletion
+         * @description How an agent invocation ended: normally or via its degraded path.
+         * @enum {string}
+         */
+        AgentCompletion: "completed" | "degraded";
+        /**
+         * AgentTraceSummary
+         * @description Per-agent trace summary embedded in the Analysis_Result.
+         *
+         *     Name, completion status, invocation latency, and — when the agent
+         *     degraded — the structured failure reason (Requirement 7.5). Never PII.
+         */
+        AgentTraceSummary: {
+            /** Agent Name */
+            agent_name: string;
+            status: components["schemas"]["AgentCompletion"];
+            /** Latency Ms */
+            latency_ms: number;
+            failure_reason?: components["schemas"]["FailureDetail"] | null;
+        };
+        /**
+         * AnalysisResult
+         * @description Final combined output the Synthesizer assembles (Requirement 7.4).
+         */
+        AnalysisResult: {
+            ats: components["schemas"]["ATSOutput"];
+            skill_gaps: components["schemas"]["SkillGapReport"];
+            improvements: components["schemas"]["ImprovementReport"];
+            profile: components["schemas"]["CandidateProfile"];
+            /** Agent Traces */
+            agent_traces?: components["schemas"]["AgentTraceSummary"][];
+        };
+        /**
+         * AnalyzeAcceptedResponse
+         * @description Body of the ``202 Accepted`` from ``POST /api/v1/matches/{id}/analyze``.
+         *
+         *     Phase-4-agentic Requirement 10.1: the Agent_Job id (UUIDv7 exposed as
+         *     a string), its Job_Status, and a pollable job URL referencing
+         *     ``GET /api/v1/jobs/{id}``. On the in-flight idempotent-reuse path
+         *     (Requirement 10.5) the body carries the *existing* non-terminal job,
+         *     whose status may already be ``running`` — hence the two-value
+         *     ``status`` literal rather than a bare ``"queued"`` constant.
+         *
+         *     No Restricted content: identifiers and a relative URL only.
+         */
+        AnalyzeAcceptedResponse: {
+            /**
+             * Id
+             * @description UUIDv7 of the Agent_Job, encoded as a string.
+             */
+            id: string;
+            /**
+             * Status
+             * @description The Agent_Job's Job_Status at response time: 'queued' for a freshly created job, or possibly 'running' when an in-flight job for the same match was reused (Requirement 10.5).
+             * @enum {string}
+             */
+            status: "queued" | "running";
+            /**
+             * Job Url
+             * @description Relative URL to poll for job progress: /api/v1/jobs/{id}.
+             */
+            job_url: string;
+        };
         /** Body_create_resume_api_v1_resumes_post */
         Body_create_resume_api_v1_resumes_post: {
             /**
@@ -646,6 +819,30 @@ export interface components {
             bullets: string[];
         };
         /**
+         * CandidateProfile
+         * @description Structured resume profile produced by the Resume_Analysis_Agent.
+         */
+        CandidateProfile: {
+            /** Sections */
+            sections?: string[];
+            /** Skills */
+            skills?: string[];
+            /** Experiences */
+            experiences?: components["schemas"]["ExperienceEntry"][];
+            /** Gaps */
+            gaps?: string[];
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded: boolean;
+            /**
+             * Derived From Degraded Input
+             * @default false
+             */
+            derived_from_degraded_input: boolean;
+        };
+        /**
          * CoachingReport
          * @description The Resume_Coach structured output (Requirement 5.2).
          *
@@ -675,7 +872,7 @@ export interface components {
              * Improvements
              * @description 3 to 10 concrete improvement actions, ordered from highest priority (rank 1) to lowest priority.
              */
-            improvements: components["schemas"]["ImprovementAction"][];
+            improvements: components["schemas"]["matchlayer_api__services__llm__schemas__ImprovementAction"][];
         };
         /**
          * CoachingReportListResponse
@@ -727,6 +924,37 @@ export interface components {
             job_description: string;
         };
         /**
+         * ExperienceEntry
+         * @description One experience entry in a Candidate_Profile.
+         *
+         *     Each sub-field may be null where not detectable (Requirement 3.2).
+         */
+        ExperienceEntry: {
+            /** Role */
+            role?: string | null;
+            /** Organization */
+            organization?: string | null;
+            /** Duration */
+            duration?: string | null;
+        };
+        /**
+         * FailureDetail
+         * @description Structured, PII-free reason an agent took its degraded path.
+         *
+         *     ``detail`` is operator-safe display text: it never carries resume or
+         *     job-description content, provider response bodies, or secrets — the
+         *     trigger plus identifiers is all an operator needs (``security.md``).
+         */
+        FailureDetail: {
+            /**
+             * Trigger
+             * @enum {string}
+             */
+            trigger: "error" | "timeout" | "schema_validation" | "quota_exhausted" | "breaker_open" | "empty_input" | "degraded_construction_error";
+            /** Detail */
+            detail?: string | null;
+        };
+        /**
          * FailureReason
          * @description Closed set of LLM failure categories (Requirement 9.2).
          *
@@ -772,6 +1000,12 @@ export interface components {
              * @enum {string}
              */
             llm: "available" | "unavailable";
+            /**
+             * Agents
+             * @description Phase 4 agent-subsystem availability (phase-4-agentic Requirements 16.1, 16.6). 'available' means the Job_Queue (SQS) was reachable from this API process at the time of evaluation (result cached ~10 s to keep the probe cheap); 'unavailable' means it was not. Exactly these two machine-readable values — the field never changes the 200 status and never exposes queue URLs, endpoint addresses, or credentials.
+             * @enum {string}
+             */
+            agents: "available" | "unavailable";
         };
         /**
          * HealthUnhealthyResponse
@@ -797,24 +1031,24 @@ export interface components {
             reason: "database_unreachable";
         };
         /**
-         * ImprovementAction
-         * @description One concrete improvement action with its explicit priority rank.
-         *
-         *     ``priority`` is a rank: 1 is the highest-priority action, larger
-         *     values are progressively lower priority (Requirement 5.2 — "each
-         *     action carries an explicit priority rank").
+         * ImprovementReport
+         * @description Rewrites and prioritized additions from the Improvement_Agent.
          */
-        ImprovementAction: {
+        ImprovementReport: {
+            /** Actions */
+            actions?: components["schemas"]["matchlayer_api__ml__agents__state__ImprovementAction"][];
+            /** Rewrites */
+            rewrites?: components["schemas"]["RewriteSuggestion"][];
             /**
-             * Priority
-             * @description Explicit priority rank: 1 is the highest-priority action; larger values are lower priority.
+             * Degraded
+             * @default false
              */
-            priority: number;
+            degraded: boolean;
             /**
-             * Action
-             * @description Concrete, user-actionable improvement instruction.
+             * Derived From Degraded Input
+             * @default false
              */
-            action: string;
+            derived_from_degraded_input: boolean;
         };
         /**
          * InterviewQuestion
@@ -875,6 +1109,95 @@ export interface components {
              * @description Opaque cursor for the next page; null on the last page. Clients pass it back unmodified.
              */
             next_cursor?: string | null;
+        };
+        /**
+         * JobErrorOut
+         * @description Structured, display-safe job error — present iff status is 'failed'.
+         *
+         *     Built from the ``error_json`` column, which the analyze endpoint's
+         *     enqueue-failure compensation and the Agent_Worker populate from the
+         *     closed, PII-free failure vocabulary (Requirements 10.3, 12.1).
+         *     Defaults + ignored unknown keys make rendering tolerant to any
+         *     historically persisted shape: a job read can never 500 because an
+         *     older error document spelled its keys differently.
+         */
+        JobErrorOut: {
+            /**
+             * Type
+             * @description Machine-readable failure category (e.g. 'enqueue_failed', 'max_attempts_exhausted').
+             * @default job_failed
+             */
+            type: string;
+            /**
+             * Detail
+             * @description Display-safe human-readable summary. Never contains resume text, job-description text, or provider payloads.
+             * @default The analysis failed.
+             */
+            detail: string;
+        };
+        /**
+         * JobResponse
+         * @description Body of ``GET /api/v1/jobs/{id}`` (Requirements 10.2, 10.3).
+         *
+         *     Timestamps serialize as ISO 8601 UTC with the ``Z`` suffix
+         *     (``conventions.md``); ``started_at`` / ``completed_at`` are null
+         *     until the corresponding Job_Status transition records them.
+         */
+        JobResponse: {
+            /**
+             * Id
+             * @description UUIDv7 of the Agent_Job, encoded as a string.
+             */
+            id: string;
+            /**
+             * Status
+             * @description The job's current Job_Status.
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+            /**
+             * Created At
+             * Format: date-time
+             * @description Job creation instant (ISO 8601 UTC, Z suffix).
+             */
+            created_at: string;
+            /**
+             * Started At
+             * @description First 'running' transition instant; null until the worker picks the job up.
+             */
+            started_at?: string | null;
+            /**
+             * Completed At
+             * @description Terminal transition instant ('completed' or 'failed'); null while the job is non-terminal.
+             */
+            completed_at?: string | null;
+            /**
+             * Steps
+             * @description Exactly five per-agent steps in graph order, statuses derived solely from agent_runs rows.
+             */
+            steps: components["schemas"]["JobStepOut"][];
+            /** @description The AnalysisResult; present iff status is 'completed'. */
+            result?: components["schemas"]["AnalysisResult"] | null;
+            /** @description Structured display-safe error; present iff status is 'failed'. */
+            error?: components["schemas"]["JobErrorOut"] | null;
+        };
+        /**
+         * JobStepOut
+         * @description One per-agent step status (Requirement 10.2).
+         */
+        JobStepOut: {
+            /**
+             * Agent Name
+             * @description The Agent_Graph node this step reports on.
+             * @enum {string}
+             */
+            agent_name: "resume_analysis" | "ats" | "skill_gap" | "improvement" | "synthesizer";
+            /**
+             * Status
+             * @description Derived solely from agent_runs rows: 'pending' when no row exists yet for this agent, else that row's status.
+             * @enum {string}
+             */
+            status: "pending" | "completed" | "degraded" | "failed";
         };
         /**
          * KeywordOut
@@ -1409,6 +1732,21 @@ export interface components {
             updated_at: string;
         };
         /**
+         * RewriteSuggestion
+         * @description A concrete rewrite: redacted excerpt, replacement, and rationale.
+         *
+         *     ``excerpt`` is always PII_Redactor-transformed resume content — never raw
+         *     unredacted text (Requirement 6.2).
+         */
+        RewriteSuggestion: {
+            /** Excerpt */
+            excerpt: string;
+            /** Replacement */
+            replacement: string;
+            /** Rationale */
+            rationale: string;
+        };
+        /**
          * ScoreBreakdownOut
          * @description The explainable breakdown behind a score (Requirement 5.5).
          *
@@ -1451,6 +1789,39 @@ export interface components {
              * @description Which algorithm produced the similarity component: 'semantic-embedding' (Phase 2 pipeline) or 'tfidf' (Phase 1 engine or per-request fallback). Optional Phase 2 addition (phase-2 Requirements 3.3, 9.1, 9.5): null on pre-Phase-2 stored results, whose absence implies TF-IDF. Every Phase 1 field above keeps its name, type, and required status.
              */
             similarity_method?: string | null;
+        };
+        /**
+         * SkillGapEntry
+         * @description One classified, ranked skill gap (Requirement 5.2).
+         */
+        SkillGapEntry: {
+            /** Skill */
+            skill: string;
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "missing" | "weak";
+            /** Rank */
+            rank: number;
+        };
+        /**
+         * SkillGapReport
+         * @description Missing/weak skills relative to the Job_Description, prioritized.
+         */
+        SkillGapReport: {
+            /** Gaps */
+            gaps?: components["schemas"]["SkillGapEntry"][];
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded: boolean;
+            /**
+             * Derived From Degraded Input
+             * @default false
+             */
+            derived_from_degraded_input: boolean;
         };
         /**
          * SuggestionOut
@@ -1555,6 +1926,36 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * ImprovementAction
+         * @description One prioritized improvement action (Requirement 6.2).
+         */
+        matchlayer_api__ml__agents__state__ImprovementAction: {
+            /** Rank */
+            rank: number;
+            /** Text */
+            text: string;
+        };
+        /**
+         * ImprovementAction
+         * @description One concrete improvement action with its explicit priority rank.
+         *
+         *     ``priority`` is a rank: 1 is the highest-priority action, larger
+         *     values are progressively lower priority (Requirement 5.2 — "each
+         *     action carries an explicit priority rank").
+         */
+        matchlayer_api__services__llm__schemas__ImprovementAction: {
+            /**
+             * Priority
+             * @description Explicit priority rank: 1 is the highest-priority action; larger values are lower priority.
+             */
+            priority: number;
+            /**
+             * Action
+             * @description Concrete, user-actionable improvement instruction.
+             */
+            action: string;
         };
     };
     responses: never;
@@ -2069,6 +2470,37 @@ export interface operations {
             };
         };
     };
+    analyze_match_api_v1_matches__match_id__analyze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyzeAcceptedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_coaching_reports_api_v1_matches__match_id__coaching_reports_get: {
         parameters: {
             query?: {
@@ -2378,6 +2810,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LLMResultEnvelope_InterviewQuestionSet_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_v1_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobResponse"];
                 };
             };
             /** @description Validation Error */

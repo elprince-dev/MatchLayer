@@ -818,7 +818,7 @@ async def test_healthz_llm_available_when_key_present_and_breaker_closed(
     assert body["llm"] == "available"
     # The body carries exactly the documented fields — no key material,
     # spend figures, or provider account details (Req 10.5).
-    assert set(body) == {"status", "semantic_scoring", "llm"}
+    assert set(body) == {"status", "semantic_scoring", "llm", "agents"}
 
 
 @pytest.mark.asyncio
@@ -833,6 +833,7 @@ async def test_healthz_llm_unavailable_when_key_absent_still_200(
         "status": "ok",
         "semantic_scoring": res.json()["semantic_scoring"],
         "llm": "unavailable",
+        "agents": res.json()["agents"],
     }
 
 

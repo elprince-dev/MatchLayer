@@ -92,6 +92,25 @@ dependencies = [
     # constrains spacy to >=3.8,<3.9 — compatible with the pin above. ONLY
     # loaded (by name, via spacy.load) in ml/semantic_adapter.py.
     "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    # phase-4-agentic dependencies. Pinned by major per security.md.
+    # langgraph: the Agent_Graph orchestration runtime (StateGraph, nodes,
+    # edges, parallel branches). ONLY imported by ml/agents/ modules.
+    "langgraph>=1.2,<2.0",
+    # langgraph-checkpoint-postgres: AsyncPostgresSaver checkpointer backing
+    # the best-effort per-transition state snapshots (design §2). ONLY
+    # imported by ml/agents/graph.py and the checkpointer schema migration.
+    "langgraph-checkpoint-postgres>=3.1,<4.0",
+    # aioboto3: async SQS client for the Job_Queue (enqueue in the API,
+    # long-poll consume in the worker). ONLY imported by
+    # services/agent_jobs/queue.py — boto3 (sync) stays confined to
+    # core/storage.py for S3.
+    "aioboto3>=15.5,<16.0",
+    # OpenTelemetry: tracing for the async agent path (job span + one child
+    # span per agent, trace context propagated over SQS message attributes).
+    # ONLY imported by core/tracing.py; no-op tracer when
+    # MATCHLAYER_OTEL_EXPORTER_OTLP_ENDPOINT is unset (Requirement 13.5).
+    "opentelemetry-sdk>=1.44,<2.0",
+    "opentelemetry-exporter-otlp>=1.44,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -181,10 +200,11 @@ indent-style = "space"
 line-ending = "lf"
 
 # ---------------------------------------------------------------------------
-# Mypy — strict on services / api / core / ml per task 3.1 + conventions.md.
-# Other modules (config, main, tools, db, workers) get the looser project-wide
-# settings below. Strict flags are spelled out because mypy doesn't honor a
-# single `strict = true` inside per-module overrides.
+# Mypy — strict on services / api / core / ml / workers per conventions.md
+# (workers added by phase-4-agentic task 10.1). Other modules (config, main,
+# db) get the looser project-wide settings below. Strict flags are spelled out
+# because mypy doesn't honor a single `strict = true` inside per-module
+# overrides.
 # ---------------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.13"
@@ -207,6 +227,7 @@ module = [
     "matchlayer_api.core.*",
     "matchlayer_api.ml.*",
     "matchlayer_api.tools.*",
+    "matchlayer_api.workers.*",
 ]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true

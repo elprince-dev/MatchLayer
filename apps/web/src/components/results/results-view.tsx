@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import * as React from "react";
 
+import { AnalysisPanel } from "@/components/analysis/analysis-panel";
 import { ErrorState } from "@/components/error-state";
 import { LlmTabs } from "@/components/llm/LlmTabs";
 import { MotionSafe } from "@/components/motion-safe";
@@ -232,10 +233,13 @@ export function ResultsView({ id }: ResultsViewProps): React.JSX.Element {
       // they render anchored to this match, between the suggestions and
       // the page footer — while the visual-harness route, which renders
       // `ResultsContent` directly from a fixture, stays network-free.
+      // The Phase 4 agent-analysis flow (phase-4-agentic Task 15.5,
+      // Req 15.1–15.7) follows the same slot pattern for the same reason.
       body = (
         <ResultsContent
           match={query.data}
           llmTools={<LlmTabs matchId={id} />}
+          agentAnalysis={<AnalysisPanel matchId={id} />}
         />
       );
     }
@@ -299,6 +303,7 @@ function NotFoundErrorState(): React.JSX.Element {
 export function ResultsContent({
   match,
   llmTools,
+  agentAnalysis,
 }: {
   match: MatchResponse;
   /**
@@ -308,6 +313,13 @@ export function ResultsContent({
    * this component without a network, never mounts the data-fetching tabs.
    */
   llmTools?: React.ReactNode;
+  /**
+   * Optional slot for the Phase 4 agent-analysis flow (phase-4-agentic
+   * Task 15.5; Req 15.1–15.7): trigger button → polled Progress_UI →
+   * Analysis_Result. Rendered after the LLM tabs, before the footer. A
+   * slot for the same visual-harness reason as `llmTools`.
+   */
+  agentAnalysis?: React.ReactNode;
 }): React.JSX.Element {
   const {
     score,
@@ -360,6 +372,8 @@ export function ResultsContent({
       )}
 
       {llmTools}
+
+      {agentAnalysis}
 
       <footer className="space-y-6 pb-4">
         {/* Attribution footnote (Req 11.8). `job_description_text` is never

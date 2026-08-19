@@ -60,6 +60,37 @@ from matchlayer_api.services.llm.spend import BreakerCause, BreakerState
 # package, with import-name knock-on effects).
 OverrideGetSession = Callable[[SQLAlchemyError | None], None]
 
+
+class _StubJobQueue:
+    """Minimal stand-in for the process-wide JobQueue (phase-4).
+
+    The health handler only awaits ``healthcheck()`` (which never
+    raises), so a canned boolean is the entire surface these tests need.
+    """
+
+    def __init__(self, *, healthy: bool) -> None:
+        self._healthy = healthy
+
+    async def healthcheck(self) -> bool:
+        return self._healthy
+
+
+@pytest.fixture(autouse=True)
+def _stub_agents_queue(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every healthz test hermetic w.r.t. the Job_Queue probe.
+
+    Resets the module-level ~10 s memo (so no value leaks across tests)
+    and substitutes a stub queue reporting unreachable — the natural
+    state of a test environment with no LocalStack. Individual tests
+    override ``get_job_queue`` again to drive the ``available`` branch.
+    """
+    monkeypatch.setattr("matchlayer_api.api.health._agents_cache", None)
+    monkeypatch.setattr(
+        "matchlayer_api.api.health.get_job_queue",
+        lambda: _StubJobQueue(healthy=False),
+    )
+
+
 # A canary substring we attach to the simulated exception's message.
 # Asserting its absence in the 503 response body is the load-bearing
 # check for "the failure path does not echo the original exception
@@ -95,6 +126,7 @@ async def test_healthz_returns_200_ok_when_db_probe_succeeds(
         "status": "ok",
         "semantic_scoring": "unavailable",
         "llm": "unavailable",
+        "agents": "unavailable",
     }
 
 
@@ -214,8 +246,8 @@ async def test_healthz_llm_reports_unavailable_when_breaker_open(
     body = response.json()
     assert body["llm"] == "unavailable"
     # Requirement 10.5: no key material, spend figures, or provider
-    # account details — the body is exactly the three known fields.
-    assert set(body) == {"status", "semantic_scoring", "llm"}
+    # account details — the body is exactly the four known fields.
+    assert set(body) == {"status", "semantic_scoring", "llm", "agents"}
     raw_body = response.text
     for needle in ("spend", "limit", "cost", "sk-", "openrouter"):
         assert needle not in raw_body.lower(), (
@@ -309,3 +341,119 @@ async def test_healthz_failure_response_body_contains_no_dsn_or_credentials(
         assert needle not in raw_body, (
             f"Response body must not contain {needle!r}; got body={raw_body!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 (phase-4-agentic task 11.8, Requirements 16.1, 16.6): the
+# ``agents`` field's available branch and the ~10 s probe memo. The
+# unavailable branch is pinned by the autouse ``_stub_agents_queue``
+# fixture above (every prior success-path test asserts
+# ``agents: "unavailable"``).
+# ---------------------------------------------------------------------------
+
+
+class _CountingJobQueue:
+    """JobQueue stub counting ``healthcheck`` probes for the cache tests."""
+
+    def __init__(self, *, healthy: bool) -> None:
+        self._healthy = healthy
+        self.probes = 0
+
+    async def healthcheck(self) -> bool:
+        self.probes += 1
+        return self._healthy
+
+
+async def test_healthz_agents_reports_available_when_queue_reachable(
+    client: AsyncClient,
+    override_get_session: OverrideGetSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Requirement 16.1: a reachable Job_Queue maps to ``agents: "available"``.
+
+    Patches ``get_job_queue`` at the name the health router imported with
+    a stub whose ``healthcheck`` resolves True. The 200 status semantics
+    are identical in both states — only the field value changes — and
+    the body stays exactly the four known fields, never a queue URL,
+    endpoint address, or credential (Requirement 16.6).
+    """
+    monkeypatch.setattr(
+        "matchlayer_api.api.health.get_job_queue",
+        lambda: _StubJobQueue(healthy=True),
+    )
+    override_get_session(None)
+
+    response = await client.get("/healthz")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["agents"] == "available"
+    assert set(body) == {"status", "semantic_scoring", "llm", "agents"}
+    raw_body = response.text.lower()
+    for needle in ("sqs", "queue-url", "amazonaws", "localstack", "aws_", "secret"):
+        assert needle not in raw_body, (
+            f"healthz body must not contain {needle!r}; got body={response.text!r}"
+        )
+
+
+async def test_healthz_agents_probe_is_cached_within_the_ttl_window(
+    client: AsyncClient,
+    override_get_session: OverrideGetSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Requirement 16.1 (design §7): the probe result is memoized ~10 s.
+
+    Two back-to-back probes inside one cache window hit the Job_Queue
+    exactly once; both responses carry the same cached value, so healthz
+    stays cheap under orchestration-frequency polling.
+    """
+    queue = _CountingJobQueue(healthy=True)
+    monkeypatch.setattr("matchlayer_api.api.health.get_job_queue", lambda: queue)
+    override_get_session(None)
+
+    first = await client.get("/healthz")
+    second = await client.get("/healthz")
+
+    assert first.json()["agents"] == "available"
+    assert second.json()["agents"] == "available"
+    assert queue.probes == 1, "the second probe within the TTL must be served from the memo"
+
+
+async def test_healthz_agents_probe_reprobes_after_cache_expiry(
+    client: AsyncClient,
+    override_get_session: OverrideGetSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An expired memo re-probes, so recovery is observed within one window.
+
+    The cached entry is backdated past the ~10 s TTL between requests
+    (rather than sleeping); the second request must consult the queue
+    again — and a queue whose reachability changed flips the field
+    without any code change (the Requirement 10.4-style recovery shape,
+    here for agents).
+    """
+    import matchlayer_api.api.health as health_module
+
+    queue = _CountingJobQueue(healthy=True)
+    monkeypatch.setattr("matchlayer_api.api.health.get_job_queue", lambda: queue)
+    override_get_session(None)
+
+    first = await client.get("/healthz")
+    assert first.json()["agents"] == "available"
+    assert queue.probes == 1
+
+    # Backdate the memo beyond the TTL and flip the queue's health: the
+    # next probe must observe the new state.
+    recorded_at, reachable = health_module._agents_cache
+    monkeypatch.setattr(
+        health_module,
+        "_agents_cache",
+        (recorded_at - health_module._AGENTS_HEALTH_CACHE_TTL_SECONDS - 1.0, reachable),
+    )
+    queue._healthy = False
+
+    second = await client.get("/healthz")
+
+    assert queue.probes == 2, "an expired memo must re-probe the Job_Queue"
+    assert second.json()["agents"] == "unavailable"

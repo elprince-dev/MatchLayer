@@ -13,6 +13,7 @@ When proposing or implementing changes, check this index first to avoid contradi
 - **0005 — Package managers: pnpm + uv.** Strict isolation, monorepo workspaces, fast installs.
 - **0006 — SEO strategy and the public/authenticated indexing split.** Public marketing pages get full SEO; authenticated PII pages are never indexed (`noindex`, robots-disallowed, out of sitemap). JSON-LD via CSP nonce, deferred in Phase 1. See `seo.md`.
 - **0007 — Auth entry pages are Public-but-noindex.** `/login` and `/register` are publicly reachable and get hygiene metadata, but stay `noindex, nofollow` and out of the sitemap. Fills a gap ADR 0006 left and corrects the `seo.md` route table to match the shipped `frontend-redesign` decision. See `seo.md`.
+- **0008 — Agent architecture.** Phase 4's analysis workflow is a LangGraph `StateGraph` over a typed, PII-free `AgentState`: five agents (resume analysis, ATS, skill gap, improvement, synthesizer) with two parallel branch levels joining at the Synthesizer. One final `BaseAgent` lifecycle (timeout, degradation, run persistence, spans) with a structural `LLMAgent`/`DeterministicAgent` split; LLM calls only via the Phase 3 orchestrator (≤2 per run). Postgres checkpointer is Alembic-provisioned and best-effort, keyed by job id. Non-Synthesizer failures degrade per-node and the graph continues; only a Synthesizer failure fails the job.
 
 ## Conventions
 

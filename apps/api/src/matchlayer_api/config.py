@@ -278,6 +278,39 @@ class Settings(BaseSettings):
     llm_price_input_usd_per_mtok: Decimal = Decimal("1.00")
     llm_price_output_usd_per_mtok: Decimal = Decimal("5.00")
 
+    # ---- agentic workflows (phase-4-agentic §11 "Configuration") ----------
+    # Job_Queue (SQS) location. LocalStack locally, real AWS SQS in
+    # production — the two environments differ only in these values
+    # (Requirement 11.3). Read ONLY by services/agent_jobs/queue.py; no
+    # Phase 4 business logic touches the environment directly
+    # (Requirement 11.1).
+    sqs_queue_url: str = "http://localstack:4566/000000000000/matchlayer-agent-jobs"
+    sqs_region: str = "us-east-1"
+    # Intentionally optional, mirroring ``s3_endpoint_url``: production
+    # leaves it unset so aioboto3 talks to real AWS SQS, while LocalStack
+    # supplies a non-AWS URL during local development.
+    sqs_endpoint_url: str | None = "http://localstack:4566"
+    # Per-node wall-clock timeout inside the Agent_Graph (seconds).
+    # Expiry degrades the node's output, never fails the job
+    # (Requirement 8.3).
+    agent_node_timeout_seconds: int = 20
+    # Maximum delivery attempts per Agent_Job before the worker marks it
+    # failed and acknowledges the message (Requirement 11.5).
+    agent_max_attempts: int = 2
+    # Per-user per-minute sliding-window limits for the async endpoints:
+    # POST /matches/{id}/analyze and GET /jobs/{id} respectively.
+    agent_analyze_rate_limit_per_minute: int = 10
+    agent_job_poll_rate_limit_per_minute: int = 120
+    # TTL for Agent_Cache entries on Redis (Requirement 9.7). Default
+    # 24 hours, mirroring ``llm_cache_ttl_seconds``.
+    agent_cache_ttl_seconds: int = 86400
+    # OTLP exporter endpoint. Empty/unset leaves the no-op tracer so
+    # traced and untraced runs have identical outcomes (Requirement 13.5).
+    otel_exporter_otlp_endpoint: str = ""
+    # OTel service resource attribute; the worker overrides this to
+    # ``matchlayer-worker`` via its own environment.
+    otel_service_name: str = "matchlayer-api"
+
     # ---- validators ------------------------------------------------------
 
     @field_validator("jwt_secret")

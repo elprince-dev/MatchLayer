@@ -18,14 +18,20 @@ import re
 from importlib import resources
 from importlib.resources.abc import Traversable
 
-from matchlayer_api.ml.prompts.registry import LLMFeature
+from matchlayer_api.ml.prompts.registry import LLMFeature, template_lineage
 
 _PROMPTS_PACKAGE = "matchlayer_api.ml.prompts"
 
 
 def _template_versions(feature: LLMFeature) -> dict[int, Traversable]:
-    """Map version number → template file for every shipped version of ``feature``."""
-    pattern = re.compile(rf"^{re.escape(feature.value)}\.v(\d+)\.txt$")
+    """Map version number → template file for every shipped version of ``feature``.
+
+    Discovery follows the feature's template lineage (phase-4-agentic:
+    a feature may reuse another feature's template files via
+    ``PROMPT_TEMPLATE_LINEAGE`` rather than shipping duplicates), so the
+    ``<feature_name>`` filename segment is the lineage's enum value.
+    """
+    pattern = re.compile(rf"^{re.escape(template_lineage(feature).value)}\.v(\d+)\.txt$")
     versions: dict[int, Traversable] = {}
     for entry in resources.files(_PROMPTS_PACKAGE).iterdir():
         match = pattern.match(entry.name)

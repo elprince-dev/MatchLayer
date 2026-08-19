@@ -63,7 +63,8 @@ Requirements covered: 4.7, 4.8, 4.9.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+import time
+from typing import Annotated, Final, Literal
 
 import structlog
 from fastapi import APIRouter, Depends, status
@@ -76,6 +77,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from matchlayer_api.core.db import get_session
 from matchlayer_api.ml.llm.availability import llm_key_present
 from matchlayer_api.ml.semantic_adapter import semantic_available
+from matchlayer_api.services.agent_jobs.queue import get_job_queue
 from matchlayer_api.services.llm.spend import get_spend_circuit_breaker
 
 # Module-level logger. The request-id middleware (§6.4) binds
@@ -90,6 +92,43 @@ _log = structlog.get_logger(__name__)
 # and downstream alerting can branch on it without string parsing, and
 # it carries zero PII or DSN content (Requirement 4.9).
 _REASON_DATABASE_UNREACHABLE = "database_unreachable"
+
+# ---------------------------------------------------------------------------
+# Agents (Job_Queue) availability — phase-4-agentic Requirements 16.1, 16.6.
+#
+# ``JobQueue.healthcheck()`` performs a real GetQueueAttributes round trip
+# under a short timeout; probing SQS on *every* /healthz hit would make the
+# liveness endpoint pay a network round trip per probe. The design (§7
+# "/healthz") therefore caches the boolean outcome for ~10 seconds — long
+# enough to keep healthz cheap under orchestration-frequency probing, short
+# enough that recovery (LocalStack/SQS coming back) is observed within one
+# cache window. The cached value is the *boolean only*: no queue URL,
+# endpoint address, or credential is ever held or returned (Req 16.6).
+# ---------------------------------------------------------------------------
+
+_AGENTS_HEALTH_CACHE_TTL_SECONDS: Final[float] = 10.0
+
+# ``(recorded_at_monotonic, reachable)`` — module-level so every request
+# shares one cache window per process. Tests reset it via monkeypatch.
+_agents_cache: tuple[float, bool] | None = None
+
+
+async def _agents_available() -> bool:
+    """Return Job_Queue reachability, memoized for ~10 seconds.
+
+    Delegates to :meth:`~matchlayer_api.services.agent_jobs.queue.JobQueue.healthcheck`,
+    which never raises (failures resolve to ``False`` after its internal
+    short timeout and emit at most one structured warning carrying the
+    exception class name only — never the queue URL or credentials,
+    Requirement 16.6).
+    """
+    global _agents_cache
+    now = time.monotonic()
+    if _agents_cache is not None and (now - _agents_cache[0]) < _AGENTS_HEALTH_CACHE_TTL_SECONDS:
+        return _agents_cache[1]
+    reachable = await get_job_queue().healthcheck()
+    _agents_cache = (time.monotonic(), reachable)
+    return reachable
 
 
 class HealthResponse(BaseModel):
@@ -124,6 +163,18 @@ class HealthResponse(BaseModel):
             "Exactly these two machine-readable values — the field never "
             "changes the HTTP status code and never exposes the API key, "
             "spend figures, or provider account details (Requirement 10.5)."
+        ),
+    )
+    agents: Literal["available", "unavailable"] = Field(
+        description=(
+            "Phase 4 agent-subsystem availability (phase-4-agentic "
+            "Requirements 16.1, 16.6). 'available' means the Job_Queue "
+            "(SQS) was reachable from this API process at the time of "
+            "evaluation (result cached ~10 s to keep the probe cheap); "
+            "'unavailable' means it was not. Exactly these two "
+            "machine-readable values — the field never changes the 200 "
+            "status and never exposes queue URLs, endpoint addresses, or "
+            "credentials."
         ),
     )
 
@@ -237,9 +288,24 @@ async def healthz(
     llm_available = llm_key_present() and not get_spend_circuit_breaker().state.is_open
     llm: Literal["available", "unavailable"] = "available" if llm_available else "unavailable"
 
+    # Phase 4 (phase-4-agentic Requirements 16.1, 16.6): report Job_Queue
+    # reachability the same additive way. The probe result is memoized for
+    # ~10 s (see ``_agents_available``); the value never affects the 200
+    # status — an instance whose queue is down still serves every
+    # synchronous endpoint — and the body carries no queue URL, endpoint
+    # address, or credential in either state.
+    agents: Literal["available", "unavailable"] = (
+        "available" if await _agents_available() else "unavailable"
+    )
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"status": "ok", "semantic_scoring": semantic_scoring, "llm": llm},
+        content={
+            "status": "ok",
+            "semantic_scoring": semantic_scoring,
+            "llm": llm,
+            "agents": agents,
+        },
     )
 
 

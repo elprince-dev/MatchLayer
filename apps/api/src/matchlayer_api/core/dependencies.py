@@ -439,7 +439,7 @@ async def _emit_rate_limit_rejected(
 # ---------------------------------------------------------------------------
 
 
-_UserRateLimitEndpoint = Literal["resume", "match"]
+_UserRateLimitEndpoint = Literal["resume", "match", "analyze", "job_poll"]
 
 # Per-user limits use a fixed 60-second window (Requirement 11.1/11.2 "per
 # 1-minute window"); only the request budget is configurable per endpoint.
@@ -448,9 +448,15 @@ _USER_RATE_LIMIT_WINDOW_SECONDS: Final[int] = 60
 # Closures over ``Settings`` keep the limit lookup declarative and avoid the
 # ``getattr(settings, dynamic_name)`` shape that defeats mypy ``--strict``,
 # matching the ``_IP_POLICY`` / ``_EMAIL_POLICY`` tables above.
+# ``analyze`` / ``job_poll`` are the phase-4-agentic async endpoints
+# (``POST /api/v1/matches/{id}/analyze`` and ``GET /api/v1/jobs/{id}``,
+# phase-4 Requirement 10.7): same limiter, same window, same 429/503
+# envelopes — only the per-minute budgets differ.
 _USER_RATE_LIMIT_LIMIT: dict[_UserRateLimitEndpoint, Callable[[Settings], int]] = {
     "resume": lambda s: s.resume_rate_limit_per_min,
     "match": lambda s: s.match_rate_limit_per_min,
+    "analyze": lambda s: s.agent_analyze_rate_limit_per_minute,
+    "job_poll": lambda s: s.agent_job_poll_rate_limit_per_minute,
 }
 
 # Annotated alias for the authenticated principal. Defined here (after
